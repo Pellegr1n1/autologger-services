@@ -1,0 +1,26 @@
+@startuml AutoLogger_C4_Architecture
+!includeurl https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Context.puml
+!includeurl https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Container.puml
+
+LAYOUT_TOP_DOWN()
+Person(user, "Usuário", "Proprietário de veículo particular")
+
+System_Boundary(s1, "AutoLogger") {
+
+  Container(ui, "Frontend (UI)", "React + TypeScript", "Interface Web que permite acesso ao sistema de gestão veicular")
+  Container(api, "Backend (API)", "NestJS", "Responsável pela lógica de negócios, autenticação e integração com a blockchain")
+  ContainerDb(db, "Banco de Dados", "PostgreSQL", "Armazena dados sensíveis como veículos, usuários, despesas")
+
+  Container(blockchain_module, "Módulo Blockchain", "Ethers.js", "Interage com contratos inteligentes no Ethereum (Sepolia)")
+  Container(smart_contracts, "Smart Contracts", "Solidity", "Registro imutável de serviços e histórico dos veículos")
+
+}
+
+Rel(user, ui, "Acessa via navegador")
+Rel(ui, api, "Requisições REST (Axios, JSON)", "HTTPS")
+Rel(api, db, "Lê/Escreve dados", "ORM - TypeORM")
+Rel(api, blockchain_module, "Envia transações e consulta eventos", "Ethers.js/Web3")
+Rel(blockchain_module, smart_contracts, "Executa funções dos contratos", "RPC / Sepolia")
+Rel(api, ui, "Responde com dados")
+
+@enduml
