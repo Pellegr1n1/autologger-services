@@ -28,7 +28,6 @@ Rel(autologger, cloud_storage, "Armazena arquivos de comprovação", "REST API")
 SHOW_LEGEND()
 @enduml
 
-' NÍVEL 2 - CONTAINERS
 @startuml AutoLogger_C4_level2
 !includeurl https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Container.puml
 
@@ -41,19 +40,17 @@ Person(user, "Usuário", "Proprietário de veículo ou comprador interessado")
 System_Boundary(autologger_boundary, "Sistema AutoLogger") {
     Container(frontend, "Frontend Web", "React + TypeScript", "Interface responsiva que permite acesso ao sistema de gestão veicular.")
     
-    Container(api_gateway, "API Gateway", "NestJS + Express", "Ponto de entrada único para todas as requisições.")
+    Container(user_module, "User Module", "NestJS", "Gerencia cadastro, autenticação e edição de perfil")
     
-    Container(user_service, "User Service", "NestJS", "Gerencia cadastro, autenticação e edição de perfil")
+    Container(vehicle_module, "Vehicle Module", "NestJS", "Gerencia CRUD de veículos")
     
-    Container(vehicle_service, "Vehicle Service", "NestJS", "Gerencia CRUD de veículos")
+    Container(event_module, "Event Module", "NestJS", "Gerencia eventos veiculares, gera hash SHA-256 e controla edição")
     
-    Container(event_service, "Event Service", "NestJS", "Gerencia eventos veiculares, gera hash SHA-256 e controla edição")
+    Container(report_module, "Report Module", "NestJS", "Gera relatórios, estatísticas e gráficos")
     
-    Container(report_service, "Report Service", "NestJS", "Gera relatórios, estatísticas e gráficos")
+    Container(blockchain_module, "Blockchain Module", "NestJS + Ethers.js", "Interage com contratos inteligentes, confirma transações")
     
-    Container(blockchain_service, "Blockchain Service", "NestJS + Ethers.js", "Interage com contratos inteligentes, confirma transações")
-    
-    Container(file_service, "File Service", "NestJS", "Gerencia upload de arquivos e integração com storage")
+    Container(file_module, "File Module", "NestJS", "Gerencia upload de arquivos e integração com storage")
     
     ContainerDb(main_db, "Banco Principal", "PostgreSQL", "Armazena usuários, veículos, eventos e metadados de arquivos")
     
@@ -67,79 +64,80 @@ System_Ext(email_ext, "Serviço de Email", "Notificações por email")
 System_Ext(storage_ext, "Cloud Storage", "Armazenamento de arquivos")
 
 Rel(user, frontend, "Acessa via navegador", "HTTPS")
-Rel(frontend, api_gateway, "Requisições REST", "HTTPS/JSON")
 
-Rel(api_gateway, user_service, "Requisições de usuário", "HTTP/JSON")
-Rel(api_gateway, vehicle_service, "Requisições de veículo", "HTTP/JSON")
-Rel(api_gateway, event_service, "Requisições de eventos", "HTTP/JSON")
-Rel(api_gateway, report_service, "Requisições de relatórios", "HTTP/JSON")
+Rel(frontend, user_module, "Requisições de usuário", "HTTPS/JSON")
+Rel(frontend, vehicle_module, "Requisições de veículo", "HTTPS/JSON")
+Rel(frontend, event_module, "Requisições de eventos", "HTTPS/JSON")
+Rel(frontend, report_module, "Requisições de relatórios", "HTTPS/JSON")
+Rel(frontend, file_module, "Uploads e downloads", "HTTPS/JSON")
 
-Rel(user_service, main_db, "CRUD usuários", "TypeORM/SQL")
-Rel(vehicle_service, main_db, "CRUD veículos", "TypeORM/SQL")
-Rel(event_service, main_db, "CRUD eventos", "TypeORM/SQL")
-Rel(report_service, main_db, "Consultas relatórios", "TypeORM/SQL")
-Rel(file_service, main_db, "Metadados arquivos", "TypeORM/SQL")
+Rel(user_module, main_db, "CRUD usuários", "TypeORM/SQL")
+Rel(vehicle_module, main_db, "CRUD veículos", "TypeORM/SQL")
+Rel(event_module, main_db, "CRUD eventos", "TypeORM/SQL")
+Rel(report_module, main_db, "Consultas relatórios", "TypeORM/SQL")
+Rel(file_module, main_db, "Metadados arquivos", "TypeORM/SQL")
 
-Rel(user_service, cache_db, "Sessões JWT", "Redis")
-Rel(api_gateway, cache_db, "Cache requisições", "Redis")
+Rel(user_module, cache_db, "Sessões JWT", "Redis")
 
-Rel(event_service, blockchain_service, "Solicita registro hash", "HTTP/JSON")
-Rel(blockchain_service, smart_contracts, "Executa transações", "Ethers.js")
+Rel(event_module, blockchain_module, "Solicita registro hash", "NestJS/HTTP")
+Rel(blockchain_module, smart_contracts, "Executa transações", "Ethers.js")
 Rel(smart_contracts, ethereum_net, "Deploy/Interação", "Web3/RPC")
 
-Rel(event_service, file_service, "Processa uploads", "HTTP/JSON")
-Rel(file_service, storage_ext, "Armazena arquivos", "REST API")
-Rel(user_service, email_ext, "Envia emails", "SMTP/API")
+Rel(event_module, file_module, "Processa uploads", "NestJS/HTTP")
+Rel(file_module, storage_ext, "Armazena arquivos", "REST API")
+Rel(user_module, email_ext, "Envia emails", "SMTP/API")
 
 SHOW_LEGEND()
 @enduml
 
-' NÍVEL 3 - COMPONENTES
 @startuml AutoLogger_C4_level3
 !includeurl https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Component.puml
 
-title AutoLogger - Componentes do Event Service
+title AutoLogger - Componentes do Event Module
 
 LAYOUT_TOP_DOWN()
 
-Container(api_gateway, "API Gateway", "NestJS", "Roteamento de requisições")
-Container(blockchain_service, "Blockchain Service", "NestJS + Ethers.js", "Interação com blockchain")
-Container(file_service, "File Service", "NestJS", "Gestão de arquivos")
+Person(user, "Usuário", "Proprietário de veículo ou comprador interessado")
+Container(frontend, "Frontend Web", "React + TypeScript", "Interface do usuário")
+Container(blockchain_module, "Blockchain Module", "NestJS + Ethers.js", "Interação com blockchain")
+Container(file_module, "File Module", "NestJS", "Gestão de arquivos")
 ContainerDb(database, "PostgreSQL", "Database", "Armazenamento principal")
 
-Container_Boundary(event_service, "Event Service") {
-    Component(event_controller, "Event Controller", "NestJS Controller", "Endpoints REST para eventos veiculares. Implementa validação de entrada e autenticação JWT")
+Container_Boundary(event_module, "Event Module") {
+    Component(event_controller, "Event Controller", "NestJS Controller", "Endpoints REST para eventos veiculares. Implementa validação de entrada e autenticação JWT.")
     
-    Component(event_manager, "Event Manager", "Service Class", "Lógica de negócio principal. Orquestra criação, edição e listagem de eventos")
+    Component(event_manager, "Event Manager", "Service Class", "Lógica de negócio principal. Orquestra criação, edição e listagem de eventos.")
     
     Component(hash_generator, "Hash Generator", "Utility Service", "Gera hash SHA-256 único para cada evento.")
     
-    Component(validation_service, "Validation Service", "Service Class", "Validações de regras de negócio e integridade dos dados de eventos")
+    Component(validation_service, "Validation Service", "Service Class", "Validações de regras de negócio e integridade dos dados de eventos.")
     
-    Component(confirmation_service, "Confirmation Service", "Service Class", "Implementa dupla confirmação antes do registro na blockchain")
+    Component(confirmation_service, "Confirmation Service", "Service Class", "Implementa dupla confirmação antes do registro na blockchain.")
     
-    Component(event_repository, "Event Repository", "Repository Pattern", "Camada de acesso a dados. Operações CRUD com controle transacional")
+    Component(event_repository, "Event Repository", "Repository Pattern", "Camada de acesso a dados. Operações CRUD com controle transacional.")
     
-    Component(event_dto, "Event DTOs", "Data Transfer Objects", "Objetos para transferência de dados entre camadas")
+    Component(event_dto, "Event DTOs", "Data Transfer Objects", "Objetos para transferência de dados entre camadas.")
     
-    Component(event_entity, "Event Entity", "TypeORM Entity", "Mapeamento objeto-relacional da tabela de eventos")
+    Component(event_entity, "Event Entity", "TypeORM Entity", "Mapeamento objeto-relacional da tabela de eventos.")
 }
 
-Rel(api_gateway, event_controller, "Requisições HTTP", "REST/JSON")
+Rel(user, frontend, "Interage com", "HTTPS")
+Rel(frontend, event_controller, "Faz chamadas para", "REST/JSON")
+
 Rel(event_controller, event_manager, "Delegação lógica", "Method calls")
 Rel(event_manager, validation_service, "Valida dados", "Method calls")
 Rel(event_manager, hash_generator, "Gera hash SHA-256", "Method calls")
-Rel(event_manager, confirmation_service, "Processo confirmação", "Method calls")
-Rel(event_manager, event_repository, "Persistência dados", "Method calls")
+Rel(event_manager, confirmation_service, "Confirma evento", "Method calls")
+Rel(event_manager, event_repository, "Persistência de dados", "Method calls")
 
 Rel(event_repository, event_entity, "Mapeamento ORM", "TypeORM")
 Rel(event_repository, database, "Operações SQL", "TypeORM/SQL")
 
 Rel(event_controller, event_dto, "Serialização", "JSON")
-Rel(event_manager, event_dto, "Transferência dados", "Objects")
+Rel(event_manager, event_dto, "Transferência de dados", "Objects")
 
-Rel(confirmation_service, blockchain_service, "Registra hash confirmado", "HTTP/JSON")
-Rel(event_manager, file_service, "Anexa arquivos", "HTTP/JSON")
+Rel(confirmation_service, blockchain_module, "Registra hash confirmado", "HTTP/JSON")
+Rel(event_manager, file_module, "Anexa arquivos", "HTTP/JSON")
 
 SHOW_LEGEND()
 @enduml
