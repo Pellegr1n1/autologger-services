@@ -1,11 +1,10 @@
-@startuml AutoLogger_C4_level1
+@startuml c4_level1
 !includeurl https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Context.puml
 !includeurl https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Container.puml
 !includeurl https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Component.puml
 
 title AutoLogger - Sistema de Gestão de Histórico Veicular com Blockchain
 
-' NÍVEL 1 - CONTEXTO
 LAYOUT_TOP_DOWN()
 
 Person(owner, "Proprietário de Veículo", "Usuário que cadastra e gerencia histórico de manutenções, despesas e eventos do veículo")
@@ -28,7 +27,7 @@ Rel(autologger, cloud_storage, "Armazena arquivos de comprovação", "REST API")
 SHOW_LEGEND()
 @enduml
 
-@startuml AutoLogger_C4_level2
+@startuml c4_level2
 !includeurl https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Container.puml
 
 title AutoLogger - Diagrama de Containers
@@ -90,7 +89,7 @@ Rel(user_module, email_ext, "Envia emails", "SMTP/API")
 SHOW_LEGEND()
 @enduml
 
-@startuml AutoLogger_C4_level3
+@startuml c4_level3
 !includeurl https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Component.puml
 
 title AutoLogger - Componentes do Event Module
@@ -138,6 +137,43 @@ Rel(event_manager, event_dto, "Transferência de dados", "Objects")
 
 Rel(confirmation_service, blockchain_module, "Registra hash confirmado", "HTTP/JSON")
 Rel(event_manager, file_module, "Anexa arquivos", "HTTP/JSON")
+
+SHOW_LEGEND()
+@enduml
+
+@startuml c4_level4
+!includeurl https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4.puml
+!includeurl https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Component.puml
+
+title AutoLogger - Código do Event Manager (Nível 4)
+
+Container_Boundary(event_manager_code, "Event Manager - Estrutura de Código") {
+    Component(ievent_manager, "IEventManager", "Interface", "Contrato do serviço")
+    Component(event_manager_impl, "EventManagerImpl", "Component", "Lógica principal")
+    
+    Container_Boundary(event_models, "Event Models") {
+        Component(event_data, "Event Data", "Component", "DTOs e Entidade")
+        Component(event_types, "Event Types", "Component", "Enums e Status")
+    }
+    
+    Component(business_rules, "Business Rules", "Component", "Validações e regras")
+    Component(event_factory, "Event Factory", "Component", "Criação de eventos")
+}
+
+Rel(event_manager_impl, ievent_manager, "implementa")
+Rel(event_manager_impl, event_data, "manipula")
+Rel(event_manager_impl, business_rules, "usa")
+Rel(event_manager_impl, event_factory, "usa")
+Rel(event_factory, event_data, "transforma")
+Rel(business_rules, event_data, "valida")
+
+System_Boundary(external, "Dependências Externas") {
+    Component(repository, "Repository", "Interface", "Persistência de dados")
+    Component(validation, "ValidationService", "Interface", "Validações externas")
+}
+
+Rel(event_manager_impl, repository, "depende de")
+Rel(event_manager_impl, validation, "depende de")
 
 SHOW_LEGEND()
 @enduml

@@ -1,0 +1,398 @@
+@startuml class_diagram
+
+!theme plain
+skinparam {
+    classFontSize 12
+    classBackgroundColor #F8F9FA
+    classBorderColor #2C3E50
+    arrowColor #3498DB
+    packageBackgroundColor #ECF0F1
+    packageBorderColor #34495E
+    stereotypeCBackgroundColor #E8F5E8
+    stereotypeCBorderColor #27AE60
+}
+
+package "User Module" {
+    class User {
+        -id: UUID
+        -email: string
+        -password: string (hashed)
+        -name: string
+        -phone: string
+        -createdAt: Date
+        -updatedAt: Date
+        -isActive: boolean
+        -emailVerified: boolean
+        +register(userData: CreateUserDto): Promise<User>
+        +authenticate(credentials: LoginDto): Promise<string>
+        +updateProfile(data: UpdateUserDto): Promise<User>
+        +changePassword(oldPassword: string, newPassword: string): Promise<void>
+        +resetPassword(token: string, newPassword: string): Promise<void>
+        +verifyEmail(token: string): Promise<void>
+    }
+
+    class UserService {
+        -userRepository: UserRepository
+        -jwtService: JwtService
+        -emailService: EmailService
+        +createUser(userData: CreateUserDto): Promise<User>
+        +validateUser(email: string, password: string): Promise<User>
+        +generateJwtToken(user: User): string
+        +sendPasswordResetEmail(email: string): Promise<void>
+        +validateResetToken(token: string): Promise<boolean>
+    }
+
+    class UserRepository {
+        +save(user: User): Promise<User>
+        +findByEmail(email: string): Promise<User>
+        +findById(id: UUID): Promise<User>
+        +update(id: UUID, data: Partial<User>): Promise<User>
+        +delete(id: UUID): Promise<void>
+    }
+
+    interface IUserRepository {
+        +save(user: User): Promise<User>
+        +findByEmail(email: string): Promise<User>
+        +findById(id: UUID): Promise<User>
+    }
+}
+
+package "Vehicle Module" {
+    class Vehicle {
+        -id: UUID
+        -userId: UUID
+        -vin: string
+        -brand: string
+        -model: string
+        -year: number
+        -color: string
+        -engineType: string
+        -enginePower: number
+        -fuelType: FuelType
+        -transmission: TransmissionType
+        -licensePlate: string
+        -registrationDate: Date
+        -purchaseDate: Date
+        -purchasePrice: number
+        -initialMileage: number
+        -currentMileage: number
+        -isActive: boolean
+        -createdAt: Date
+        -updatedAt: Date
+        +updateMileage(newMileage: number): Promise<void>
+        +calculateTotalDistance(): number
+        +getMaintenanceHistory(): Promise<Event[]>
+        +generateQRCode(): string
+    }
+
+    class VehicleService {
+        -vehicleRepository: VehicleRepository
+        -eventService: EventService
+        -externalApiService: ExternalApiService
+        +createVehicle(vehicleData: CreateVehicleDto): Promise<Vehicle>
+        +updateVehicle(id: UUID, data: UpdateVehicleDto): Promise<Vehicle>
+        +deleteVehicle(id: UUID): Promise<void>
+        +getUserVehicles(userId: UUID): Promise<Vehicle[]>
+        +getVehicleById(id: UUID): Promise<Vehicle>
+        +fetchVehicleDataFromApi(model: string): Promise<VehicleApiData>
+    }
+
+    class VehicleRepository {
+        +save(vehicle: Vehicle): Promise<Vehicle>
+        +findById(id: UUID): Promise<Vehicle>
+        +findByUserId(userId: UUID): Promise<Vehicle[]>
+        +findByVin(vin: string): Promise<Vehicle>
+        +update(id: UUID, data: Partial<Vehicle>): Promise<Vehicle>
+        +delete(id: UUID): Promise<void>
+    }
+
+    enum FuelType {
+        GASOLINE
+        DIESEL
+        ETHANOL
+        FLEX
+        ELECTRIC
+        HYBRID
+    }
+
+    enum TransmissionType {
+        MANUAL
+        AUTOMATIC
+        CVT
+        AUTOMATED_MANUAL
+    }
+}
+
+package "Event Module" {
+    class Event {
+        -id: UUID
+        -vehicleId: UUID
+        -type: EventType
+        -title: string
+        -description: string
+        -date: Date
+        -mileage: number
+        -cost: number
+        -location: string
+        -mechanicName: string
+        -tags: string[]
+        -status: EventStatus
+        -hash: string
+        -isConfirmed: boolean
+        -blockchainTxHash: string
+        -createdAt: Date
+        -updatedAt: Date
+        +generateHash(): string
+        +validateData(): boolean
+        +confirmEvent(): Promise<void>
+        +registerOnBlockchain(): Promise<string>
+    }
+
+    class EventService {
+        -eventRepository: EventRepository
+        -hashGenerator: HashGenerator
+        -validationService: ValidationService
+        -confirmationService: ConfirmationService
+        -blockchainModule: BlockchainModule
+        +createEvent(eventData: CreateEventDto): Promise<Event>
+        +updateEvent(id: UUID, data: UpdateEventDto): Promise<Event>
+        +deleteEvent(id: UUID): Promise<void>
+        +getVehicleEvents(vehicleId: UUID): Promise<Event[]>
+        +confirmEventWithDoubleCheck(id: UUID, captchaToken: string): Promise<Event>
+    }
+
+    class EventRepository {
+        +save(event: Event): Promise<Event>
+        +findById(id: UUID): Promise<Event>
+        +findByVehicleId(vehicleId: UUID): Promise<Event[]>
+        +findByDateRange(startDate: Date, endDate: Date): Promise<Event[]>
+        +update(id: UUID, data: Partial<Event>): Promise<Event>
+        +delete(id: UUID): Promise<void>
+    }
+
+    class HashGenerator {
+        +generateEventHash(event: Event): string
+        +validateHash(event: Event, hash: string): boolean
+    }
+
+    class ValidationService {
+        +validateEventData(event: Event): ValidationResult
+        +validateMileage(newMileage: number, vehicleId: UUID): Promise<boolean>
+        +validateDateLogic(eventDate: Date, vehicleId: UUID): Promise<boolean>
+    }
+
+    class ConfirmationService {
+        +requireDoubleConfirmation(eventId: UUID): Promise<boolean>
+        +validateCaptcha(token: string): Promise<boolean>
+        +sendConfirmationEmail(userId: UUID, eventId: UUID): Promise<void>
+    }
+
+    enum EventType {
+        MAINTENANCE
+        REPAIR
+        INSPECTION
+        ACCIDENT
+        FUEL
+        INSURANCE
+        OTHER
+    }
+
+    enum EventStatus {
+        DRAFT
+        PENDING_CONFIRMATION
+        CONFIRMED
+        BLOCKCHAIN_REGISTERED
+        CANCELLED
+    }
+}
+
+package "Blockchain Module" {
+    class BlockchainService {
+        -ethersProvider: Provider
+        -wallet: Wallet
+        -contract: Contract
+        +registerEventHash(hash: string): Promise<string>
+        +verifyEventHash(hash: string): Promise<boolean>
+        +getTransactionStatus(txHash: string): Promise<TransactionStatus>
+        +estimateGasCost(): Promise<number>
+    }
+
+    class SmartContract {
+        -contractAddress: string
+        -abi: ContractInterface
+        +registerHash(hash: string): Promise<TransactionResponse>
+        +getHashRecord(hash: string): Promise<HashRecord>
+        +isHashRegistered(hash: string): Promise<boolean>
+    }
+
+    class TransactionRecord {
+        -id: UUID
+        -eventId: UUID
+        -transactionHash: string
+        -blockNumber: number
+        -gasUsed: number
+        -status: TransactionStatus
+        -timestamp: Date
+    }
+
+    enum TransactionStatus {
+        PENDING
+        CONFIRMED
+        FAILED
+        REVERTED
+        CANCELLED
+    }
+}
+
+package "File Module" {
+    class FileService {
+        -cloudStorage: CloudStorageAdapter
+        -fileRepository: FileRepository
+        +uploadFile(file: FileUploadDto): Promise<FileEntity>
+        +deleteFile(fileId: UUID): Promise<void>
+        +getFileUrl(fileId: UUID): Promise<string>
+        +validateFileType(file: Express.Multer.File): boolean
+        +compressImage(file: Express.Multer.File): Promise<Buffer>
+    }
+
+    class FileEntity {
+        -id: UUID
+        -fileName: string
+        -originalName: string
+        -mimeType: string
+        -size: number
+        -url: string
+        -associatedEntityId: UUID
+        -associatedEntityType: string
+        -uploadedAt: Date
+        +getPublicUrl(): string
+        +delete(): Promise<void>
+    }
+
+    class CloudStorageAdapter {
+        +upload(file: Buffer, fileName: string): Promise<string>
+        +delete(fileName: string): Promise<void>
+        +getUrl(fileName: string): Promise<string>
+    }
+
+    interface ICloudStorage {
+        +upload(file: Buffer, fileName: string): Promise<string>
+        +delete(fileName: string): Promise<void>
+    }
+}
+
+package "Report Module" {
+    class ReportService {
+        -eventRepository: EventRepository
+        -vehicleRepository: VehicleRepository
+        +generateMaintenanceReport(vehicleId: UUID): Promise<MaintenanceReport>
+        +generateCostAnalysis(vehicleId: UUID, period: DateRange): Promise<CostAnalysis>
+        +generateMileageReport(vehicleId: UUID): Promise<MileageReport>
+        +exportToPDF(reportData: any): Promise<Buffer>
+    }
+
+    class DashboardService {
+        -reportService: ReportService
+        -eventService: EventService
+        +getDashboardData(vehicleId: UUID): Promise<DashboardData>
+        +getMonthlyStatistics(vehicleId: UUID): Promise<MonthlyStats>
+        +getUpcomingMaintenances(vehicleId: UUID): Promise<UpcomingMaintenance[]>
+    }
+
+    class MaintenanceReport {
+        -vehicleId: UUID
+        -totalMaintenances: number
+        -totalCost: number
+        -averageCostPerService: number
+        -maintenanceFrequency: number
+        -mostCommonServices: ServiceFrequency[]
+        +generateChart(): ChartData
+    }
+
+    class CostAnalysis {
+        -totalSpent: number
+        -categoryBreakdown: Map<string, number>
+        -monthlyTrends: MonthlyTrend[]
+        -projectedCosts: number
+        +generateCostChart(): ChartData
+        +generateTrendChart(): ChartData
+    }
+}
+
+package "DTOs and Interfaces" {
+    class CreateUserDto {
+        +email: string
+        +password: string
+        +name: string
+        +phone: string
+    }
+
+    class CreateVehicleDto {
+        +vin: string
+        +brand: string
+        +model: string
+        +year: number
+        +licensePlate: string
+        +initialMileage: number
+    }
+
+    class CreateEventDto {
+        +vehicleId: UUID
+        +type: EventType
+        +title: string
+        +description: string
+        +date: Date
+        +mileage: number
+        +cost: number
+    }
+
+    class FileUploadDto {
+        +file: Express.Multer.File
+        +associatedEntityId: UUID
+        +associatedEntityType: string
+    }
+
+    interface IEventManager {
+        +createEvent(eventData: CreateEventDto): Promise<Event>
+        +updateEvent(id: UUID, data: UpdateEventDto): Promise<Event>
+        +confirmEvent(id: UUID): Promise<Event>
+    }
+}
+
+User ||--o{ Vehicle : owns
+Vehicle ||--o{ Event : has
+Event ||--o| TransactionRecord : generates
+Event ||--o{ FileEntity : attachments
+Vehicle ||--o{ FileEntity : photos
+
+UserService --> UserRepository
+UserService --> User
+VehicleService --> VehicleRepository
+VehicleService --> Vehicle
+EventService --> EventRepository
+EventService --> Event
+EventService --> HashGenerator
+EventService --> ValidationService
+EventService --> ConfirmationService
+
+EventService --> BlockchainService
+BlockchainService --> SmartContract
+BlockchainService --> TransactionRecord
+
+FileService --> FileEntity
+FileService --> CloudStorageAdapter
+CloudStorageAdapter ..|> ICloudStorage
+
+ReportService --> Event
+ReportService --> Vehicle
+DashboardService --> ReportService
+
+EventService ..|> IEventManager
+UserRepository ..|> IUserRepository
+
+legend top right
+|<back:#2C3E50><color:white> </color></back>| **AutoLogger - Diagrama de Classes Completo** |
+Sistema de gestão de histórico veicular com blockchain
+endlegend
+
+@enduml

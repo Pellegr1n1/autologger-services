@@ -1,4 +1,4 @@
-@startuml AutoLogger_UseCase_Diagram
+@startuml use_case_diagram
 
 left to right direction
 
