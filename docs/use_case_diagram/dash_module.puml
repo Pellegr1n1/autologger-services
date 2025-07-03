@@ -1,0 +1,48 @@
+@startuml dash_module
+
+left to right direction
+
+skinparam {
+    usecaseFontSize 12
+    usecaseFontName "Segoe UI"
+    usecaseBackgroundColor #FFFFFF
+    usecaseBorderColor #34495E
+    actorBackgroundColor #FFFFFF
+    actorBorderColor #2C3E50
+    actorFontName "Segoe UI"
+    actorFontSize 12
+    arrowColor #34495E
+    rectangleBackgroundColor #F8F9FA
+    rectangleBorderColor #BDC3C7
+    rectangleFontColor #2C3E50
+    rectangleFontName "Segoe UI"
+    rectangleFontSize 13
+    defaultTextAlignment center
+    wrapWidth 200
+    dpi 150
+    shadowing false
+    linetype ortho
+    defaultFontName "Segoe UI"
+    defaultFontSize 10
+}
+
+actor "Usuário" as User #FFFFFF
+
+rectangle "Módulo de Relatórios" #F8F9FA {
+    (Visualizar Histórico) as UC12
+    (Calcular Estatísticas KM) as UC13
+    (Gerar Gráficos) as UC14
+}
+
+User --- UC12
+User --- UC13
+User --- UC14
+
+UC12 ..> UC13 : <<include>>
+UC12 ..> UC14 : <<include>>
+
+note right of UC12 : Visualização completa\ndo histórico de eventos
+note right of UC13 : Cálculos estatísticos\nde quilometragem
+note right of UC14 : Geração de gráficos\ne dashboards
+
+@enduml

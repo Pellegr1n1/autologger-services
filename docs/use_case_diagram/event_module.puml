@@ -1,4 +1,4 @@
-@startuml use_case_diagram
+@startuml event_module
 
 left to right direction
 
@@ -29,53 +29,31 @@ skinparam {
 actor "Usuário" as User #FFFFFF
 actor "Blockchain" as Blockchain #ECF0F1
 
-rectangle "Sistema AutoLogger" #F8F9FA {
-
-  rectangle "Autenticação" #FFFFFF {
-    (Cadastrar Usuário) as UC01
-    (Autenticar Usuário) as UC02
-    (Editar Perfil) as UC16
-  }
-
-  rectangle "Veículos" #FFFFFF {
-    (Cadastrar Veículo) as UC03
-    (Editar Dados Veículo) as UC17
-  }
-
-  rectangle "Eventos" #FFFFFF {
+rectangle "Módulo de Eventos" #F8F9FA {
     (Registrar Evento Veicular) as UC05
-    (Upload de Aquivos) as UC07
+    (Upload de Arquivos) as UC07
     (Gerar Hash Evento) as UC08
     (Confirmar Registro) as UC09
     (Registrar na Blockchain) as UC10
     (Consultar Status Transação) as UC11
     (Editar Evento) as UC15
-  }
-
-  rectangle "Relatórios" #FFFFFF {
-    (Visualizar Histórico) as UC12
-    (Calcular Estatísticas KM) as UC13
-    (Gerar Gráficos) as UC14
-  }
 }
 
-User --- UC01
-User --- UC02
-User --- UC16
-User --- UC03
-User --- UC17
 User --- UC05
 User --- UC07
 User --- UC09
 User --- UC11
 User --- UC15
-User --- UC12
-User --- UC13
-User --- UC14
+
 UC05 ..> UC08 : <<include>>
 UC09 ..> UC10 : <<include>>
 UC05 ..> UC07 : <<extend>>
 UC10 --- Blockchain
 UC11 --- Blockchain
+
+note right of UC05 : Processo principal de\nregistro de eventos
+note right of UC08 : Geração automática de\nhash para integridade
+note right of UC10 : Registro imutável\nna blockchain
+note bottom of UC07 : Funcionalidade opcional\npara anexar documentos
 
 @enduml
