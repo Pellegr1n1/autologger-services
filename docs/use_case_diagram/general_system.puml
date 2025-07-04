@@ -1,24 +1,24 @@
-@startuml casos_uso_completos
+@startuml general_system
 
 left to right direction
 
 skinparam {
-    usecaseFontSize 11
+    usecaseFontSize 12
     usecaseFontName "Segoe UI"
     usecaseBackgroundColor #FFFFFF
     usecaseBorderColor #34495E
     actorBackgroundColor #FFFFFF
     actorBorderColor #2C3E50
     actorFontName "Segoe UI"
-    actorFontSize 11
+    actorFontSize 12
     arrowColor #34495E
     rectangleBackgroundColor #F8F9FA
     rectangleBorderColor #BDC3C7
     rectangleFontColor #2C3E50
     rectangleFontName "Segoe UI"
-    rectangleFontSize 12
+    rectangleFontSize 13
     defaultTextAlignment center
-    wrapWidth 180
+    wrapWidth 200
     dpi 150
     shadowing false
     linetype ortho
@@ -27,90 +27,36 @@ skinparam {
 }
 
 actor "Usuário" as User #FFFFFF
-actor "Comprador\nPotencial" as Buyer #ECF0F1
 actor "Blockchain" as Blockchain #ECF0F1
 
 rectangle "Sistema AutoLogger" #F8F9FA {
-
-  rectangle "Autenticação" #E8F4FD {
-    (Cadastrar Usuário) as UC01
-    (Autenticar Usuário) as UC02
-    (Editar Perfil) as UC16
-  }
-
-  rectangle "Gestão de Veículos" #E8F8F5 {
-    (Cadastrar Veículo) as UC03
-    (Editar Dados Veículo) as UC17
-    (Marcar Veículo como Vendido) as UC18
-    (Arquivar Veículo) as UC19
-    (Reivindicar Veículo) as UC20
-  }
-
-  rectangle "Gestão de Eventos" #FFF2E8 {
-    (Registrar Evento Veicular) as UC05
-    (Upload de Arquivos) as UC07
-    (Gerar Hash Evento) as UC08
-    (Confirmar Registro) as UC09
-    (Registrar na Blockchain) as UC10
-    (Consultar Status Transação) as UC11
-    (Editar Evento) as UC15
-  }
-
-  rectangle "Relatórios e Histórico" #F8E8FF {
-    (Visualizar Histórico) as UC12
-    (Calcular Estatísticas KM) as UC13
-    (Gerar Gráficos) as UC14
-    (Gerar Relatório de Venda) as UC21
-    (Visualizar Veículos Anteriores) as UC22
-  }
-
-  rectangle "Compartilhamento" #E8FFE8 {
-    (Gerar Link Público) as UC23
-    (Gerar QR Code) as UC24
-    (Visualizar Histórico Público) as UC25
-    (Verificar Integridade Blockchain) as UC26
-  }
+    rectangle "Autenticação" #E8F4FD {
+        (Gerenciar Usuários) as AUTH
+    }
+    
+    rectangle "Veículos" #E8F8F5 {
+        (Gerenciar Veículos) as VEH
+    }
+    
+    rectangle "Eventos" #FFF2E8 {
+        (Processar Eventos) as EVT
+    }
+    
+    rectangle "Relatórios" #F8E8FF {
+        (Gerar Relatórios) as REP
+    }
 }
 
-' Conexões do Usuário Principal
-User --- UC01
-User --- UC02
-User --- UC16
-User --- UC03
-User --- UC17
-User --- UC18
-User --- UC19
-User --- UC20
-User --- UC05
-User --- UC07
-User --- UC09
-User --- UC11
-User --- UC15
-User --- UC12
-User --- UC13
-User --- UC14
-User --- UC21
-User --- UC22
-User --- UC23
-User --- UC24
+User --- AUTH
+User --- VEH
+User --- EVT
+User --- REP
 
-' Conexões do Comprador Potencial
-Buyer --- UC25
-Buyer --- UC26
-Buyer --- UC20
+EVT --- Blockchain
 
-' Relacionamentos Include/Extend
-UC05 ..> UC08 : <<include>>
-UC09 ..> UC10 : <<include>>
-UC05 ..> UC07 : <<extend>>
-UC18 ..> UC21 : <<include>>
-UC21 ..> UC23 : <<include>>
-UC21 ..> UC24 : <<include>>
-UC25 ..> UC26 : <<include>>
-
-' Conexões com Blockchain
-UC10 --- Blockchain
-UC11 --- Blockchain
-UC26 --- Blockchain
+note right of AUTH : Cadastro, login e\ngerenciamento de perfis
+note right of VEH : Cadastro e gerenciamento\nde veículos
+note right of EVT : Registro de eventos\ncom blockchain
+note right of REP : Histórico, estatísticas\ne gráficos
 
 @enduml
