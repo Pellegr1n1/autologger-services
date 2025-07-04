@@ -39,7 +39,7 @@ Person(user, "Usuário", "Proprietário de veículo ou comprador interessado")
 System_Boundary(autologger_boundary, "Sistema AutoLogger") {
     Container(frontend, "Frontend Web", "React + TypeScript", "Interface responsiva que permite acesso ao sistema de gestão veicular.")
     
-    Container(user_module, "User Module", "NestJS", "Gerencia cadastro, autenticação e edição de perfil")
+    Container(user_module, "User Module", "NestJS", "Gerencia cadastro, autenticação, edição e exclusão de usuários")
     
     Container(vehicle_module, "Vehicle Module", "NestJS", "Gerencia CRUD de veículos")
     
