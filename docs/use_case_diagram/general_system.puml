@@ -31,7 +31,7 @@ actor "Blockchain" as Blockchain #ECF0F1
 
 rectangle "Sistema AutoLogger" #F8F9FA {
     rectangle "Autenticação" #E8F4FD {
-        (Gerenciar Usuários) as AUTH
+        (Gerenciar Perfil) as AUTH
     }
     
     rectangle "Veículos" #E8F8F5 {
