@@ -25,27 +25,19 @@ skinparam {
 }
 
 actor "Usuário" as User #FFFFFF
-actor "Comprador\nPotencial" as Buyer #ECF0F1
 
 rectangle "Módulo Gestão de Veículos" #F8F9FA {
     (Cadastrar Veículo) as UC04
     (Editar Dados Veículo) as UC17
     (Marcar Veículo como Vendido) as UC18
     (Visualizar Veículos Vendidos) as UC20
-    (Gerar Relatório/QR Code) as UC19
 }
 
-User --- UC04
-User --- UC17
-User --- UC18
-User --- UC20
-User --- UC19
-Buyer --- UC19
+User --> UC04
+User --> UC17
+User --> UC18
+User --> UC20
 
 note right of UC04 : Permite cadastro de novos\nveículos (máximo 2 ativos)
-note right of UC17 : Permite edição dos\ndados do veículo
-note right of UC18 : Marca veículo como vendido através de uma confirmação
-note right of UC20 : Visualiza veículos vendidos\nna seção "Anteriores"
-note right of UC19 : Gera relatório completo\ncom QR code para compartilhar
 
 @enduml

@@ -39,24 +39,19 @@ rectangle "Sistema AutoLogger" #F8F9FA {
     }
     
     rectangle "Eventos" #FFF2E8 {
-        (Processar Eventos) as EVT
+        (Gerenciar Eventos) as EVT
     }
     
     rectangle "Relatórios" #F8E8FF {
-        (Gerar Relatórios) as REP
+        (Consultar Relatórios) as REP
     }
 }
 
-User --- AUTH
-User --- VEH
-User --- EVT
-User --- REP
+User --> AUTH
+User --> VEH
+User --> EVT 
+User --> REP
 
-EVT --- Blockchain
-
-note right of AUTH : Cadastro, login e\ngerenciamento de perfis
-note right of VEH : Cadastro e gerenciamento\nde veículos
-note right of EVT : Registro de eventos\ncom blockchain
-note right of REP : Histórico, estatísticas\ne gráficos
+EVT --> Blockchain
 
 @enduml

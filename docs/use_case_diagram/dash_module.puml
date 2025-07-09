@@ -27,22 +27,19 @@ skinparam {
 }
 
 actor "Usuário" as User #FFFFFF
+actor "Comprador\nPotencial" as Buyer #ECF0F1
+
 
 rectangle "Módulo de Relatórios" #F8F9FA {
-    (Visualizar Histórico) as UC12
-    (Calcular Estatísticas KM) as UC13
-    (Gerar Gráficos) as UC14
+    (Visualizar Gráficos) as UC14
+    (Visualizar Relatório\nVeícular) as UC19
 }
 
-User --- UC12
-User --- UC13
-User --- UC14
+User --> UC14
+Buyer --> UC19
+User --> UC19
 
-UC12 ..> UC13 : <<include>>
-UC12 ..> UC14 : <<include>>
 
-note right of UC12 : Visualização completa\ndo histórico de eventos
-note right of UC13 : Cálculos estatísticos\nde quilometragem
-note right of UC14 : Geração de gráficos\ne dashboards
+note right of UC19 : Visualização de relatório\ncom QR code para acesso
 
 @enduml

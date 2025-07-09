@@ -28,19 +28,17 @@ actor "Usuário" as User #FFFFFF
 
 rectangle "Módulo de Autenticação" #F8F9FA {
     (Cadastrar Usuário) as UC01
-    (Autenticar Usuário) as UC02
+    (Fazer Login) as UC02
     (Editar Perfil) as UC16
     (Excluir Conta) as UC03
 }
 
-User --- UC01
-User --- UC02
-User --- UC16
-User --- UC03
+User --> UC01
+User --> UC02
+User --> UC16
+User --> UC03
 
-note right of UC01 : Permite que novos usuários\nse registrem no sistema\ncom consentimento LGPD
-note right of UC02 : Valida credenciais de\nacesso do usuário
-note right of UC16 : Permite atualização\ndos dados do perfil
-note right of UC03 : Permite exclusão completa\nda conta com confirmação
+note right of UC01 : Registro com\nconsentimento LGPD
+note right of UC03 : Exclusão completa\ncom confirmação
 
 @enduml

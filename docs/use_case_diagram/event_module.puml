@@ -24,36 +24,41 @@ skinparam {
     linetype ortho
     defaultFontName "Segoe UI"
     defaultFontSize 10
+    packageBorderColor #34495E
+    packageBackgroundColor #F8F9FA
 }
 
 actor "Usuário" as User #FFFFFF
 actor "Blockchain" as Blockchain #ECF0F1
 
 rectangle "Módulo de Eventos" #F8F9FA {
-    (Registrar Evento Veicular) as UC05
-    (Upload de Arquivos) as UC07
-    (Gerar Hash Evento) as UC08
+    
+    (Registrar Evento\nVeicular) as UC05
     (Confirmar Registro) as UC09
-    (Registrar na Blockchain) as UC10
-    (Consultar Status Transação) as UC11
     (Editar Evento) as UC15
+    
+    UC05 -[hidden]right- UC09
+    UC09 -[hidden]right- UC15
+    
+    (Upload de\nArquivos) as UC07
+    (Consultar Status\nTransação) as UC11
+    
+    UC05 -[hidden]down- UC07
+    UC09 -[hidden]down- UC11
+    
+    UC07 -[hidden]right- UC11
 }
 
-User --- UC05
-User --- UC07
-User --- UC09
-User --- UC11
-User --- UC15
+User --> UC05
+User --> UC09
+User --> UC15
+User --> UC11
 
-UC05 ..> UC08 : <<include>>
-UC09 ..> UC10 : <<include>>
 UC05 ..> UC07 : <<extend>>
-UC10 --- Blockchain
-UC11 --- Blockchain
 
-note right of UC05 : Processo principal de\nregistro de eventos
-note right of UC08 : Geração automática de\nhash para integridade
-note right of UC10 : Registro imutável\nna blockchain
-note bottom of UC07 : Funcionalidade opcional\npara anexar documentos
+UC09 --> Blockchain
+UC11 --> Blockchain
+
+note left of UC05 : Despesas\nautomotivas
 
 @enduml
