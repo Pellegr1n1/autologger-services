@@ -1,0 +1,153 @@
+version: '3.8'
+
+services:
+  backend:
+    build: .
+    container_name: autologger-backend
+    ports:
+      - "${PORT:-3001}:${PORT:-3001}"
+    env_file:
+      - .env
+    environment:
+      # Override specific variables for Docker network
+      - DB_HOST=postgres
+      - REDIS_HOST=redis
+      - BLOCKCHAIN_RPC_URL=http://besu:8545
+    depends_on:
+      - postgres
+      - redis
+    volumes:
+      - ./src:/app/src
+      - ./logs:/app/logs
+    networks:
+      - autologger-network
+    restart: unless-stopped
+
+  postgres:
+    image: postgres:15-alpine
+    container_name: autologger-postgres
+    environment:
+      - POSTGRES_DB=${DB_NAME:-autologger}
+      - POSTGRES_USER=${DB_USERNAME:-postgres}
+      - POSTGRES_PASSWORD=${DB_PASSWORD:-postgres}
+    ports:
+      - "${DB_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./init-db.sql:/docker-entrypoint-initdb.d/init-db.sql
+    networks:
+      - autologger-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USERNAME:-postgres}"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  redis:
+    image: redis:7-alpine
+    container_name: autologger-redis
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - autologger-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  besu:
+    image: hyperledger/besu:latest
+    container_name: autologger-besu
+    ports:
+      - "8545:8545"
+      - "8546:8546"
+    command: [
+      "--network=dev",
+      "--miner-enabled",
+      "--miner-coinbase=0xfe3b557e8fb62b89f4916b721be55ceb828dbd73",
+      "--rpc-http-enabled",
+      "--rpc-http-host=0.0.0.0",
+      "--rpc-http-port=8545",
+      "--rpc-http-cors-origins=*",
+      "--rpc-ws-enabled",
+      "--rpc-ws-host=0.0.0.0",
+      "--rpc-ws-port=8546",
+      "--data-path=/opt/besu/data",
+      "--genesis-file=/opt/besu/genesis.json"
+    ]
+    volumes:
+      - ./besu-config/genesis.json:/opt/besu/genesis.json
+      - besu_data:/opt/besu/data
+    networks:
+      - autologger-network
+    restart: unless-stopped
+    profiles:
+      - blockchain
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: autologger-grafana
+    ports:
+      - "3002:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD:-admin}
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./grafana/provisioning:/etc/grafana/provisioning
+    networks:
+      - autologger-network
+    restart: unless-stopped
+    profiles:
+      - monitoring
+
+  loki:
+    image: grafana/loki:latest
+    container_name: autologger-loki
+    ports:
+      - "3100:3100"
+    volumes:
+      - ./loki-config.yaml:/etc/loki/local-config.yaml
+    networks:
+      - autologger-network
+    restart: unless-stopped
+    profiles:
+      - monitoring
+
+  sonarqube:
+    image: sonarqube:community
+    container_name: autologger-sonarqube
+    depends_on:
+      - postgres
+    environment:
+      - SONAR_JDBC_URL=jdbc:postgresql://postgres:5432/${SONAR_DB_NAME:-sonarqube}
+      - SONAR_JDBC_USERNAME=${DB_USERNAME:-postgres}
+      - SONAR_JDBC_PASSWORD=${DB_PASSWORD:-postgres}
+    ports:
+      - "9000:9000"
+    volumes:
+      - sonarqube_data:/opt/sonarqube/data
+      - sonarqube_extensions:/opt/sonarqube/extensions
+      - sonarqube_logs:/opt/sonarqube/logs
+    networks:
+      - autologger-network
+    restart: unless-stopped
+    profiles:
+      - analysis
+
+volumes:
+  postgres_data:
+  redis_data:
+  besu_data:
+  sonarqube_data:
+  sonarqube_extensions:
+  sonarqube_logs:
+  grafana_data:
+
+networks:
+  autologger-network:
+    driver: bridge
