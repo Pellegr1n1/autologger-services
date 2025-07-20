@@ -4,28 +4,26 @@ import {
   BadRequestException,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
-import { UsersService } from '../modules/users/services/users.service';
+import { UserService } from '../modules/user/services/user.service';
 import { AuthRegisterDto } from './dto/auth-register.dto';
 import { AuthLoginDto } from './dto/auth-login.dto';
 import { AuthResponseDto } from './dto/auth-response.dto';
-import { CreateUserDto } from '../modules/users/dto/create-user.dto';
+import { CreateUserDto } from '../modules/user/dto/create-user.dto';
 import { JwtPayload } from '../common/interfaces/jwt-payload.interface';
 
 @Injectable()
 export class AuthService {
   constructor(
-    private readonly usersService: UsersService,
+    private readonly userService: UserService,
     private readonly jwtService: JwtService,
   ) {}
 
   async register(authRegisterDto: AuthRegisterDto): Promise<AuthResponseDto> {
-    // Valida se as senhas coincidem
     if (authRegisterDto.password !== authRegisterDto.confirmPassword) {
       throw new BadRequestException('As senhas não coincidem');
     }
 
     try {
-      // Converte AuthRegisterDto para CreateUserDto
       const createUserDto: CreateUserDto = {
         name: authRegisterDto.name,
         email: authRegisterDto.email,
@@ -33,7 +31,7 @@ export class AuthService {
         password: authRegisterDto.password,
       };
 
-      const user = await this.usersService.create(createUserDto);
+      const user = await this.userService.create(createUserDto);
       
       const payload: JwtPayload = {
         sub: user.id,
@@ -56,13 +54,13 @@ export class AuthService {
   }
 
   async login(authLoginDto: AuthLoginDto): Promise<AuthResponseDto> {
-    const user = await this.usersService.findByEmail(authLoginDto.email);
+    const user = await this.userService.findByEmail(authLoginDto.email);
     
     if (!user || !user.isActive) {
       throw new UnauthorizedException('Credenciais inválidas');
     }
 
-    const isPasswordValid = await this.usersService.validatePassword(
+    const isPasswordValid = await this.userService.validatePassword(
       authLoginDto.password,
       user.password,
     );

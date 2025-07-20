@@ -4,19 +4,19 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import * as bcrypt from 'bcryptjs';
-import { UsersRepository } from '../repositories/users.repository';
+import { UserRepository } from '../repositories/user.repository';
 import { CreateUserDto } from '../dto/create-user.dto';
 import { UpdateUserDto } from '../dto/update-user.dto';
 import { UserResponseDto } from '../dto/user-response.dto';
 import { User } from '../entities/user.entity';
 
 @Injectable()
-export class UsersService {
-  constructor(private readonly usersRepository: UsersRepository) {}
+export class UserService {
+  constructor(private readonly userRepository: UserRepository) {}
 
   async create(createUserDto: CreateUserDto): Promise<UserResponseDto> {
     // Verifica se o usuário já existe
-    const existingUser = await this.usersRepository.findByEmail(
+    const existingUser = await this.userRepository.findByEmail(
       createUserDto.email,
     );
     if (existingUser) {
@@ -33,16 +33,16 @@ export class UsersService {
       password: hashedPassword,
     };
 
-    const user = await this.usersRepository.create(userData);
+    const user = await this.userRepository.create(userData);
     return this.toUserResponseDto(user);
   }
 
   async findByEmail(email: string): Promise<User | null> {
-    return await this.usersRepository.findByEmail(email);
+    return await this.userRepository.findByEmail(email);
   }
 
   async findById(id: string): Promise<UserResponseDto> {
-    const user = await this.usersRepository.findById(id);
+    const user = await this.userRepository.findById(id);
     if (!user || !user.isActive) {
       throw new NotFoundException('Usuário não encontrado');
     }
@@ -51,14 +51,14 @@ export class UsersService {
 
   async updateProfile(id: string, updateUserDto: UpdateUserDto): Promise<UserResponseDto> {
     // Verifica se o usuário existe
-    const existingUser = await this.usersRepository.findById(id);
+    const existingUser = await this.userRepository.findById(id);
     if (!existingUser || !existingUser.isActive) {
       throw new NotFoundException('Usuário não encontrado');
     }
 
     // Se o email está sendo alterado, verifica se já não está em uso por outro usuário
     if (updateUserDto.email && updateUserDto.email !== existingUser.email) {
-      const userWithEmail = await this.usersRepository.findByEmail(updateUserDto.email);
+      const userWithEmail = await this.userRepository.findByEmail(updateUserDto.email);
       if (userWithEmail && userWithEmail.id !== id) {
         throw new ConflictException('Email já está em uso por outro usuário');
       }
@@ -80,7 +80,7 @@ export class UsersService {
     }
 
     // Atualiza no banco
-    const updatedUser = await this.usersRepository.update(id, updateData);
+    const updatedUser = await this.userRepository.update(id, updateData);
     
     if (!updatedUser) {
       throw new NotFoundException('Erro ao atualizar usuário');
@@ -97,11 +97,11 @@ export class UsersService {
   }
 
   async deleteAccount(userId: string): Promise<void> {
-    const user = await this.usersRepository.findById(userId);
+    const user = await this.userRepository.findById(userId);
     if (!user) {
       throw new NotFoundException('Usuário não encontrado');
     }
-    await this.usersRepository.softDelete(userId);
+    await this.userRepository.softDelete(userId);
   }
 
   private toUserResponseDto(user: User): UserResponseDto {
