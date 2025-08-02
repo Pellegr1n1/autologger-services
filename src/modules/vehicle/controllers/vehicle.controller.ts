@@ -1,4 +1,3 @@
-// src/modules/vehicle/controllers/vehicle.controller.ts
 import {
   Controller,
   Get,
@@ -26,7 +25,7 @@ import { VehicleResponseDto } from '../dto/vehicle-response.dto';
 import { MarkVehicleSoldDto } from '../dto/mark-vehicle-sold.dto';
 import { JwtAuthGuard } from '../../../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../../../common/decorators/current-user.decorator';
-import { JwtPayload } from '../../../common/interfaces/jwt-payload.interface';
+import { UserResponseDto } from '@/modules/user/dto/user-response.dto';
 
 @ApiTags('Veículos')
 @ApiBearerAuth()
@@ -53,9 +52,9 @@ export class VehicleController {
   })
   async createVehicle(
     @Body() createVehicleDto: CreateVehicleDto,
-    @CurrentUser() user: JwtPayload,
+    @CurrentUser() user: UserResponseDto,
   ): Promise<VehicleResponseDto> {
-    return this.vehicleService.createVehicle(createVehicleDto, user.sub);
+    return this.vehicleService.createVehicle(createVehicleDto, user.id);
   }
 
   @Get()
@@ -77,8 +76,8 @@ export class VehicleController {
       },
     },
   })
-  async getUserVehicles(@CurrentUser() user: JwtPayload) {
-    return this.vehicleService.findUserVehicles(user.sub);
+  async getUserVehicles(@CurrentUser() user: UserResponseDto) {
+    return this.vehicleService.findUserVehicles(user.id);
   }
 
   @Get(':id')
@@ -95,9 +94,9 @@ export class VehicleController {
   })
   async getVehicleById(
     @Param('id') id: string,
-    @CurrentUser() user: JwtPayload,
+    @CurrentUser() user: UserResponseDto,
   ): Promise<VehicleResponseDto> {
-    return this.vehicleService.findVehicleById(id, user.sub);
+    return this.vehicleService.findVehicleById(id, user.id);
   }
 
   @Put(':id')
@@ -119,9 +118,9 @@ export class VehicleController {
   async updateVehicle(
     @Param('id') id: string,
     @Body() updateVehicleDto: UpdateVehicleDto,
-    @CurrentUser() user: JwtPayload,
+    @CurrentUser() user: UserResponseDto,
   ): Promise<VehicleResponseDto> {
-    return this.vehicleService.updateVehicle(id, updateVehicleDto, user.sub);
+    return this.vehicleService.updateVehicle(id, updateVehicleDto, user.id);
   }
 
   @Patch(':id/mark-sold')
@@ -143,9 +142,9 @@ export class VehicleController {
   async markVehicleAsSold(
     @Param('id') id: string,
     @Body() markVehicleSoldDto: MarkVehicleSoldDto,
-    @CurrentUser() user: JwtPayload,
+    @CurrentUser() user: UserResponseDto,
   ): Promise<VehicleResponseDto> {
-    return this.vehicleService.markVehicleAsSold(id, markVehicleSoldDto, user.sub);
+    return this.vehicleService.markVehicleAsSold(id, markVehicleSoldDto, user.id);
   }
 
   @Get('stats/active-count')
@@ -162,8 +161,8 @@ export class VehicleController {
       },
     },
   })
-  async getActiveVehiclesStats(@CurrentUser() user: JwtPayload) {
-    const count = await this.vehicleService.getActiveVehiclesCount(user.sub);
+  async getActiveVehiclesStats(@CurrentUser() user: UserResponseDto) {
+    const count = await this.vehicleService.getActiveVehiclesCount(user.id);
     const limit = 2;
     
     return {
@@ -187,8 +186,8 @@ export class VehicleController {
   })
   async deleteVehicle(
     @Param('id') id: string,
-    @CurrentUser() user: JwtPayload,
+    @CurrentUser() user: UserResponseDto,
   ): Promise<void> {
-    return this.vehicleService.deleteVehicle(id, user.sub);
+    return this.vehicleService.deleteVehicle(id, user.id);
   }
 }

@@ -57,11 +57,17 @@ export class VehicleFactory {
    * Cria uma instância de Vehicle a partir de dados básicos
    */
   createVehicle(data: Partial<Vehicle>): Vehicle {
-    return new Vehicle({
+    // ✅ CORRIGIDO: Não usa mais o construtor customizado
+    const vehicle = new Vehicle();
+    
+    // Atribui todas as propriedades manualmente
+    Object.assign(vehicle, {
       ...data,
-      createdAt: new Date(),
-      updatedAt: new Date(),
+      createdAt: data.createdAt || new Date(),
+      updatedAt: data.updatedAt || new Date(),
     });
+    
+    return vehicle;
   }
 
   /**
@@ -71,9 +77,14 @@ export class VehicleFactory {
     const cleanPlate = plate.toUpperCase().replace(/[^A-Z0-9]/g, '');
     
     if (cleanPlate.length === 7) {
-      return cleanPlate.replace(/^([A-Z]{3})([0-9]{4})$/, '$1-$2');
-    } else if (cleanPlate.length === 7 && /^[A-Z]{3}[0-9][A-Z][0-9]{2}$/.test(cleanPlate)) {
-      return cleanPlate.replace(/^([A-Z]{3})([0-9][A-Z][0-9]{2})$/, '$1-$2');
+      // Formato antigo: ABC1234 -> ABC-1234
+      if (/^[A-Z]{3}[0-9]{4}$/.test(cleanPlate)) {
+        return cleanPlate.replace(/^([A-Z]{3})([0-9]{4})$/, '$1-$2');
+      }
+      // Formato Mercosul: ABC1D23 (sem hífen)
+      else if (/^[A-Z]{3}[0-9][A-Z][0-9]{2}$/.test(cleanPlate)) {
+        return cleanPlate;
+      }
     }
     
     return cleanPlate;
@@ -103,6 +114,7 @@ export class VehicleFactory {
    * Formata o nome/marca/modelo com primeira letra maiúscula
    */
   private capitalizeFirstLetter(text: string): string {
+    if (!text) return text;
     return text.charAt(0).toUpperCase() + text.slice(1).toLowerCase();
   }
 
@@ -125,5 +137,33 @@ export class VehicleFactory {
    */
   isSold(vehicle: Vehicle): boolean {
     return vehicle.status === VehicleStatus.SOLD;
+  }
+
+  /**
+   * Formata quilometragem para exibição
+   */
+  formatMileage(mileage: number): string {
+    return new Intl.NumberFormat('pt-BR').format(mileage) + ' km';
+  }
+
+  /**
+   * Calcula a idade do veículo
+   */
+  getVehicleAge(year: number): number {
+    return new Date().getFullYear() - year;
+  }
+
+  /**
+   * Normaliza dados de entrada do veículo
+   */
+  normalizeVehicleData(data: Partial<Vehicle>): Partial<Vehicle> {
+    return {
+      ...data,
+      plate: data.plate ? data.plate.toUpperCase().replace(/[^A-Z0-9]/g, '') : undefined,
+      brand: data.brand ? this.capitalizeFirstLetter(data.brand) : undefined,
+      model: data.model ? this.capitalizeFirstLetter(data.model) : undefined,
+      color: data.color ? this.capitalizeFirstLetter(data.color) : undefined,
+      renavam: data.renavam ? data.renavam.replace(/\D/g, '') : undefined,
+    };
   }
 }

@@ -70,8 +70,4 @@ export class Vehicle {
   //   eager: false,
   // })
   // events: Event[];
-
-  constructor(partial: Partial<Vehicle>) {
-    Object.assign(this, partial);
-  }
 }
