@@ -10,6 +10,12 @@ import {
   UseGuards,
   HttpStatus,
   HttpCode,
+  UseInterceptors,
+  UploadedFile,
+  ParseFilePipe,
+  MaxFileSizeValidator,
+  FileTypeValidator,
+  Res,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -17,7 +23,9 @@ import {
   ApiResponse,
   ApiBearerAuth,
   ApiParam,
+  ApiConsumes,
 } from '@nestjs/swagger';
+import { FileInterceptor } from '@nestjs/platform-express';
 import { VehicleService } from '../services/vehicle.service';
 import { CreateVehicleDto } from '../dto/create-vehicle.dto';
 import { UpdateVehicleDto } from '../dto/update-vehicle.dto';
@@ -26,6 +34,9 @@ import { MarkVehicleSoldDto } from '../dto/mark-vehicle-sold.dto';
 import { JwtAuthGuard } from '../../../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../../../common/decorators/current-user.decorator';
 import { UserResponseDto } from '@/modules/user/dto/user-response.dto';
+import { Response } from 'express';
+import * as path from 'path';
+import * as fs from 'fs';
 
 @ApiTags('Veículos')
 @ApiBearerAuth()
@@ -36,6 +47,8 @@ export class VehicleController {
 
   @Post()
   @HttpCode(HttpStatus.CREATED)
+  @UseInterceptors(FileInterceptor('photo'))
+  @ApiConsumes('multipart/form-data')
   @ApiOperation({ summary: 'Cadastrar novo veículo' })
   @ApiResponse({
     status: HttpStatus.CREATED,
@@ -53,8 +66,26 @@ export class VehicleController {
   async createVehicle(
     @Body() createVehicleDto: CreateVehicleDto,
     @CurrentUser() user: UserResponseDto,
+    @UploadedFile(
+      new ParseFilePipe({
+        validators: [
+          new MaxFileSizeValidator({ maxSize: 5 * 1024 * 1024 }), // 5MB
+          new FileTypeValidator({ fileType: '.(jpg|jpeg|png|gif)' }),
+        ],
+        fileIsRequired: false,
+      }),
+    )
+    photo?: any,
   ): Promise<VehicleResponseDto> {
-    return this.vehicleService.createVehicle(createVehicleDto, user.id);
+    // Converter dados para os tipos corretos
+    const vehicleData = {
+      ...createVehicleDto,
+      year: parseInt(createVehicleDto.year as any),
+      mileage: parseInt(createVehicleDto.mileage as any) || 0,
+      photo,
+    };
+    
+    return this.vehicleService.createVehicle(vehicleData, user.id);
   }
 
   @Get()
@@ -100,6 +131,8 @@ export class VehicleController {
   }
 
   @Put(':id')
+  @UseInterceptors(FileInterceptor('photo'))
+  @ApiConsumes('multipart/form-data')
   @ApiOperation({ summary: 'Atualizar dados do veículo' })
   @ApiParam({ name: 'id', description: 'ID do veículo' })
   @ApiResponse({
@@ -119,8 +152,26 @@ export class VehicleController {
     @Param('id') id: string,
     @Body() updateVehicleDto: UpdateVehicleDto,
     @CurrentUser() user: UserResponseDto,
+    @UploadedFile(
+      new ParseFilePipe({
+        validators: [
+          new MaxFileSizeValidator({ maxSize: 5 * 1024 * 1024 }), // 5MB
+          new FileTypeValidator({ fileType: '.(jpg|jpeg|png|gif)' }),
+        ],
+        fileIsRequired: false,
+      }),
+    )
+    photo?: any,
   ): Promise<VehicleResponseDto> {
-    return this.vehicleService.updateVehicle(id, updateVehicleDto, user.id);
+    // Converter dados para os tipos corretos
+    const vehicleData = {
+      ...updateVehicleDto,
+      year: updateVehicleDto.year ? parseInt(updateVehicleDto.year as any) : undefined,
+      mileage: updateVehicleDto.mileage ? parseInt(updateVehicleDto.mileage as any) : undefined,
+      photo,
+    };
+    
+    return this.vehicleService.updateVehicle(id, vehicleData, user.id);
   }
 
   @Patch(':id/mark-sold')
@@ -173,6 +224,7 @@ export class VehicleController {
   }
 
   @Delete(':id')
+  @UseGuards(JwtAuthGuard)
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({ summary: 'Excluir veículo' })
   @ApiParam({ name: 'id', description: 'ID do veículo' })

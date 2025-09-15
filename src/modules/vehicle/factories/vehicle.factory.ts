@@ -19,6 +19,7 @@ export class VehicleFactory {
       color: vehicle.color,
       renavam: vehicle.renavam,
       mileage: vehicle.mileage,
+      photoUrl: vehicle.photoUrl,
       status: vehicle.status,
       soldAt: vehicle.soldAt,
       createdAt: vehicle.createdAt,

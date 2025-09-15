@@ -60,29 +60,33 @@ services:
       timeout: 10s
       retries: 3
 
-  besu:
-    image: hyperledger/besu:latest
-    container_name: autologger-besu
+  # Rede Besu privada - usar docker-compose.besu.yml para iniciar
+  # Comando: docker-compose -f docker-compose.besu.yml up -d
+  besu-node1:
+    image: hyperledger/besu:24.1.2
+    container_name: autologger-besu-node1
     ports:
       - "8545:8545"
-      - "8546:8546"
     command: [
-      "--network=dev",
-      "--miner-enabled",
-      "--miner-coinbase=0xfe3b557e8fb62b89f4916b721be55ceb828dbd73",
+      "--data-path=/opt/besu/data",
+      "--genesis-file=/opt/besu/genesis.json",
+      "--node-private-key-file=/opt/besu/nodes/node1/key",
       "--rpc-http-enabled",
       "--rpc-http-host=0.0.0.0",
       "--rpc-http-port=8545",
       "--rpc-http-cors-origins=*",
-      "--rpc-ws-enabled",
-      "--rpc-ws-host=0.0.0.0",
-      "--rpc-ws-port=8546",
-      "--data-path=/opt/besu/data",
-      "--genesis-file=/opt/besu/genesis.json"
+      "--rpc-http-api=ETH,NET,WEB3,IBFT,ADMIN",
+      "--host-allowlist=*",
+      "--p2p-port=30303",
+      "--p2p-host=0.0.0.0",
+      "--min-gas-price=0",
+      "--tx-pool-limit-by-account-percentage=1",
+      "--logging=INFO"
     ]
     volumes:
-      - ./besu-config/genesis.json:/opt/besu/genesis.json
-      - besu_data:/opt/besu/data
+      - ./besu-network/genesis.json:/opt/besu/genesis.json
+      - ./besu-network/nodes/node1:/opt/besu/nodes/node1
+      - besu_node1_data:/opt/besu/data
     networks:
       - autologger-network
     restart: unless-stopped
@@ -142,7 +146,7 @@ services:
 volumes:
   postgres_data:
   redis_data:
-  besu_data:
+  besu_node1_data:
   sonarqube_data:
   sonarqube_extensions:
   sonarqube_logs:
@@ -151,3 +155,6 @@ volumes:
 networks:
   autologger-network:
     driver: bridge
+    aliases:
+      - besu
+      - besu-node1

@@ -7,6 +7,7 @@ import { CreateVehicleDto } from '../dto/create-vehicle.dto';
 import { UpdateVehicleDto } from '../dto/update-vehicle.dto';
 import { VehicleResponseDto } from '../dto/vehicle-response.dto';
 import { MarkVehicleSoldDto } from '../dto/mark-vehicle-sold.dto';
+import { FileUploadService } from './file-upload.service';
 
 @Injectable()
 export class VehicleService implements IVehicleService {
@@ -14,6 +15,7 @@ export class VehicleService implements IVehicleService {
     private readonly vehicleRepository: VehicleRepository,
     private readonly businessRules: VehicleBusinessRulesService,
     private readonly vehicleFactory: VehicleFactory,
+    private readonly fileUploadService: FileUploadService,
   ) {}
 
   async createVehicle(
@@ -25,8 +27,20 @@ export class VehicleService implements IVehicleService {
     await this.businessRules.validateUniquePlate(createVehicleDto.plate);
     await this.businessRules.validateUniqueRenavam(createVehicleDto.renavam);
 
-    // Criar veículo
-    const vehicle = await this.vehicleRepository.create(createVehicleDto, userId);
+    // Upload da foto se fornecida
+    let photoUrl: string = null;
+    if (createVehicleDto.photo) {
+      photoUrl = await this.fileUploadService.uploadPhoto(createVehicleDto.photo);
+    }
+
+    // Criar veículo com foto
+    const vehicleData = {
+      ...createVehicleDto,
+      photoUrl,
+    };
+    delete vehicleData.photo; // Remover arquivo do DTO
+
+    const vehicle = await this.vehicleRepository.create(vehicleData, userId);
 
     return this.vehicleFactory.toResponseDto(vehicle);
   }
@@ -65,8 +79,29 @@ export class VehicleService implements IVehicleService {
     await this.businessRules.validateVehicleOwnership(id, userId);
     await this.businessRules.validateVehicleCanBeUpdated(id);
 
-    // Atualizar veículo
-    const vehicle = await this.vehicleRepository.update(id, updateVehicleDto);
+    // Buscar veículo atual para verificar se tem foto
+    const currentVehicle = await this.vehicleRepository.findByIdAndUserId(id, userId);
+    
+    // Upload da nova foto se fornecida
+    let photoUrl: string = currentVehicle.photoUrl;
+    if (updateVehicleDto.photo) {
+      // Deletar foto antiga se existir
+      if (currentVehicle.photoUrl) {
+        await this.fileUploadService.deletePhoto(currentVehicle.photoUrl);
+      }
+      
+      // Upload da nova foto
+      photoUrl = await this.fileUploadService.uploadPhoto(updateVehicleDto.photo);
+    }
+
+    // Atualizar veículo com foto
+    const vehicleData = {
+      ...updateVehicleDto,
+      photoUrl,
+    };
+    delete vehicleData.photo; // Remover arquivo do DTO
+
+    const vehicle = await this.vehicleRepository.update(id, vehicleData);
 
     return this.vehicleFactory.toResponseDto(vehicle);
   }
@@ -93,6 +128,14 @@ export class VehicleService implements IVehicleService {
   async deleteVehicle(id: string, userId: string): Promise<void> {
     // Validar propriedade
     await this.businessRules.validateVehicleOwnership(id, userId);
+
+    // Buscar veículo para deletar foto
+    const vehicle = await this.vehicleRepository.findByIdAndUserId(id, userId);
+    
+    // Deletar foto se existir
+    if (vehicle.photoUrl) {
+      await this.fileUploadService.deletePhoto(vehicle.photoUrl);
+    }
 
     // Deletar veículo
     await this.vehicleRepository.delete(id);

@@ -37,6 +37,9 @@ export class Vehicle {
   @Column({ type: 'int', default: 0 })
   mileage: number;
 
+  @Column({ type: 'varchar', length: 255, nullable: true })
+  photoUrl: string;
+
   @Column({
     type: 'enum',
     enum: VehicleStatus,

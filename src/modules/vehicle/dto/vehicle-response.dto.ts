@@ -26,6 +26,9 @@ export class VehicleResponseDto {
   @ApiProperty()
   mileage: number;
 
+  @ApiProperty({ required: false })
+  photoUrl?: string;
+
   @ApiProperty({ enum: VehicleStatus })
   status: VehicleStatus;
 

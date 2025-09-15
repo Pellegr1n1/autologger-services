@@ -4,6 +4,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { AuthModule } from './auth/auth.module';
 import { UserModule } from './modules/user/user.module';
 import { VehicleModule } from './modules/vehicle/vehicle.module';
+import { BlockchainModule } from './blockchain/blockchain.module';
 
 @Module({
   imports: [
@@ -27,7 +28,8 @@ import { VehicleModule } from './modules/vehicle/vehicle.module';
     }),
     AuthModule,
     UserModule,
-    VehicleModule
+    VehicleModule,
+    BlockchainModule
   ],
 })
 export class AppModule {}

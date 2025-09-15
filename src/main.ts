@@ -1,40 +1,50 @@
 import { NestFactory } from '@nestjs/core';
+import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { ValidationPipe } from '@nestjs/common';
 import { AppModule } from './app.module';
-import { HttpExceptionFilter } from './common/filters/http-exception.filter';
-import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
+import * as express from 'express';
+import * as path from 'path';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
   
+  // Configurar CORS com variáveis de ambiente
+  const corsOrigins = process.env.CORS_ORIGINS 
+    ? process.env.CORS_ORIGINS.split(',') 
+    : ['http://localhost:5173', 'http://localhost:3000'];
+    
   app.enableCors({
-    origin: [
-      'http://localhost:3000',
-      'http://localhost:5173', 
-      'http://127.0.0.1:3000',
-      'http://127.0.0.1:5173',
-      // Adicione outras URLs conforme necessário
-    ],
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'Accept'],
+    origin: corsOrigins,
     credentials: true,
   });
 
-  app.useGlobalPipes(
-    new ValidationPipe({
-      whitelist: true,
-      forbidNonWhitelisted: true,
-      transform: true,
-    }),
-  );
+  // Configurar validação global
+  app.useGlobalPipes(new ValidationPipe({
+    transform: true,
+    whitelist: true,
+    forbidNonWhitelisted: true,
+  }));
 
-  app.useGlobalFilters(
-    new AllExceptionsFilter(),
-    new HttpExceptionFilter(),
-  );
+  // Configurar arquivos estáticos
+  app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));
+
+  // Configurar Swagger
+  const config = new DocumentBuilder()
+    .setTitle('AutoLogger API')
+    .setDescription('API para gerenciamento de veículos e serviços')
+    .setVersion('1.0')
+    .addBearerAuth()
+    .build();
+  
+  const document = SwaggerModule.createDocument(app, config);
+  SwaggerModule.setup('api', app, document);
 
   const port = process.env.PORT || 3001;
   await app.listen(port);
-  console.log(`🚀 AutoLogger API rodando em: http://localhost:${port}`);
+  
+  console.log(`🚗 AutoLogger API rodando na porta ${port}`);
+  console.log(`📚 Swagger disponível em: http://localhost:${port}/api`);
+  console.log(`📁 Arquivos estáticos em: http://localhost:${port}/uploads`);
+  console.log(`🌐 CORS configurado para: ${corsOrigins.join(', ')}`);
 }
 bootstrap();

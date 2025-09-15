@@ -1,5 +1,6 @@
 import { IsString, IsInt, IsOptional, Length, Min, Max, Matches } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
+import { Type } from 'class-transformer';
 
 export class CreateVehicleDto {
   @ApiProperty({ description: 'Placa do veículo', example: 'ABC1234' })
@@ -24,6 +25,7 @@ export class CreateVehicleDto {
   @IsInt()
   @Min(1900)
   @Max(new Date().getFullYear() + 1)
+  @Type(() => Number)
   year: number;
 
   @ApiProperty({ description: 'Cor do veículo', example: 'Branco' })
@@ -41,5 +43,10 @@ export class CreateVehicleDto {
   @IsOptional()
   @IsInt()
   @Min(0)
+  @Type(() => Number)
   mileage?: number;
+
+  @ApiProperty({ description: 'Foto do veículo', type: 'string', format: 'binary', required: false })
+  @IsOptional()
+  photo?: any;
 }

@@ -1,0 +1,40 @@
+version: '2.1'
+services:
+  besu-node-1:
+    user: root
+    container_name: besu-node-1
+    volumes:
+      - ../node/besu-1/data:/opt/besu/data
+      - ../genesis:/opt/besu/genesis
+    image: hyperledger/besu:24.1.2
+    entrypoint:
+      - /bin/bash
+      - -c
+      - besu --data-path=data --genesis-file=genesis/genesis.json --bootnodes=enode://54be15dbbd5faf57f374db991a6acc444e167a5f0fbd42fe243837f7157a9a288c7c9f57a225850928323f910fde0a23be591d9ee0740672132c50618d85c61b@172.29.0.2:30303 --p2p-port=30304 --rpc-http-enabled --rpc-http-api=ETH,NET,QBFT --host-allowlist="*" --rpc-http-cors-origins="all" --rpc-http-port=8546 --min-gas-price=0
+    ports:
+      - "8546:8546"
+      - "30304:30304"
+    networks:
+      besu_network:
+    restart: always
+  besu-node-2:
+    user: root
+    container_name: besu-node-2
+    volumes:
+      - ../node/besu-2/data:/opt/besu/data
+      - ../genesis:/opt/besu/genesis
+    image: hyperledger/besu:24.1.2
+    entrypoint:
+      - /bin/bash
+      - -c
+      - besu --data-path=data --genesis-file=genesis/genesis.json --bootnodes=enode://54be15dbbd5faf57f374db991a6acc444e167a5f0fbd42fe243837f7157a9a288c7c9f57a225850928323f910fde0a23be591d9ee0740672132c50618d85c61b@172.29.0.2:30303 --p2p-port=30305 --rpc-http-enabled --rpc-http-api=ETH,NET,QBFT --host-allowlist="*" --rpc-http-cors-origins="all" --rpc-http-port=8547 --min-gas-price=0
+    ports:
+      - "8547:8547"
+      - "30305:30305"
+    networks:
+      besu_network:
+    restart: always
+
+networks:
+  besu_network:
+    external: true
