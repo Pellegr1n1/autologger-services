@@ -8,31 +8,54 @@ import {
   Delete,
   Query,
   UseGuards,
+  Request,
+  BadRequestException,
 } from '@nestjs/common';
 import { VehicleServiceService } from '../services/vehicle-service.service';
 import { CreateVehicleServiceDto } from '../dto/create-vehicle-service.dto';
 import { UpdateVehicleServiceDto } from '../dto/update-vehicle-service.dto';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
+import { JwtAuthGuard } from '../../../auth/guards/jwt-auth.guard';
+import { VehicleService } from '../../vehicle/services/vehicle.service';
 
 @ApiTags('vehicle-services')
 @ApiBearerAuth()
+@UseGuards(JwtAuthGuard)
 @Controller('vehicle-services')
 export class VehicleServiceController {
-  constructor(private readonly vehicleServiceService: VehicleServiceService) {}
+  constructor(
+    private readonly vehicleServiceService: VehicleServiceService,
+    private readonly vehicleService: VehicleService,
+  ) {}
 
   @Post()
   @ApiOperation({ summary: 'Criar um novo serviço de veículo' })
   @ApiResponse({ status: 201, description: 'Serviço criado com sucesso' })
   @ApiResponse({ status: 400, description: 'Dados inválidos' })
-  create(@Body() createVehicleServiceDto: CreateVehicleServiceDto) {
+  async create(@Body() createVehicleServiceDto: CreateVehicleServiceDto, @Request() req) {
+    const userId = req.user?.id;
+    
+    // Verificar se o usuário tem veículos cadastrados
+    const userVehicles = await this.vehicleService.findUserVehicles(userId);
+    if (!userVehicles.active || userVehicles.active.length === 0) {
+      throw new BadRequestException('Você precisa ter pelo menos um veículo cadastrado para criar manutenções');
+    }
+
+    // Verificar se o veículo especificado pertence ao usuário
+    const vehicleExists = userVehicles.active.some(vehicle => vehicle.id === createVehicleServiceDto.vehicleId);
+    if (!vehicleExists) {
+      throw new BadRequestException('Veículo não encontrado ou não pertence ao usuário');
+    }
+
     return this.vehicleServiceService.create(createVehicleServiceDto);
   }
 
   @Get()
-  @ApiOperation({ summary: 'Listar todos os serviços' })
+  @ApiOperation({ summary: 'Listar todos os serviços do usuário' })
   @ApiResponse({ status: 200, description: 'Lista de serviços retornada' })
-  findAll() {
-    return this.vehicleServiceService.findAll();
+  findAll(@Request() req) {
+    const userId = req.user?.id;
+    return this.vehicleServiceService.findAll(userId);
   }
 
   @Get('vehicle/:vehicleId')
@@ -45,15 +68,17 @@ export class VehicleServiceController {
   @Get('type/:type')
   @ApiOperation({ summary: 'Listar serviços por tipo' })
   @ApiResponse({ status: 200, description: 'Lista de serviços por tipo' })
-  findByType(@Param('type') type: string) {
-    return this.vehicleServiceService.getServicesByType(type as any);
+  findByType(@Param('type') type: string, @Request() req) {
+    const userId = req.user?.id;
+    return this.vehicleServiceService.getServicesByType(type as any, userId);
   }
 
   @Get('status/:status')
   @ApiOperation({ summary: 'Listar serviços por status' })
   @ApiResponse({ status: 200, description: 'Lista de serviços por status' })
-  findByStatus(@Param('status') status: string) {
-    return this.vehicleServiceService.getServicesByStatus(status as any);
+  findByStatus(@Param('status') status: string, @Request() req) {
+    const userId = req.user?.id;
+    return this.vehicleServiceService.getServicesByStatus(status as any, userId);
   }
 
   @Get('date-range')
@@ -62,10 +87,13 @@ export class VehicleServiceController {
   findByDateRange(
     @Query('startDate') startDate: string,
     @Query('endDate') endDate: string,
+    @Request() req,
   ) {
+    const userId = req.user?.id;
     return this.vehicleServiceService.getServicesByDateRange(
       new Date(startDate),
       new Date(endDate),
+      userId,
     );
   }
 

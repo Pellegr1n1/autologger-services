@@ -4,7 +4,7 @@ import { ethers } from 'ethers';
 import { BesuService } from './besu/besu.service';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, Not, IsNull } from 'typeorm';
-import { VehicleService } from '../modules/vehicle/entities/vehicle-service.entity';
+import { VehicleService, ServiceStatus } from '../modules/vehicle/entities/vehicle-service.entity';
 
 export interface BlockchainTransaction {
   hash: string;
@@ -21,6 +21,7 @@ export interface ServiceSubmissionResult {
   status: 'PENDING' | 'SUBMITTED' | 'CONFIRMED' | 'FAILED';
   serviceId?: string;
   message?: string;
+  blockchainServiceId?: number;
 }
 
 @Injectable()
@@ -72,35 +73,24 @@ export class BlockchainService {
     try {
       if (await this.besuService.isConnected()) {
         try {
-          // Criar hash do evento para registrar na blockchain
-          const eventData = {
-            serviceId: serviceData.serviceId,
+          // Registrar o serviço diretamente na blockchain
+          const result = await this.besuService.registerService({
             vehicleId: serviceData.vehicleId,
-            type: serviceData.type || 'MANUTENCAO',
-            description: serviceData.description,
-            cost: serviceData.cost,
-            location: serviceData.location || 'Local não especificado',
             mileage: serviceData.mileage,
-            timestamp: new Date().toISOString()
-          };
-
-          // Criar hash único do evento
-          const eventHash = ethers.keccak256(ethers.toUtf8Bytes(JSON.stringify(eventData)));
-
-          const result = await this.besuService.registerHash(
-            eventHash,
-            serviceData.vehicleId,
-            serviceData.type || 'MANUTENCAO'
-          );
+            cost: serviceData.cost,
+            description: serviceData.description,
+            serviceType: serviceData.type || 'MANUTENCAO'
+          });
 
           if (result.success) {
-            this.logger.log('✅ Evento registrado na rede Besu com sucesso');
+            this.logger.log('✅ Serviço registrado na rede Besu com sucesso');
             return {
               success: true,
               transactionHash: result.transactionHash,
               status: 'SUBMITTED' as const,
               serviceId: serviceData.serviceId,
-              message: 'Evento registrado na blockchain Besu'
+              message: 'Serviço registrado na blockchain Besu',
+              blockchainServiceId: result.serviceId
             };
           } else {
             throw new Error(result.error || 'Erro desconhecido');
@@ -460,19 +450,174 @@ export class BlockchainService {
     }
   }
 
-  async getAllServices() {
+  /**
+   * Corrige hashes que estão falhando na verificação
+   * @returns Resultado da operação
+   */
+  async fixFailingHashes() {
+    try {
+      this.logger.log('🔧 Corrigindo hashes que estão falhando na verificação...');
+      
+      // Buscar todos os serviços com hash blockchain
+      const services = await this.vehicleServiceRepository.find({
+        where: [
+          { blockchainHash: Not(IsNull()) }
+        ],
+        relations: ['vehicle'],
+        order: { createdAt: 'DESC' }
+      });
+
+      let successCount = 0;
+      let errorCount = 0;
+      let fixedCount = 0;
+
+      for (const service of services) {
+        try {
+          // Verificar se o hash existe no contrato
+          const exists = await this.besuService.verifyHashInContract(service.blockchainHash);
+          
+          if (!exists) {
+            this.logger.log(`🔧 Hash não encontrado no contrato, registrando: ${service.blockchainHash}`);
+            
+            // Registrar o hash no contrato
+            const result = await this.besuService.registerHash(
+              service.blockchainHash,
+              service.vehicleId,
+              service.type || 'MANUTENCAO'
+            );
+            
+            if (result.success) {
+              // Atualizar status de confirmação no banco
+              await this.vehicleServiceRepository.update(
+                { id: service.id },
+                { 
+                  blockchainConfirmedAt: new Date(),
+                  status: ServiceStatus.CONFIRMED,
+                  isImmutable: true,
+                  canEdit: false,
+                  confirmedBy: 'blockchain-fix'
+                }
+              );
+              
+              fixedCount++;
+              successCount++;
+              this.logger.log(`✅ Hash corrigido e registrado: ${service.blockchainHash}`);
+            } else {
+              errorCount++;
+              this.logger.warn(`⚠️ Falha ao registrar hash: ${service.blockchainHash}`);
+            }
+          } else {
+            this.logger.log(`ℹ️ Hash já existe no contrato: ${service.blockchainHash}`);
+            successCount++;
+          }
+        } catch (error) {
+          errorCount++;
+          this.logger.error(`❌ Erro ao processar hash ${service.blockchainHash}:`, error.message);
+        }
+      }
+
+      this.logger.log(`📊 Correção concluída: ${fixedCount} hashes corrigidos, ${successCount} sucessos, ${errorCount} erros`);
+      
+      return {
+        success: true,
+        totalProcessed: services.length,
+        fixedCount,
+        successCount,
+        errorCount,
+        message: `Corrigidos ${fixedCount} de ${services.length} hashes falhando`
+      };
+    } catch (error) {
+      this.logger.error('❌ Erro ao corrigir hashes falhando:', error.message);
+      throw error;
+    }
+  }
+
+  /**
+   * Verifica e corrige datas incorretas nos serviços
+   * @returns Resultado da operação
+   */
+  async fixIncorrectDates() {
+    try {
+      this.logger.log('🔧 Verificando e corrigindo datas incorretas...');
+      
+      // Buscar todos os serviços
+      const services = await this.vehicleServiceRepository.find({
+        relations: ['vehicle'],
+        order: { createdAt: 'DESC' }
+      });
+
+      let correctedCount = 0;
+      const currentDate = new Date();
+      const oneYearAgo = new Date(currentDate.getFullYear() - 1, currentDate.getMonth(), currentDate.getDate());
+      const oneYearFromNow = new Date(currentDate.getFullYear() + 1, currentDate.getMonth(), currentDate.getDate());
+
+      for (const service of services) {
+        let needsUpdate = false;
+        const updates: any = {};
+
+        // Verificar serviceDate
+        if (service.serviceDate) {
+          const serviceDate = new Date(service.serviceDate);
+          // Se a data está muito no futuro (mais de 1 ano) ou muito no passado (mais de 1 ano)
+          if (serviceDate > oneYearFromNow || serviceDate < oneYearAgo) {
+            this.logger.warn(`⚠️ Data de serviço suspeita: ${serviceDate} para serviço ${service.id}`);
+            // Usar a data de criação como referência
+            updates.serviceDate = service.createdAt;
+            needsUpdate = true;
+          }
+        }
+
+        // Verificar se createdAt está no futuro
+        if (service.createdAt) {
+          const createdAt = new Date(service.createdAt);
+          if (createdAt > currentDate) {
+            this.logger.warn(`⚠️ Data de criação no futuro: ${createdAt} para serviço ${service.id}`);
+            updates.createdAt = currentDate;
+            needsUpdate = true;
+          }
+        }
+
+        if (needsUpdate) {
+          await this.vehicleServiceRepository.update(
+            { id: service.id },
+            updates
+          );
+          correctedCount++;
+          this.logger.log(`✅ Datas corrigidas para serviço ${service.id}`);
+        }
+      }
+
+      this.logger.log(`📊 Correção concluída: ${correctedCount} serviços corrigidos`);
+      
+      return {
+        success: true,
+        totalProcessed: services.length,
+        correctedCount,
+        message: `Corrigidas ${correctedCount} datas incorretas de ${services.length} serviços`
+      };
+    } catch (error) {
+      this.logger.error('❌ Erro ao corrigir datas:', error.message);
+      throw error;
+    }
+  }
+
+  async getAllServices(userId?: string) {
     try {
       if (await this.besuService.isConnected()) {
         this.logger.log('📋 Serviços gerenciados pela rede Besu');
 
         // Buscar serviços do banco de dados que têm hash blockchain
-        const services = await this.vehicleServiceRepository.find({
-          where: [
-            { blockchainHash: Not(IsNull()) }
-          ],
-          relations: ['vehicle'],
-          order: { createdAt: 'DESC' }
-        });
+        const queryBuilder = this.vehicleServiceRepository
+          .createQueryBuilder('vehicleService')
+          .leftJoinAndSelect('vehicleService.vehicle', 'vehicle')
+          .where('vehicleService.blockchainHash IS NOT NULL')
+          .orderBy('vehicleService.createdAt', 'DESC');
+
+        if (userId) {
+          queryBuilder.andWhere('vehicle.userId = :userId', { userId });
+        }
+
+        const services = await queryBuilder.getMany();
 
         this.logger.log(`📊 Encontrados ${services.length} serviços com hash blockchain`);
         this.logger.log(`📊 Serviços confirmados: ${services.filter(s => s.blockchainConfirmedAt).length}`);
@@ -516,6 +661,7 @@ export class BlockchainService {
           }
 
           this.logger.log(`🔍 Serviço ${service.id}: hash=${!!service.blockchainHash}, confirmed=${!!service.blockchainConfirmedAt}, verified=${service.blockchainVerified}, status=${mappedStatus}`);
+          this.logger.log(`📅 Datas do serviço ${service.id}: serviceDate=${service.serviceDate}, createdAt=${service.createdAt}`);
 
           return {
             id: service.id,
@@ -556,6 +702,200 @@ export class BlockchainService {
     } catch (error) {
       this.logger.error('❌ Erro ao obter todos os serviços:', error);
       return [];
+    }
+  }
+
+  /**
+   * Reenvia um serviço falhado para a blockchain
+   * @param serviceId ID do serviço a ser reenviado
+   * @returns Resultado do reenvio
+   */
+  async resendFailedService(serviceId: string): Promise<ServiceSubmissionResult> {
+    try {
+      this.logger.log(`🔄 Reenviando serviço falhado: ${serviceId}`);
+
+      // Buscar o serviço no banco de dados
+      const service = await this.vehicleServiceRepository.findOne({
+        where: { id: serviceId },
+        relations: ['vehicle']
+      });
+
+      this.logger.log(`🔍 Serviço encontrado:`, {
+        id: service?.id,
+        status: service?.status,
+        vehicleId: service?.vehicleId,
+        description: service?.description
+      });
+
+      if (!service) {
+        this.logger.warn(`❌ Serviço não encontrado: ${serviceId}`);
+        return {
+          success: false,
+          error: 'Serviço não encontrado',
+          status: 'FAILED'
+        };
+      }
+
+      // Verificar se o serviço está realmente falhado
+      if (service.status !== 'rejected' && service.status !== 'expired') {
+        this.logger.warn(`⚠️ Serviço não está em estado de falha: ${service.status}`);
+        return {
+          success: false,
+          error: 'Serviço não está em estado de falha',
+          status: 'FAILED'
+        };
+      }
+
+      // Verificar se já foi tentado muitas vezes (limite de 3 tentativas)
+      const retryCount = await this.getRetryCount(serviceId);
+      if (retryCount >= 3) {
+        return {
+          success: false,
+          error: 'Número máximo de tentativas de reenvio excedido',
+          status: 'FAILED'
+        };
+      }
+
+      // Reenviar para blockchain
+      const result = await this.submitServiceToBlockchain({
+        serviceId: service.id,
+        vehicleId: service.vehicleId,
+        mileage: service.mileage,
+        cost: service.cost,
+        description: service.description,
+        location: service.location,
+        type: service.type
+      });
+
+      if (result.success) {
+        // Atualizar status do serviço
+        service.status = ServiceStatus.CONFIRMED;
+        service.blockchainHash = result.transactionHash;
+        service.isImmutable = true;
+        service.canEdit = false;
+        service.blockchainConfirmedAt = new Date();
+        service.confirmedBy = 'blockchain-resend';
+        
+        await this.vehicleServiceRepository.save(service);
+        
+        // Incrementar contador de tentativas
+        await this.incrementRetryCount(serviceId);
+        
+        this.logger.log(`✅ Serviço ${serviceId} reenviado com sucesso`);
+      } else {
+        // Incrementar contador de tentativas mesmo em caso de falha
+        await this.incrementRetryCount(serviceId);
+        this.logger.warn(`⚠️ Falha ao reenviar serviço ${serviceId}: ${result.error}`);
+      }
+
+      return result;
+    } catch (error) {
+      this.logger.error('❌ Erro ao reenviar serviço:', error);
+      return {
+        success: false,
+        error: error.message,
+        status: 'FAILED'
+      };
+    }
+  }
+
+  /**
+   * Obtém o número de tentativas de reenvio de um serviço
+   * @param serviceId ID do serviço
+   * @returns Número de tentativas
+   */
+  private async getRetryCount(serviceId: string): Promise<number> {
+    // Por simplicidade, vamos usar um campo no banco ou cache
+    // Em uma implementação real, você poderia ter uma tabela separada para tracking
+    const service = await this.vehicleServiceRepository.findOne({
+      where: { id: serviceId },
+      select: ['id', 'notes'] // Usar notes para armazenar retry count temporariamente
+    });
+
+    if (!service || !service.notes) return 0;
+
+    const retryMatch = service.notes.match(/retry_count:(\d+)/);
+    return retryMatch ? parseInt(retryMatch[1]) : 0;
+  }
+
+  /**
+   * Incrementa o contador de tentativas de reenvio
+   * @param serviceId ID do serviço
+   */
+  private async incrementRetryCount(serviceId: string): Promise<void> {
+    const currentCount = await this.getRetryCount(serviceId);
+    const newCount = currentCount + 1;
+    
+    await this.vehicleServiceRepository.update(
+      { id: serviceId },
+      { 
+        notes: `retry_count:${newCount}`,
+        updatedAt: new Date()
+      }
+    );
+  }
+
+
+  /**
+   * Registra um hash diretamente no contrato blockchain
+   * @param hash Hash a ser registrado
+   * @param vehicleId ID do veículo
+   * @param eventType Tipo do evento
+   * @returns Resultado do registro
+   */
+  async registerHashInContract(
+    hash: string,
+    vehicleId: string,
+    eventType: string
+  ): Promise<{ success: boolean; transactionHash?: string; error?: string }> {
+    try {
+      this.logger.log(`🔄 Iniciando registro de hash no contrato: ${hash}`);
+      
+      const isConnected = await this.besuService.isConnected();
+      this.logger.log(`🔗 Status da conexão Besu: ${isConnected}`);
+      
+      if (isConnected) {
+        try {
+          this.logger.log(`📝 Chamando besuService.registerHash...`);
+          // Registrar o hash no contrato
+          const result = await this.besuService.registerHash(hash, vehicleId, eventType);
+          
+          this.logger.log(`📊 Resultado do besuService.registerHash:`, result);
+          
+          if (result.success) {
+            this.logger.log(`✅ Hash registrado no contrato: ${hash}`);
+            return {
+              success: true,
+              transactionHash: result.transactionHash
+            };
+          } else {
+            this.logger.warn(`⚠️ Falha ao registrar hash no contrato: ${result.error}`);
+            return {
+              success: false,
+              error: result.error
+            };
+          }
+        } catch (besuError) {
+          this.logger.error('❌ Erro ao registrar hash na rede Besu:', besuError.message);
+          return {
+            success: false,
+            error: `Falha na rede Besu: ${besuError.message}`
+          };
+        }
+      }
+
+      // Se Besu não estiver disponível, retornar falha
+      this.logger.warn('🚫 Rede Besu não disponível - hash não registrado na blockchain');
+      return {
+        success: false,
+        error: 'Rede blockchain não disponível'
+      };
+    } catch (error) {
+      this.logger.error('❌ Erro ao registrar hash no contrato:', error);
+      return {
+        success: false,
+        error: error.message
+      };
     }
   }
 

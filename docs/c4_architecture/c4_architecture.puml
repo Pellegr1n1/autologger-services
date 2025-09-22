@@ -3,7 +3,7 @@
 !includeurl https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Container.puml
 !includeurl https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Component.puml
 
-title AutoLogger - Sistema de Gestão de Histórico Veicular com Blockchain
+title AutoLogger - Sistema de Gestão de Histórico Veicular com Blockchain Privada Besu
 
 LAYOUT_TOP_DOWN()
 
@@ -11,16 +11,16 @@ Person(owner, "Proprietário de Veículo", "Usuário que cadastra e gerencia his
 Person(buyer, "Comprador Potencial", "Pessoa interessada em verificar o histórico autêntico do veículo antes da compra")
 
 System_Boundary(autologger_system, "Sistema AutoLogger") {
-    System(autologger, "AutoLogger", "Plataforma web para gestão de histórico veicular com registro imutável em blockchain")
+    System(autologger, "AutoLogger", "Plataforma web para gestão de histórico veicular com registro imutável em blockchain privada")
 }
 
-System_Ext(ethereum, "Rede Ethereum (Sepolia)", "Blockchain pública para registro imutável de hashes dos eventos veiculares")
+System_Ext(besu_network, "Rede Besu Privada", "Blockchain privada para registro imutável de hashes dos eventos veiculares")
 System_Ext(email_service, "Serviço de Email", "Envio de notificações e recuperação de senha")
 System_Ext(cloud_storage, "Armazenamento em Nuvem", "Storage para imagens e documentos PDF dos eventos")
 
 Rel(owner, autologger, "Cadastra eventos, gerencia veículos e visualiza relatórios", "HTTPS")
 Rel(buyer, autologger, "Consulta histórico verificado do veículo", "HTTPS")
-Rel(autologger, ethereum, "Registra hash SHA-256 dos eventos confirmados", "Web3/RPC")
+Rel(autologger, besu_network, "Registra hash SHA-256 dos eventos confirmados", "Web3/RPC")
 Rel(autologger, email_service, "Envia notificações e emails", "SMTP/API")
 Rel(autologger, cloud_storage, "Armazena arquivos de comprovação", "REST API")
 
@@ -37,53 +37,45 @@ LAYOUT_TOP_DOWN()
 Person(user, "Usuário", "Proprietário de veículo ou comprador interessado")
 
 System_Boundary(autologger_boundary, "Sistema AutoLogger") {
-    Container(frontend, "Frontend Web", "React + TypeScript", "Interface responsiva que permite acesso ao sistema de gestão veicular.")
+    Container(frontend, "Frontend Web", "React + TypeScript + Ant Design", "Interface responsiva com páginas: Home, Auth, Vehicles, Maintenance, Reports, Blockchain, Profile")
     
-    Container(user_module, "User Module", "NestJS", "Gerencia cadastro, autenticação, edição e exclusão de usuários")
+    Container(auth_module, "Auth Module", "NestJS", "Gerencia autenticação JWT, login e registro de usuários")
     
-    Container(vehicle_module, "Vehicle Module", "NestJS", "Gerencia CRUD de veículos")
+    Container(user_module, "User Module", "NestJS", "Gerencia cadastro, edição e exclusão de usuários")
     
-    Container(event_module, "Event Module", "NestJS", "Gerencia eventos veiculares, gera hash SHA-256 e controla edição")
+    Container(vehicle_module, "Vehicle Module", "NestJS", "Gerencia CRUD de veículos e serviços veiculares")
     
-    Container(report_module, "Report Module", "NestJS", "Gera relatórios, estatísticas e gráficos")
+    Container(blockchain_module, "Blockchain Module", "NestJS + Ethers.js", "Interage com rede Besu privada, confirma transações e registra hashes")
     
-    Container(blockchain_module, "Blockchain Module", "NestJS + Ethers.js", "Interage com contratos inteligentes, confirma transações")
-    
-    Container(file_module, "File Module", "NestJS", "Gerencia upload de arquivos e integração com storage")
-    
-    ContainerDb(main_db, "Banco Principal", "PostgreSQL", "Armazena usuários, veículos, eventos e metadados de arquivos")
+    ContainerDb(main_db, "Banco Principal", "PostgreSQL", "Armazena usuários, veículos, serviços veiculares e metadados")
     
     ContainerDb(cache_db, "Cache", "Redis", "Cache de sessões JWT e consultas frequentes")
     
-    Container(smart_contracts, "Smart Contracts", "Solidity", "Contratos na rede Sepolia para registro imutável")
+    Container(smart_contracts, "Smart Contracts", "Solidity", "Contratos na rede Besu privada para registro imutável")
 }
 
-System_Ext(ethereum_net, "Rede Ethereum (Sepolia)", "Blockchain para registro de hashes")
+System_Ext(besu_net, "Rede Besu Privada", "Blockchain privada para registro de hashes")
 System_Ext(email_ext, "Serviço de Email", "Notificações por email")
 System_Ext(storage_ext, "Cloud Storage", "Armazenamento de arquivos")
 
 Rel(user, frontend, "Acessa via navegador", "HTTPS")
 
+Rel(frontend, auth_module, "Autenticação e login", "HTTPS/JSON")
 Rel(frontend, user_module, "Requisições de usuário", "HTTPS/JSON")
-Rel(frontend, vehicle_module, "Requisições de veículo", "HTTPS/JSON")
-Rel(frontend, event_module, "Requisições de eventos", "HTTPS/JSON")
-Rel(frontend, report_module, "Requisições de relatórios", "HTTPS/JSON")
-Rel(frontend, file_module, "Uploads e downloads", "HTTPS/JSON")
+Rel(frontend, vehicle_module, "Requisições de veículo e serviços", "HTTPS/JSON")
+Rel(frontend, blockchain_module, "Status blockchain", "HTTPS/JSON")
 
+Rel(auth_module, main_db, "Validação de credenciais", "TypeORM/SQL")
 Rel(user_module, main_db, "CRUD usuários", "TypeORM/SQL")
-Rel(vehicle_module, main_db, "CRUD veículos", "TypeORM/SQL")
-Rel(event_module, main_db, "CRUD eventos", "TypeORM/SQL")
-Rel(report_module, main_db, "Consultas relatórios", "TypeORM/SQL")
-Rel(file_module, main_db, "Metadados arquivos", "TypeORM/SQL")
+Rel(vehicle_module, main_db, "CRUD veículos e serviços", "TypeORM/SQL")
 
-Rel(user_module, cache_db, "Sessões JWT", "Redis")
+Rel(auth_module, cache_db, "Sessões JWT", "Redis")
 
-Rel(event_module, blockchain_module, "Solicita registro hash", "NestJS/HTTP")
+Rel(vehicle_module, blockchain_module, "Registra eventos", "NestJS/HTTP")
 Rel(blockchain_module, smart_contracts, "Executa transações", "Ethers.js")
-Rel(smart_contracts, ethereum_net, "Deploy/Interação", "Web3/RPC")
+Rel(smart_contracts, besu_net, "Deploy/Interação", "Web3/RPC")
 
-Rel(event_module, file_module, "Processa uploads", "NestJS/HTTP")
-Rel(file_module, storage_ext, "Armazena arquivos", "REST API")
+Rel(vehicle_module, storage_ext, "Armazena arquivos", "REST API")
 Rel(user_module, email_ext, "Envia emails", "SMTP/API")
 
 SHOW_LEGEND()
@@ -92,51 +84,63 @@ SHOW_LEGEND()
 @startuml c4_level3
 !includeurl https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Component.puml
 
-title AutoLogger - Componentes do Event Module
+title AutoLogger - Componentes do Vehicle Module
 
 LAYOUT_TOP_DOWN()
 
 Person(user, "Usuário", "Proprietário de veículo ou comprador interessado")
-Container(frontend, "Frontend Web", "React + TypeScript", "Interface do usuário")
-Container(blockchain_module, "Blockchain Module", "NestJS + Ethers.js", "Interação com blockchain")
-Container(file_module, "File Module", "NestJS", "Gestão de arquivos")
+Container(frontend, "Frontend Web", "React + TypeScript + Ant Design", "Interface do usuário")
+Container(blockchain_module, "Blockchain Module", "NestJS + Ethers.js", "Interação com blockchain Besu")
+Container(storage_ext, "Cloud Storage", "External Service", "Armazenamento de arquivos")
 ContainerDb(database, "PostgreSQL", "Database", "Armazenamento principal")
 
-Container_Boundary(event_module, "Event Module") {
-    Component(event_controller, "Event Controller", "NestJS Controller", "Endpoints REST para eventos veiculares. Implementa validação de entrada e autenticação JWT.")
+Container_Boundary(vehicle_module, "Vehicle Module") {
+    Component(vehicle_controller, "Vehicle Controller", "NestJS Controller", "Endpoints REST para veículos e serviços. Implementa validação de entrada e autenticação JWT.")
     
-    Component(event_manager, "Event Manager", "Service Class", "Lógica de negócio principal. Orquestra criação, edição e listagem de eventos.")
+    Component(vehicle_service, "Vehicle Service", "Service Class", "Lógica de negócio principal. Orquestra criação, edição e listagem de veículos.")
     
-    Component(hash_generator, "Hash Generator", "Utility Service", "Gera hash SHA-256 único para cada evento.")
+    Component(service_service, "Service Service", "Service Class", "Gerencia serviços veiculares, gera hash SHA-256 e controla edição.")
     
-    Component(validation_service, "Validation Service", "Service Class", "Validações de regras de negócio e integridade dos dados de eventos.")
+    Component(validation_service, "Validation Service", "Service Class", "Validações de regras de negócio e integridade dos dados.")
     
     Component(confirmation_service, "Confirmation Service", "Service Class", "Implementa dupla confirmação antes do registro na blockchain.")
     
-    Component(event_repository, "Event Repository", "Repository Pattern", "Camada de acesso a dados. Operações CRUD com controle transacional.")
+    Component(vehicle_repository, "Vehicle Repository", "Repository Pattern", "Camada de acesso a dados para veículos. Operações CRUD com controle transacional.")
     
-    Component(event_dto, "Event DTOs", "Data Transfer Objects", "Objetos para transferência de dados entre camadas.")
+    Component(service_repository, "Service Repository", "Repository Pattern", "Camada de acesso a dados para serviços. Operações CRUD com controle transacional.")
     
-    Component(event_entity, "Event Entity", "TypeORM Entity", "Mapeamento objeto-relacional da tabela de eventos.")
+    Component(vehicle_dto, "Vehicle DTOs", "Data Transfer Objects", "Objetos para transferência de dados de veículos entre camadas.")
+    
+    Component(service_dto, "Service DTOs", "Data Transfer Objects", "Objetos para transferência de dados de serviços entre camadas.")
+    
+    Component(vehicle_entity, "Vehicle Entity", "TypeORM Entity", "Mapeamento objeto-relacional da tabela de veículos.")
+    
+    Component(service_entity, "Service Entity", "TypeORM Entity", "Mapeamento objeto-relacional da tabela de serviços veiculares.")
 }
 
 Rel(user, frontend, "Interage com", "HTTPS")
-Rel(frontend, event_controller, "Faz chamadas para", "REST/JSON")
+Rel(frontend, vehicle_controller, "Faz chamadas para", "REST/JSON")
 
-Rel(event_controller, event_manager, "Delegação lógica", "Method calls")
-Rel(event_manager, validation_service, "Valida dados", "Method calls")
-Rel(event_manager, hash_generator, "Gera hash SHA-256", "Method calls")
-Rel(event_manager, confirmation_service, "Confirma evento", "Method calls")
-Rel(event_manager, event_repository, "Persistência de dados", "Method calls")
+Rel(vehicle_controller, vehicle_service, "Delegação lógica veículos", "Method calls")
+Rel(vehicle_controller, service_service, "Delegação lógica serviços", "Method calls")
+Rel(vehicle_service, validation_service, "Valida dados veículos", "Method calls")
+Rel(service_service, validation_service, "Valida dados serviços", "Method calls")
+Rel(service_service, confirmation_service, "Confirma serviço", "Method calls")
+Rel(vehicle_service, vehicle_repository, "Persistência veículos", "Method calls")
+Rel(service_service, service_repository, "Persistência serviços", "Method calls")
 
-Rel(event_repository, event_entity, "Mapeamento ORM", "TypeORM")
-Rel(event_repository, database, "Operações SQL", "TypeORM/SQL")
+Rel(vehicle_repository, vehicle_entity, "Mapeamento ORM", "TypeORM")
+Rel(service_repository, service_entity, "Mapeamento ORM", "TypeORM")
+Rel(vehicle_repository, database, "Operações SQL veículos", "TypeORM/SQL")
+Rel(service_repository, database, "Operações SQL serviços", "TypeORM/SQL")
 
-Rel(event_controller, event_dto, "Serialização", "JSON")
-Rel(event_manager, event_dto, "Transferência de dados", "Objects")
+Rel(vehicle_controller, vehicle_dto, "Serialização veículos", "JSON")
+Rel(vehicle_controller, service_dto, "Serialização serviços", "JSON")
+Rel(vehicle_service, vehicle_dto, "Transferência dados veículos", "Objects")
+Rel(service_service, service_dto, "Transferência dados serviços", "Objects")
 
 Rel(confirmation_service, blockchain_module, "Registra hash confirmado", "HTTP/JSON")
-Rel(event_manager, file_module, "Anexa arquivos", "HTTP/JSON")
+Rel(service_service, storage_ext, "Anexa arquivos", "HTTP/JSON")
 
 SHOW_LEGEND()
 @enduml
@@ -145,35 +149,55 @@ SHOW_LEGEND()
 !includeurl https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4.puml
 !includeurl https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Component.puml
 
-title AutoLogger - Código do Event Manager (Nível 4)
+title AutoLogger - Código do Vehicle Service (Nível 4)
 
-Container_Boundary(event_manager_code, "Event Manager - Estrutura de Código") {
-    Component(ievent_manager, "IEventManager", "Interface", "Contrato do serviço")
-    Component(event_manager_impl, "EventManagerImpl", "Component", "Lógica principal")
+Container_Boundary(vehicle_service_code, "Vehicle Service - Estrutura de Código") {
+    Component(ivehicle_service, "IVehicleService", "Interface", "Contrato do serviço de veículos")
+    Component(vehicle_service_impl, "VehicleServiceImpl", "Component", "Lógica principal de veículos")
     
-    Container_Boundary(event_models, "Event Models") {
-        Component(event_data, "Event Data", "Component", "DTOs e Entidade")
-        Component(event_types, "Event Types", "Component", "Enums e Status")
+    Component(iservice_service, "IServiceService", "Interface", "Contrato do serviço de serviços veiculares")
+    Component(service_service_impl, "ServiceServiceImpl", "Component", "Lógica principal de serviços")
+    
+    Container_Boundary(vehicle_models, "Vehicle Models") {
+        Component(vehicle_data, "Vehicle Data", "Component", "DTOs e Entidade de veículos")
+        Component(vehicle_types, "Vehicle Types", "Component", "Enums e Status de veículos")
     }
     
-    Component(business_rules, "Business Rules", "Component", "Validações e regras")
-    Component(event_factory, "Event Factory", "Component", "Criação de eventos")
+    Container_Boundary(service_models, "Service Models") {
+        Component(service_data, "Service Data", "Component", "DTOs e Entidade de serviços")
+        Component(service_types, "Service Types", "Component", "Enums e Status de serviços")
+    }
+    
+    Component(business_rules, "Business Rules", "Component", "Validações e regras de negócio")
+    Component(vehicle_factory, "Vehicle Factory", "Component", "Criação de veículos")
+    Component(service_factory, "Service Factory", "Component", "Criação de serviços")
 }
 
-Rel(event_manager_impl, ievent_manager, "implementa")
-Rel(event_manager_impl, event_data, "manipula")
-Rel(event_manager_impl, business_rules, "usa")
-Rel(event_manager_impl, event_factory, "usa")
-Rel(event_factory, event_data, "transforma")
-Rel(business_rules, event_data, "valida")
+Rel(vehicle_service_impl, ivehicle_service, "implementa")
+Rel(service_service_impl, iservice_service, "implementa")
+Rel(vehicle_service_impl, vehicle_data, "manipula")
+Rel(service_service_impl, service_data, "manipula")
+Rel(vehicle_service_impl, business_rules, "usa")
+Rel(service_service_impl, business_rules, "usa")
+Rel(vehicle_service_impl, vehicle_factory, "usa")
+Rel(service_service_impl, service_factory, "usa")
+Rel(vehicle_factory, vehicle_data, "transforma")
+Rel(service_factory, service_data, "transforma")
+Rel(business_rules, vehicle_data, "valida")
+Rel(business_rules, service_data, "valida")
 
 System_Boundary(external, "Dependências Externas") {
-    Component(repository, "Repository", "Interface", "Persistência de dados")
+    Component(vehicle_repository, "VehicleRepository", "Interface", "Persistência de veículos")
+    Component(service_repository, "ServiceRepository", "Interface", "Persistência de serviços")
     Component(validation, "ValidationService", "Interface", "Validações externas")
+    Component(blockchain, "BlockchainService", "Interface", "Integração com blockchain")
 }
 
-Rel(event_manager_impl, repository, "depende de")
-Rel(event_manager_impl, validation, "depende de")
+Rel(vehicle_service_impl, vehicle_repository, "depende de")
+Rel(service_service_impl, service_repository, "depende de")
+Rel(vehicle_service_impl, validation, "depende de")
+Rel(service_service_impl, validation, "depende de")
+Rel(service_service_impl, blockchain, "depende de")
 
 SHOW_LEGEND()
 @enduml

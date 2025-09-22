@@ -1,4 +1,4 @@
-import { Controller, Post, Get, Body, Param, UseGuards } from '@nestjs/common';
+import { Controller, Post, Get, Body, Param, UseGuards, Request } from '@nestjs/common';
 import { BlockchainService, ServiceSubmissionResult, BlockchainTransaction } from './blockchain.service';
 import { BesuService } from './besu/besu.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -29,14 +29,21 @@ export class BlockchainController {
     return this.blockchainService.confirmService(serviceId);
   }
 
+  @Post('services/:serviceId/resend')
+  async resendFailedService(@Param('serviceId') serviceId: string): Promise<ServiceSubmissionResult> {
+    return this.blockchainService.resendFailedService(serviceId);
+  }
+
+
   @Get('services/:serviceId/status')
   async getServiceStatus(@Param('serviceId') serviceId: string): Promise<BlockchainTransaction> {
     return this.blockchainService.getServiceStatus(serviceId);
   }
 
   @Get('services')
-  async getAllServices() {
-    return this.blockchainService.getAllServices();
+  async getAllServices(@Request() req) {
+    const userId = req.user?.id;
+    return this.blockchainService.getAllServices(userId);
   }
 
   @Post('services/verify')
@@ -57,6 +64,17 @@ export class BlockchainController {
   @Post('services/clean-orphan-hashes')
   async cleanOrphanHashes() {
     return this.blockchainService.cleanOrphanHashes();
+  }
+
+  @Post('services/fix-failing-hashes')
+  async fixFailingHashes() {
+    return this.blockchainService.fixFailingHashes();
+  }
+
+  @Post('services/fix-dates')
+  async fixIncorrectDates(@Request() req) {
+    const userId = req.user?.id;
+    return this.blockchainService.fixIncorrectDates();
   }
 
   @Get('network/health')

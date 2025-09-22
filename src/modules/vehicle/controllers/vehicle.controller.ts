@@ -70,7 +70,7 @@ export class VehicleController {
       new ParseFilePipe({
         validators: [
           new MaxFileSizeValidator({ maxSize: 5 * 1024 * 1024 }), // 5MB
-          new FileTypeValidator({ fileType: '.(jpg|jpeg|png|gif)' }),
+          new FileTypeValidator({ fileType: '.(jpg|jpeg|png|gif|webp)' }),
         ],
         fileIsRequired: false,
       }),
@@ -156,7 +156,7 @@ export class VehicleController {
       new ParseFilePipe({
         validators: [
           new MaxFileSizeValidator({ maxSize: 5 * 1024 * 1024 }), // 5MB
-          new FileTypeValidator({ fileType: '.(jpg|jpeg|png|gif)' }),
+          new FileTypeValidator({ fileType: '.(jpg|jpeg|png|gif|webp)' }),
         ],
         fileIsRequired: false,
       }),

@@ -6,16 +6,28 @@ import { VehicleService, ServiceStatus, ServiceType } from '../entities/vehicle-
 import { CreateVehicleServiceDto } from '../dto/create-vehicle-service.dto';
 import { UpdateVehicleServiceDto } from '../dto/update-vehicle-service.dto';
 import { BlockchainService } from '../../../blockchain/blockchain.service';
+import { Vehicle } from '../entities/vehicle.entity';
 
 @Injectable()
 export class VehicleServiceService {
   constructor(
     @InjectRepository(VehicleService)
     private vehicleServiceRepository: Repository<VehicleService>,
+    @InjectRepository(Vehicle)
+    private vehicleRepository: Repository<Vehicle>,
     private blockchainService: BlockchainService,
   ) {}
 
   async create(createVehicleServiceDto: CreateVehicleServiceDto): Promise<VehicleService> {
+    // Verificar se o veículo existe e pertence ao usuário
+    const vehicle = await this.vehicleRepository.findOne({
+      where: { id: createVehicleServiceDto.vehicleId },
+    });
+
+    if (!vehicle) {
+      throw new BadRequestException('Veículo não encontrado');
+    }
+
     // Criar o serviço no banco de dados
     const vehicleService = this.vehicleServiceRepository.create({
       ...createVehicleServiceDto,
@@ -24,43 +36,85 @@ export class VehicleServiceService {
 
     const savedService = await this.vehicleServiceRepository.save(vehicleService);
 
-    // Tentar registrar na blockchain
-    try {
-      const blockchainResult = await this.blockchainService.submitServiceToBlockchain({
-        serviceId: savedService.id,
-        vehicleId: savedService.vehicleId,
-        mileage: savedService.mileage,
-        cost: savedService.cost,
-        description: savedService.description,
-        location: savedService.location,
-        type: savedService.type,
-      });
-
-      if (blockchainResult.success) {
-        // Atualizar o serviço com informações da blockchain
-        savedService.blockchainHash = blockchainResult.transactionHash;
-        savedService.status = ServiceStatus.CONFIRMED;
-        savedService.isImmutable = true;
-        savedService.canEdit = false;
-        savedService.blockchainConfirmedAt = new Date();
-        savedService.confirmedBy = 'blockchain';
-
-        return await this.vehicleServiceRepository.save(savedService);
-      }
-    } catch (error) {
-      console.error('Erro ao registrar na blockchain:', error);
-      // O serviço foi criado no banco, mas falhou na blockchain
-      // Pode ser processado posteriormente
-    }
+    // Processar blockchain de forma assíncrona (não bloquear a resposta)
+    this.processBlockchainAsync(savedService).catch(error => {
+      console.error('Erro ao processar blockchain de forma assíncrona:', error);
+    });
 
     return savedService;
   }
 
-  async findAll(): Promise<VehicleService[]> {
-    return await this.vehicleServiceRepository.find({
-      relations: ['vehicle'],
-      order: { createdAt: 'DESC' },
-    });
+  /**
+   * Processa o registro na blockchain de forma assíncrona
+   * @param service Serviço a ser processado
+   */
+  private async processBlockchainAsync(service: VehicleService): Promise<void> {
+    try {
+      console.log(`🔄 Iniciando processamento blockchain para serviço: ${service.id}`);
+      
+      // Primeiro, gerar o hash do serviço
+      const eventData = {
+        serviceId: service.id,
+        vehicleId: service.vehicleId,
+        type: service.type,
+        description: service.description,
+        serviceDate: service.serviceDate,
+        timestamp: new Date().toISOString()
+      };
+      
+      const serviceHash = ethers.keccak256(ethers.toUtf8Bytes(JSON.stringify(eventData)));
+      console.log(`🔑 Hash gerado para serviço ${service.id}: ${serviceHash}`);
+      
+      // Registrar o hash no contrato blockchain
+      console.log(`📝 Tentando registrar hash no contrato blockchain...`);
+      const hashResult = await this.blockchainService.registerHashInContract(
+        serviceHash,
+        service.vehicleId,
+        service.type || 'MANUTENCAO'
+      );
+
+      console.log(`📊 Resultado do registro:`, hashResult);
+
+      if (hashResult.success) {
+        // Atualizar o serviço com informações da blockchain
+        service.blockchainHash = serviceHash;
+        service.status = ServiceStatus.CONFIRMED;
+        service.isImmutable = true;
+        service.canEdit = false;
+        service.blockchainConfirmedAt = new Date();
+        service.confirmedBy = 'blockchain';
+
+        await this.vehicleServiceRepository.save(service);
+        console.log(`✅ Serviço ${service.id} registrado na blockchain com sucesso - Hash: ${serviceHash}`);
+      } else {
+        // Marcar como rejeitado quando falha na blockchain
+        service.status = ServiceStatus.REJECTED;
+        service.canEdit = true; // Permite edição quando rejeitado
+        
+        await this.vehicleServiceRepository.save(service);
+        console.warn(`⚠️ Serviço ${service.id} rejeitado pela blockchain: ${hashResult.error}`);
+      }
+    } catch (error) {
+      // Marcar como rejeitado quando há exceção na blockchain
+      service.status = ServiceStatus.REJECTED;
+      service.canEdit = true; // Permite edição quando rejeitado
+      
+      await this.vehicleServiceRepository.save(service);
+      console.error(`❌ Serviço ${service.id} rejeitado por erro na blockchain:`, error);
+    }
+  }
+
+  async findAll(userId?: string): Promise<VehicleService[]> {
+    const queryBuilder = this.vehicleServiceRepository
+      .createQueryBuilder('vehicleService')
+      .leftJoinAndSelect('vehicleService.vehicle', 'vehicle')
+      .orderBy('vehicleService.createdAt', 'DESC');
+
+    if (userId) {
+      queryBuilder.where('vehicle.userId = :userId', { userId });
+    }
+
+    return await queryBuilder.getMany();
   }
 
   async findByVehicleId(vehicleId: string): Promise<VehicleService[]> {
@@ -135,35 +189,53 @@ export class VehicleServiceService {
     return await this.vehicleServiceRepository.save(vehicleService);
   }
 
-  async getServicesByType(type: ServiceType): Promise<VehicleService[]> {
-    return await this.vehicleServiceRepository.find({
-      where: { type },
-      relations: ['vehicle'],
-      order: { serviceDate: 'DESC' },
-    });
+  async getServicesByType(type: ServiceType, userId?: string): Promise<VehicleService[]> {
+    const queryBuilder = this.vehicleServiceRepository
+      .createQueryBuilder('vehicleService')
+      .leftJoinAndSelect('vehicleService.vehicle', 'vehicle')
+      .where('vehicleService.type = :type', { type })
+      .orderBy('vehicleService.serviceDate', 'DESC');
+
+    if (userId) {
+      queryBuilder.andWhere('vehicle.userId = :userId', { userId });
+    }
+
+    return await queryBuilder.getMany();
   }
 
-  async getServicesByStatus(status: ServiceStatus): Promise<VehicleService[]> {
-    return await this.vehicleServiceRepository.find({
-      where: { status },
-      relations: ['vehicle'],
-      order: { createdAt: 'DESC' },
-    });
+  async getServicesByStatus(status: ServiceStatus, userId?: string): Promise<VehicleService[]> {
+    const queryBuilder = this.vehicleServiceRepository
+      .createQueryBuilder('vehicleService')
+      .leftJoinAndSelect('vehicleService.vehicle', 'vehicle')
+      .where('vehicleService.status = :status', { status })
+      .orderBy('vehicleService.createdAt', 'DESC');
+
+    if (userId) {
+      queryBuilder.andWhere('vehicle.userId = :userId', { userId });
+    }
+
+    return await queryBuilder.getMany();
   }
 
   async getServicesByDateRange(
     startDate: Date,
     endDate: Date,
+    userId?: string,
   ): Promise<VehicleService[]> {
-    return await this.vehicleServiceRepository
+    const queryBuilder = this.vehicleServiceRepository
       .createQueryBuilder('service')
       .leftJoinAndSelect('service.vehicle', 'vehicle')
       .where('service.serviceDate BETWEEN :startDate AND :endDate', {
         startDate,
         endDate,
       })
-      .orderBy('service.serviceDate', 'DESC')
-      .getMany();
+      .orderBy('service.serviceDate', 'DESC');
+
+    if (userId) {
+      queryBuilder.andWhere('vehicle.userId = :userId', { userId });
+    }
+
+    return await queryBuilder.getMany();
   }
 
   async getServicesByMileageRange(

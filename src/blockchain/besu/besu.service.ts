@@ -29,6 +29,8 @@ export class BesuService {
     'function totalServices() external view returns (uint256)',
     'function nextServiceId() external view returns (uint256)',
     'function admin() external view returns (address)',
+    'function transferAdmin(address _newAdmin) external',
+    'function withdraw(uint256 _amount) external',
     
     // Eventos
     'event ServiceRegistered(uint256 indexed serviceId, string indexed vehicleId, address indexed serviceProvider, uint256 timestamp, uint256 cost)',
@@ -91,7 +93,72 @@ export class BesuService {
   }
 
   /**
-   * Registra um hash de evento veicular na blockchain
+   * Registra um serviço de veículo na blockchain
+   * @param serviceData Dados do serviço
+   * @returns Resultado do registro
+   */
+  async registerService(serviceData: {
+    vehicleId: string;
+    mileage: number;
+    cost: number;
+    description: string;
+    serviceType: string;
+  }): Promise<{ success: boolean; transactionHash?: string; serviceId?: number; error?: string }> {
+    try {
+      if (!this.contract) {
+        throw new Error('Contrato não inicializado');
+      }
+
+      this.logger.log(`📝 Registrando serviço para veículo: ${serviceData.vehicleId}`);
+
+      // Registrar o serviço no contrato
+      const tx = await this.contract.registerService(
+        serviceData.vehicleId,
+        serviceData.mileage,
+        serviceData.cost,
+        serviceData.description,
+        serviceData.serviceType
+      );
+      
+      this.logger.log(`⏳ Transação enviada: ${tx.hash}`);
+      
+      // Aguardar confirmação
+      const receipt = await tx.wait();
+      
+      this.logger.log(`✅ Serviço registrado com sucesso no bloco: ${receipt.blockNumber}`);
+
+      // Extrair o ID do serviço do evento
+      const event = receipt.logs.find(log => {
+        try {
+          const parsed = this.contract.interface.parseLog(log);
+          return parsed?.name === 'ServiceRegistered';
+        } catch {
+          return false;
+        }
+      });
+
+      let serviceId: number | undefined;
+      if (event) {
+        const parsed = this.contract.interface.parseLog(event);
+        serviceId = Number(parsed?.args.serviceId);
+      }
+
+      return {
+        success: true,
+        transactionHash: tx.hash,
+        serviceId
+      };
+    } catch (error) {
+      this.logger.error('❌ Erro ao registrar serviço:', error.message);
+      return {
+        success: false,
+        error: error.message
+      };
+    }
+  }
+
+  /**
+   * Registra um hash de evento veicular na blockchain (método legado)
    * @param hash Hash do evento
    * @param vehicleId ID do veículo
    * @param eventType Tipo do evento
@@ -108,9 +175,6 @@ export class BesuService {
       }
 
       this.logger.log(`📝 Registrando hash: ${hash} para veículo: ${vehicleId}`);
-
-      // Converter hash string para bytes32
-      const hashBytes32 = ethers.keccak256(ethers.toUtf8Bytes(hash));
 
       // Registrar o hash no contrato
       const tx = await this.contract.registerHash(hash);
