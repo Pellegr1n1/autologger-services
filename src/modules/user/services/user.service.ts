@@ -23,15 +23,16 @@ export class UserService {
       throw new ConflictException('Email já está em uso');
     }
 
-    // Criptografa a senha
-    const saltRounds = 12;
-    const hashedPassword = await bcrypt.hash(createUserDto.password, saltRounds);
-
     // Cria o usuário
     const userData = {
       ...createUserDto,
-      password: hashedPassword,
     };
+
+    // Se tem senha, criptografa
+    if (createUserDto.password) {
+      const saltRounds = 12;
+      userData.password = await bcrypt.hash(createUserDto.password, saltRounds);
+    }
 
     const user = await this.userRepository.create(userData);
     return this.toUserResponseDto(user);
@@ -75,8 +76,17 @@ export class UserService {
       updateData.email = updateUserDto.email;
     }
     
-    if (updateUserDto.phone !== undefined) {
-      updateData.phone = updateUserDto.phone;
+
+    if (updateUserDto.googleId !== undefined) {
+      updateData.googleId = updateUserDto.googleId;
+    }
+
+    if (updateUserDto.avatar !== undefined) {
+      updateData.avatar = updateUserDto.avatar;
+    }
+
+    if (updateUserDto.authProvider !== undefined) {
+      updateData.authProvider = updateUserDto.authProvider;
     }
 
     // Atualiza no banco
@@ -102,6 +112,23 @@ export class UserService {
       throw new NotFoundException('Usuário não encontrado');
     }
     await this.userRepository.softDelete(userId);
+  }
+
+  async findByGoogleId(googleId: string): Promise<User | null> {
+    return await this.userRepository.findByGoogleId(googleId);
+  }
+
+  async createGoogleUser(googleUser: any): Promise<User> {
+    const userData = {
+      name: googleUser.name,
+      email: googleUser.email,
+      googleId: googleUser.googleId,
+      avatar: googleUser.avatar,
+      authProvider: 'google' as const,
+      isActive: true,
+    };
+
+    return await this.userRepository.createGoogleUser(userData);
   }
 
   private toUserResponseDto(user: User): UserResponseDto {

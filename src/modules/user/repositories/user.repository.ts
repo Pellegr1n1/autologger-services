@@ -32,4 +32,20 @@ export class UserRepository {
   async softDelete(id: string): Promise<void> {
     await this.userRepository.update(id, { isActive: false });
   }
+
+  async findByGoogleId(googleId: string): Promise<User | null> {
+    return await this.userRepository.findOne({ where: { googleId } });
+  }
+
+  async createGoogleUser(userData: {
+    name: string;
+    email: string;
+    googleId: string;
+    avatar?: string;
+    authProvider: 'google';
+    isActive: boolean;
+  }): Promise<User> {
+    const user = this.userRepository.create(userData);
+    return await this.userRepository.save(user);
+  }
 }

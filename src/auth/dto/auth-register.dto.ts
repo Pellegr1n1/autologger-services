@@ -8,12 +8,6 @@ export class AuthRegisterDto {
   @IsEmail({}, { message: 'Email deve ter um formato válido' })
   email: string;
 
-  @IsOptional()
-  @IsString({ message: 'Telefone deve ser uma string' })
-  @Matches(/^\d{10,11}$/, {
-    message: 'Telefone deve conter apenas números e ter 10 ou 11 dígitos'
-  })
-  phone?: string;
 
   @IsString({ message: 'Senha deve ser uma string' })
   @MinLength(8, { message: 'Senha deve ter pelo menos 8 caracteres' })

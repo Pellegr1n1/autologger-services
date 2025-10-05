@@ -1,4 +1,4 @@
-import { IsEmail, IsString, MinLength, IsOptional, Matches } from 'class-validator';
+import { IsEmail, IsString, MinLength, IsOptional, Matches, IsEnum } from 'class-validator';
 
 export class UpdateUserDto {
   @IsOptional()
@@ -10,10 +10,16 @@ export class UpdateUserDto {
   @IsEmail({}, { message: 'Email deve ter um formato válido' })
   email?: string;
 
+
   @IsOptional()
-  @IsString({ message: 'Telefone deve ser uma string' })
-  @Matches(/^\(\d{2}\)\s\d{4,5}-\d{4}$/, {
-    message: 'Telefone deve estar no formato (11) 99999-9999'
-  })
-  phone?: string;
+  @IsString({ message: 'Google ID deve ser uma string' })
+  googleId?: string;
+
+  @IsOptional()
+  @IsString({ message: 'Avatar deve ser uma string' })
+  avatar?: string;
+
+  @IsOptional()
+  @IsEnum(['local', 'google'], { message: 'Provedor de autenticação deve ser local ou google' })
+  authProvider?: 'local' | 'google';
 }

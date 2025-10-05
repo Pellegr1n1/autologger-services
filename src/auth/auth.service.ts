@@ -27,7 +27,6 @@ export class AuthService {
       const createUserDto: CreateUserDto = {
         name: authRegisterDto.name,
         email: authRegisterDto.email,
-        phone: authRegisterDto.phone,
         password: authRegisterDto.password,
       };
 
@@ -45,7 +44,8 @@ export class AuthService {
           id: user.id,
           name: user.name,
           email: user.email,
-          phone: user.phone,
+          avatar: user.avatar,
+          authProvider: user.authProvider,
         },
       };
     } catch (error) {
@@ -58,6 +58,10 @@ export class AuthService {
     
     if (!user || !user.isActive) {
       throw new UnauthorizedException('Credenciais inválidas');
+    }
+
+    if (user.authProvider !== 'local') {
+      throw new UnauthorizedException('Use o login com Google para esta conta');
     }
 
     const isPasswordValid = await this.userService.validatePassword(
@@ -81,7 +85,64 @@ export class AuthService {
         id: user.id,
         name: user.name,
         email: user.email,
-        phone: user.phone,
+        avatar: user.avatar,
+        authProvider: user.authProvider,
+      },
+    };
+  }
+
+  async validateGoogleUser(googleUser: any) {
+    console.log('Validating Google user:', googleUser);
+    
+    if (!googleUser.googleId || !googleUser.email) {
+      throw new BadRequestException('Dados do usuário Google inválidos');
+    }
+
+    const existingUser = await this.userService.findByGoogleId(googleUser.googleId);
+    
+    if (existingUser) {
+      console.log('Found existing user by Google ID:', existingUser.id);
+      return existingUser;
+    }
+
+    const userByEmail = await this.userService.findByEmail(googleUser.email);
+    if (userByEmail) {
+      console.log('Found existing user by email:', userByEmail.id, 'authProvider:', userByEmail.authProvider);
+      if (userByEmail.authProvider === 'local') {
+        throw new BadRequestException('Já existe uma conta com este email. Use login com senha.');
+      }
+      // Atualizar usuário existente com Google ID se necessário
+      if (!userByEmail.googleId) {
+        console.log('Updating existing user with Google ID');
+        await this.userService.updateProfile(userByEmail.id, {
+          googleId: googleUser.googleId,
+          avatar: googleUser.avatar,
+          authProvider: 'google'
+        });
+      }
+      return userByEmail;
+    }
+
+    console.log('Creating new Google user');
+    const newUser = await this.userService.createGoogleUser(googleUser);
+    return newUser;
+  }
+
+  async googleLogin(user: any): Promise<AuthResponseDto> {
+    const payload: JwtPayload = {
+      sub: user.id,
+      email: user.email,
+      name: user.name,
+    };
+
+    return {
+      access_token: this.jwtService.sign(payload),
+      user: {
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        avatar: user.avatar,
+        authProvider: user.authProvider,
       },
     };
   }
