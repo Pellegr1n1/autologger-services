@@ -10,13 +10,17 @@ import {
   UseGuards,
   Request,
   BadRequestException,
+  UseInterceptors,
+  UploadedFiles,
 } from '@nestjs/common';
+import { FilesInterceptor } from '@nestjs/platform-express';
 import { VehicleServiceService } from '../services/vehicle-service.service';
 import { CreateVehicleServiceDto } from '../dto/create-vehicle-service.dto';
 import { UpdateVehicleServiceDto } from '../dto/update-vehicle-service.dto';
-import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiConsumes, ApiBody } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../../../auth/guards/jwt-auth.guard';
 import { VehicleService } from '../../vehicle/services/vehicle.service';
+import { FileUploadService } from '../services/file-upload.service';
 
 @ApiTags('vehicle-services')
 @ApiBearerAuth()
@@ -26,6 +30,7 @@ export class VehicleServiceController {
   constructor(
     private readonly vehicleServiceService: VehicleServiceService,
     private readonly vehicleService: VehicleService,
+    private readonly fileUploadService: FileUploadService,
   ) {}
 
   @Post()
@@ -48,6 +53,48 @@ export class VehicleServiceController {
     }
 
     return this.vehicleServiceService.create(createVehicleServiceDto);
+  }
+
+  @Post('upload-attachments')
+  @UseInterceptors(FilesInterceptor('files', 10))
+  @ApiConsumes('multipart/form-data')
+  @ApiOperation({ summary: 'Fazer upload de anexos para serviços' })
+  @ApiResponse({ status: 201, description: 'Anexos enviados com sucesso' })
+  @ApiResponse({ status: 400, description: 'Erro no upload' })
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        files: {
+          type: 'array',
+          items: {
+            type: 'string',
+            format: 'binary',
+          },
+        },
+      },
+    },
+  })
+  async uploadAttachments(@UploadedFiles() files: any[]) {
+    console.log('📎 Recebendo arquivos para upload:', files?.length || 0);
+    
+    if (!files || files.length === 0) {
+      throw new BadRequestException('Nenhum arquivo foi enviado');
+    }
+
+    try {
+      const uploadedUrls = await this.fileUploadService.uploadMultipleAttachments(files);
+      console.log('✅ Arquivos enviados com sucesso:', uploadedUrls);
+      
+      return {
+        success: true,
+        urls: uploadedUrls,
+        count: uploadedUrls.length,
+      };
+    } catch (error) {
+      console.error('❌ Erro ao fazer upload de anexos:', error);
+      throw new BadRequestException('Erro ao fazer upload dos arquivos');
+    }
   }
 
   @Get()

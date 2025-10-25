@@ -10,14 +10,17 @@ import { Vehicle } from './entities/vehicle.entity';
 import { VehicleService as VehicleServiceEntity } from './entities/vehicle-service.entity';
 import { VehicleServiceService } from './services/vehicle-service.service';
 import { VehicleServiceController } from './controllers/vehicle-service.controller';
+import { VehicleShare } from './entities/vehicle-share.entity';
+import { VehicleShareService } from './services/vehicle-share.service';
+import { VehicleShareController } from './controllers/vehicle-share.controller';
 import { BlockchainModule } from '../../blockchain/blockchain.module';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([Vehicle, VehicleServiceEntity]),
+    TypeOrmModule.forFeature([Vehicle, VehicleServiceEntity, VehicleShare]),
     BlockchainModule,
   ],
-  controllers: [VehicleController, VehicleServiceController],
+  controllers: [VehicleController, VehicleServiceController, VehicleShareController],
   providers: [
     VehicleService,
     VehicleBusinessRulesService,
@@ -25,6 +28,7 @@ import { BlockchainModule } from '../../blockchain/blockchain.module';
     VehicleFactory,
     FileUploadService,
     VehicleServiceService,
+    VehicleShareService,
   ],
   exports: [
     VehicleService,
@@ -32,6 +36,7 @@ import { BlockchainModule } from '../../blockchain/blockchain.module';
     VehicleFactory,
     FileUploadService,
     VehicleServiceService,
+    VehicleShareService,
   ],
 })
 export class VehicleModule {}

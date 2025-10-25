@@ -31,7 +31,7 @@
     "truffle:test": "cd besu-network/contracts && truffle test",
     "truffle:console": "cd besu-network/contracts && truffle console --network besu",
     "truffle:deploy": "npm run truffle:compile && npm run truffle:migrate",
-    "blockchain:start": "cd besu-network && ./start-besu.sh",
+    ":startblockchain": "cd besu-network && ./start-besu.sh",
     "blockchain:stop": "./besu-network/scripts/stop-besu.sh",
     "blockchain:deploy": "./besu-network/scripts/deploy-truffle.sh",
     "blockchain:verify": "cd besu-network/contracts && truffle run verify --network besu"

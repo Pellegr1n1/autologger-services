@@ -34,6 +34,15 @@ export class BlockchainController {
     return this.blockchainService.resendFailedService(serviceId);
   }
 
+  @Post('services/:serviceId/reset-retries')
+  async resetRetryCount(@Param('serviceId') serviceId: string) {
+    return this.blockchainService.resetRetryCount(serviceId);
+  }
+
+  @Post('services/reset-all-retries')
+  async resetAllRetries() {
+    return this.blockchainService.resetAllFailedRetries();
+  }
 
   @Get('services/:serviceId/status')
   async getServiceStatus(@Param('serviceId') serviceId: string): Promise<BlockchainTransaction> {
@@ -126,5 +135,10 @@ export class BlockchainController {
   async getConnectionStatus() {
     const isConnected = await this.besuService.isConnected();
     return { connected: isConnected };
+  }
+
+  @Get('besu/network/diagnose')
+  async diagnoseNetwork() {
+    return this.besuService.diagnoseNetwork();
   }
 }

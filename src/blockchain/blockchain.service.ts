@@ -196,16 +196,35 @@ export class BlockchainService {
               const hashExists = await this.besuService.verifyHashInContract(service.blockchainHash);
               blockchainVerified = hashExists;
               
-              if (hashExists && !service.blockchainConfirmedAt) {
-                // Atualizar status de confirmação no banco
+              if (hashExists) {
+                // Hash existe na blockchain - garantir que está marcado como confirmado
+                if (!service.blockchainConfirmedAt || service.status !== ServiceStatus.CONFIRMED) {
+                  await this.vehicleServiceRepository.update(
+                    { id: service.id },
+                    { 
+                      blockchainConfirmedAt: new Date(),
+                      status: ServiceStatus.CONFIRMED,
+                      isImmutable: true,
+                      canEdit: false
+                    }
+                  );
+                  service.blockchainConfirmedAt = new Date();
+                  service.status = ServiceStatus.CONFIRMED;
+                  this.logger.log(`✅ Serviço ${service.id} atualizado como CONFIRMED (verificado na blockchain)`);
+                }
+              } else if (!hashExists && service.status === ServiceStatus.CONFIRMED) {
+                // Hash NÃO existe na blockchain, mas banco diz que está confirmado
+                // Marcar como rejeitado para permitir reenvio
+                this.logger.warn(`❌ Hash ${service.blockchainHash} NÃO encontrado na blockchain - marcando como REJECTED para reenvio`);
                 await this.vehicleServiceRepository.update(
                   { id: service.id },
-                  { blockchainConfirmedAt: new Date() }
+                  { 
+                    status: ServiceStatus.REJECTED,
+                    isImmutable: false,
+                    canEdit: true
+                  }
                 );
-                service.blockchainConfirmedAt = new Date();
-              } else if (!hashExists) {
-                // Hash não existe no contrato - marcar como falhou
-                this.logger.warn(`❌ Hash ${service.blockchainHash} não encontrado no contrato - marcando como falhou`);
+                service.status = ServiceStatus.REJECTED;
               }
             } catch (error) {
               this.logger.warn(`⚠️ Erro ao verificar hash ${service.blockchainHash}: ${error.message}`);
@@ -631,7 +650,8 @@ export class BlockchainService {
 
         // Converter para formato esperado pelo frontend
         const mappedServices = verifiedServices.map((service) => {
-          // Determinar status baseado na verificação real da blockchain
+          // PRIORIDADE: Blockchain é a fonte da verdade!
+          // Se não está verificado na blockchain, é FAILED (precisa reenviar)
           let mappedStatus = 'PENDING';
           let isValidHash = false;
           
@@ -639,28 +659,30 @@ export class BlockchainService {
             isValidHash = true;
             
             if (service.blockchainVerified) {
-              // Serviço verificado na blockchain
+              // ✅ ÚNICO CASO DE SUCESSO: Verificado na blockchain
               mappedStatus = 'CONFIRMED';
-            } else if (service.blockchainHash && !service.blockchainVerified) {
-              // Serviço com hash mas não verificado na blockchain
-              if (service.blockchainHash === 'pending-hash') {
-                mappedStatus = 'PENDING'; // Hash inválido, precisa ser corrigido
-              } else {
-                mappedStatus = 'FAILED'; // Hash válido mas não registrado na blockchain
-              }
+              this.logger.log(`✅ Serviço ${service.id} CONFIRMADO na blockchain`);
             } else {
-              // Serviço sem hash blockchain
-              mappedStatus = 'PENDING';
+              // ❌ Tem hash mas NÃO está na blockchain → FAILED (precisa reenviar)
+              if (service.blockchainHash === 'pending-hash') {
+                mappedStatus = 'PENDING';
+                this.logger.log(`⏳ Serviço ${service.id} com hash temporário - aguardando registro`);
+              } else {
+                mappedStatus = 'FAILED';
+                this.logger.log(`❌ Serviço ${service.id} NÃO verificado na blockchain - Status: FAILED (reenvio necessário)`);
+              }
             }
           } else if (service.status === 'rejected' || service.status === 'expired') {
-            // Serviço rejeitado ou expirado
+            // Serviço rejeitado ou expirado no banco
             mappedStatus = 'FAILED';
+            this.logger.log(`❌ Serviço ${service.id} rejeitado/expirado no banco - Status: FAILED`);
           } else {
-            // Serviço sem hash blockchain (antigos ou pendentes)
+            // Sem hash blockchain ainda (registro em andamento)
             mappedStatus = 'PENDING';
+            this.logger.log(`⏳ Serviço ${service.id} sem hash - Status: PENDING`);
           }
 
-          this.logger.log(`🔍 Serviço ${service.id}: hash=${!!service.blockchainHash}, confirmed=${!!service.blockchainConfirmedAt}, verified=${service.blockchainVerified}, status=${mappedStatus}`);
+          this.logger.log(`🔍 Serviço ${service.id}: hash=${service.blockchainHash?.substring(0, 10)}..., verified=${service.blockchainVerified}, dbStatus=${service.status}, finalStatus=${mappedStatus}`);
           this.logger.log(`📅 Datas do serviço ${service.id}: serviceDate=${service.serviceDate}, createdAt=${service.createdAt}`);
 
           return {
@@ -723,6 +745,8 @@ export class BlockchainService {
       this.logger.log(`🔍 Serviço encontrado:`, {
         id: service?.id,
         status: service?.status,
+        blockchainHash: service?.blockchainHash,
+        isImmutable: service?.isImmutable,
         vehicleId: service?.vehicleId,
         description: service?.description
       });
@@ -736,41 +760,77 @@ export class BlockchainService {
         };
       }
 
-      // Verificar se o serviço está realmente falhado
-      if (service.status !== 'rejected' && service.status !== 'expired') {
-        this.logger.warn(`⚠️ Serviço não está em estado de falha: ${service.status}`);
-        return {
-          success: false,
-          error: 'Serviço não está em estado de falha',
-          status: 'FAILED'
-        };
+      // OTIMIZAÇÃO: Se o serviço já está marcado como REJECTED/EXPIRED, pode reenviar diretamente
+      // (não precisa verificar na blockchain, pois já sabemos que falhou)
+      const canResendDirectly = 
+        service.status === ServiceStatus.REJECTED || 
+        service.status === ServiceStatus.EXPIRED ||
+        !service.blockchainHash ||
+        service.blockchainHash === 'pending-hash';
+
+      if (canResendDirectly) {
+        this.logger.log(`✅ Serviço ${service.id} pode ser reenviado diretamente (status: ${service.status})`);
+      } else {
+        // Apenas verifica na blockchain se o serviço parece estar confirmado
+        // Usa timeout curto (5 segundos) para não travar
+        this.logger.log(`🔍 Verificando se hash está na blockchain (com timeout de 5s)...`);
+        
+        try {
+          const verificationPromise = this.besuService.verifyHashInContract(service.blockchainHash);
+          const timeoutPromise = new Promise<boolean>((_, reject) => 
+            setTimeout(() => reject(new Error('Timeout na verificação')), 5000)
+          );
+          
+          const isInBlockchain = await Promise.race([verificationPromise, timeoutPromise]);
+          
+          if (isInBlockchain) {
+            this.logger.warn(`⚠️ Serviço ${service.id} JÁ ESTÁ na blockchain - Reenvio bloqueado`);
+            return {
+              success: false,
+              error: 'Serviço já está registrado e verificado na blockchain',
+              status: 'FAILED'
+            };
+          }
+          
+          this.logger.log(`✅ Hash não encontrado na blockchain - pode reenviar`);
+        } catch (error) {
+          // Se a verificação falhar ou der timeout, PERMITE reenvio
+          // (melhor tentar reenviar do que bloquear por erro de verificação)
+          this.logger.warn(`⚠️ Erro/timeout na verificação (${error.message}) - permitindo reenvio por segurança`);
+        }
       }
 
-      // Verificar se já foi tentado muitas vezes (limite de 3 tentativas)
+      // Log de tentativas (sem limite - permite reenvios ilimitados)
       const retryCount = await this.getRetryCount(serviceId);
-      if (retryCount >= 3) {
-        return {
-          success: false,
-          error: 'Número máximo de tentativas de reenvio excedido',
-          status: 'FAILED'
-        };
-      }
+      this.logger.log(`🔄 Tentativa de reenvio número ${retryCount + 1}`);
 
-      // Reenviar para blockchain
-      const result = await this.submitServiceToBlockchain({
+      // Gerar o hash do serviço
+      const eventData = {
         serviceId: service.id,
         vehicleId: service.vehicleId,
-        mileage: service.mileage,
-        cost: service.cost,
+        type: service.type,
         description: service.description,
-        location: service.location,
-        type: service.type
-      });
+        serviceDate: service.serviceDate,
+        timestamp: new Date().toISOString()
+      };
+      
+      const serviceHash = ethers.keccak256(ethers.toUtf8Bytes(JSON.stringify(eventData)));
+      this.logger.log(`🔑 Hash gerado para reenvio do serviço ${service.id}: ${serviceHash}`);
+      
+      // Registrar o hash no contrato blockchain
+      this.logger.log(`📝 Tentando registrar hash no contrato blockchain...`);
+      const hashResult = await this.registerHashInContract(
+        serviceHash,
+        service.vehicleId,
+        service.type || 'MANUTENCAO'
+      );
 
-      if (result.success) {
-        // Atualizar status do serviço
+      this.logger.log(`📊 Resultado do registro:`, hashResult);
+
+      if (hashResult.success) {
+        // Atualizar o serviço com informações da blockchain
+        service.blockchainHash = serviceHash;
         service.status = ServiceStatus.CONFIRMED;
-        service.blockchainHash = result.transactionHash;
         service.isImmutable = true;
         service.canEdit = false;
         service.blockchainConfirmedAt = new Date();
@@ -781,14 +841,32 @@ export class BlockchainService {
         // Incrementar contador de tentativas
         await this.incrementRetryCount(serviceId);
         
-        this.logger.log(`✅ Serviço ${serviceId} reenviado com sucesso`);
+        this.logger.log(`✅ Serviço ${service.id} reenviado e registrado na blockchain com sucesso - Hash: ${serviceHash}`);
+        
+        return {
+          success: true,
+          transactionHash: serviceHash,
+          status: 'CONFIRMED',
+          message: 'Serviço reenviado e registrado na blockchain com sucesso'
+        };
       } else {
         // Incrementar contador de tentativas mesmo em caso de falha
         await this.incrementRetryCount(serviceId);
-        this.logger.warn(`⚠️ Falha ao reenviar serviço ${serviceId}: ${result.error}`);
+        
+        // Manter ou atualizar status como rejeitado
+        if (service.status !== ServiceStatus.REJECTED) {
+          service.status = ServiceStatus.REJECTED;
+          await this.vehicleServiceRepository.save(service);
+        }
+        
+        this.logger.warn(`⚠️ Falha ao reenviar serviço ${service.id}: ${hashResult.error}`);
+        
+        return {
+          success: false,
+          error: hashResult.error || 'Erro ao registrar na blockchain',
+          status: 'FAILED'
+        };
       }
-
-      return result;
     } catch (error) {
       this.logger.error('❌ Erro ao reenviar serviço:', error);
       return {
@@ -835,6 +913,77 @@ export class BlockchainService {
     );
   }
 
+  /**
+   * Reseta o contador de tentativas de reenvio de um serviço
+   * @param serviceId ID do serviço
+   */
+  async resetRetryCount(serviceId: string): Promise<{ success: boolean; message: string }> {
+    try {
+      this.logger.log(`🔄 Resetando contador de tentativas do serviço: ${serviceId}`);
+      
+      await this.vehicleServiceRepository.update(
+        { id: serviceId },
+        { 
+          notes: 'retry_count:0',
+          updatedAt: new Date()
+        }
+      );
+      
+      return {
+        success: true,
+        message: 'Contador de tentativas resetado com sucesso'
+      };
+    } catch (error) {
+      this.logger.error(`❌ Erro ao resetar contador: ${error.message}`);
+      return {
+        success: false,
+        message: `Erro ao resetar contador: ${error.message}`
+      };
+    }
+  }
+
+  /**
+   * Reseta o contador de todos os serviços falhados
+   */
+  async resetAllFailedRetries(): Promise<{ success: boolean; count: number; message: string }> {
+    try {
+      this.logger.log(`🔄 Resetando contadores de todos os serviços rejeitados...`);
+      
+      // Buscar todos os serviços rejeitados/expirados
+      const failedServices = await this.vehicleServiceRepository.find({
+        where: [
+          { status: ServiceStatus.REJECTED },
+          { status: ServiceStatus.EXPIRED }
+        ]
+      });
+      
+      // Resetar contador de cada um
+      await Promise.all(
+        failedServices.map(service =>
+          this.vehicleServiceRepository.update(
+            { id: service.id },
+            { notes: 'retry_count:0', updatedAt: new Date() }
+          )
+        )
+      );
+      
+      this.logger.log(`✅ Resetados ${failedServices.length} serviços`);
+      
+      return {
+        success: true,
+        count: failedServices.length,
+        message: `${failedServices.length} serviços resetados com sucesso`
+      };
+    } catch (error) {
+      this.logger.error(`❌ Erro ao resetar contadores: ${error.message}`);
+      return {
+        success: false,
+        count: 0,
+        message: `Erro ao resetar contadores: ${error.message}`
+      };
+    }
+  }
+
 
   /**
    * Registra um hash diretamente no contrato blockchain
@@ -856,9 +1005,15 @@ export class BlockchainService {
       
       if (isConnected) {
         try {
-          this.logger.log(`📝 Chamando besuService.registerHash...`);
-          // Registrar o hash no contrato
-          const result = await this.besuService.registerHash(hash, vehicleId, eventType);
+          this.logger.log(`📝 Chamando besuService.registerHash com timeout de 25s...`);
+          
+          // Adicionar timeout de 25 segundos para não ultrapassar timeout do HTTP (30s)
+          const registerPromise = this.besuService.registerHash(hash, vehicleId, eventType);
+          const timeoutPromise = new Promise<any>((_, reject) => 
+            setTimeout(() => reject(new Error('Timeout no registro (25s)')), 25000)
+          );
+          
+          const result = await Promise.race([registerPromise, timeoutPromise]);
           
           this.logger.log(`📊 Resultado do besuService.registerHash:`, result);
           
