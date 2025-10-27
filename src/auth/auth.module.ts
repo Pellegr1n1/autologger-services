@@ -6,12 +6,16 @@ import { AuthService } from './auth.service';
 import { AuthController } from './auth.controller';
 import { GoogleAuthController } from './controllers/google-auth.controller';
 import { UserModule } from '../modules/user/user.module';
+import { EmailVerificationModule } from '../modules/email-verification/email-verification.module';
+import { PasswordResetModule } from '../modules/password-reset/password-reset.module';
 import { JwtStrategy } from './strategies/jwt.strategy';
 import { GoogleStrategy } from './strategies/google.strategy';
 
 @Module({
   imports: [
     UserModule,
+    EmailVerificationModule,
+    PasswordResetModule,
     PassportModule,
     JwtModule.registerAsync({
       imports: [ConfigModule],

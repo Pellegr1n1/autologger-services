@@ -5,6 +5,7 @@ export class UserResponseDto {
   avatar?: string;
   authProvider: 'local' | 'google';
   isActive: boolean;
+  isEmailVerified: boolean;
   createdAt: Date;
   updatedAt: Date;
 }

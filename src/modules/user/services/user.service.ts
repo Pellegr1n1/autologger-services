@@ -131,6 +131,20 @@ export class UserService {
     return await this.userRepository.createGoogleUser(userData);
   }
 
+  /**
+   * Marcar email como verificado
+   */
+  async markEmailAsVerified(userId: string): Promise<void> {
+    await this.userRepository.update(userId, { isEmailVerified: true });
+  }
+
+  /**
+   * Marcar email como não verificado
+   */
+  async markEmailAsUnverified(userId: string): Promise<void> {
+    await this.userRepository.update(userId, { isEmailVerified: false });
+  }
+
   private toUserResponseDto(user: User): UserResponseDto {
     const { password, ...userResponse } = user;
     return userResponse;

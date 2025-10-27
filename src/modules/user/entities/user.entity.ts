@@ -35,6 +35,9 @@ export class User {
     @Column({ default: true })
     isActive: boolean;
 
+    @Column({ default: false })
+    isEmailVerified: boolean;
+
     @OneToMany(() => Vehicle, (vehicle) => vehicle.user, {
         cascade: false,
         eager: false,

@@ -46,6 +46,7 @@ export class AuthService {
           email: user.email,
           avatar: user.avatar,
           authProvider: user.authProvider,
+          isEmailVerified: user.isEmailVerified,
         },
       };
     } catch (error) {
@@ -87,6 +88,7 @@ export class AuthService {
         email: user.email,
         avatar: user.avatar,
         authProvider: user.authProvider,
+        isEmailVerified: user.isEmailVerified,
       },
     };
   }
@@ -143,6 +145,7 @@ export class AuthService {
         email: user.email,
         avatar: user.avatar,
         authProvider: user.authProvider,
+        isEmailVerified: user.isEmailVerified || true, // Google users are pre-verified
       },
     };
   }

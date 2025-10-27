@@ -6,5 +6,6 @@ export class AuthResponseDto {
     email: string;
     avatar?: string;
     authProvider: 'local' | 'google';
+    isEmailVerified: boolean;
   };
 }
