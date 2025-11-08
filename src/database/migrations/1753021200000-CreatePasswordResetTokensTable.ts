@@ -44,16 +44,25 @@ export class CreatePasswordResetTokensTable1753021200000 implements MigrationInt
             true,
         );
 
-        // Criar foreign key
-        await queryRunner.createForeignKey(
-            'password_reset_tokens',
-            new TableForeignKey({
-                columnNames: ['userId'],
-                referencedColumnNames: ['id'],
-                referencedTableName: 'users',
-                onDelete: 'CASCADE',
-            })
-        );
+        // Criar foreign key apenas se não existir
+        const foreignKeyExists = await queryRunner.query(`
+            SELECT 1 
+            FROM information_schema.table_constraints 
+            WHERE constraint_name = 'FK_d6a19d4b4f6c62dcd29daa497e2' 
+            AND table_name = 'password_reset_tokens'
+        `);
+
+        if (!foreignKeyExists || foreignKeyExists.length === 0) {
+            await queryRunner.createForeignKey(
+                'password_reset_tokens',
+                new TableForeignKey({
+                    columnNames: ['userId'],
+                    referencedColumnNames: ['id'],
+                    referencedTableName: 'users',
+                    onDelete: 'CASCADE',
+                })
+            );
+        }
 
         // Criar índices
         await queryRunner.createIndex(

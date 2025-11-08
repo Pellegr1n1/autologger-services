@@ -33,12 +33,6 @@ export class CreateVehicleDto {
   @Length(1, 30)
   color: string;
 
-  @ApiProperty({ description: 'RENAVAM do veículo', example: '12345678901' })
-  @IsString()
-  @Length(11, 11)
-  @Matches(/^[0-9]{11}$/, { message: 'RENAVAM deve conter exatamente 11 dígitos' })
-  renavam: string;
-
   @ApiProperty({ description: 'Quilometragem atual', example: 50000, required: false })
   @IsOptional()
   @IsInt()

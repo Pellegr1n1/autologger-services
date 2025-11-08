@@ -10,13 +10,23 @@ import {
 } from 'typeorm';
 import { User } from '../../user/entities/user.entity';
 import { VehicleStatus } from '../enums/vehicle-status.enum';
+import { EncryptedTransformer } from '../../../common/decorators/encrypted-column.decorator';
 
 @Entity('vehicles')
 export class Vehicle {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
-  @Column({ type: 'varchar', length: 8, unique: true })
+  /**
+   * Placa do veículo (criptografada no banco de dados)
+   * Usa criptografia determinística para permitir constraints UNIQUE e buscas
+   */
+  @Column({ 
+    type: 'varchar', 
+    length: 255, // Aumentado para acomodar texto criptografado em base64
+    unique: true,
+    transformer: new EncryptedTransformer()
+  })
   plate: string;
 
   @Column({ type: 'varchar', length: 50 })
@@ -30,9 +40,6 @@ export class Vehicle {
 
   @Column({ type: 'varchar', length: 30 })
   color: string;
-
-  @Column({ type: 'varchar', length: 11, unique: true })
-  renavam: string;
 
   @Column({ type: 'int', default: 0 })
   mileage: number;

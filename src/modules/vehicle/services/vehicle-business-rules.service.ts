@@ -24,14 +24,6 @@ export class VehicleBusinessRulesService {
     }
   }
 
-  async validateUniqueRenavam(renavam: string, excludeId?: string): Promise<void> {
-    const exists = await this.vehicleRepository.existsByRenavam(renavam, excludeId);
-    
-    if (exists) {
-      throw new ConflictException(`Já existe um veículo cadastrado com o RENAVAM ${renavam}`);
-    }
-  }
-
   async validateVehicleOwnership(vehicleId: string, userId: string): Promise<void> {
     const vehicle = await this.vehicleRepository.findByIdAndUserId(vehicleId, userId);
     

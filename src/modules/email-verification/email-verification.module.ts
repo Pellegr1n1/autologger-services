@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { EmailVerificationService } from './email-verification.service';
 import { EmailVerificationRepository } from './email-verification.repository';
 import { TypeOrmModule } from '@nestjs/typeorm';
@@ -10,10 +10,10 @@ import { UserModule } from '../user/user.module';
   imports: [
     TypeOrmModule.forFeature([EmailVerificationToken]),
     EmailModule,
-    UserModule,
+    forwardRef(() => UserModule),
   ],
   providers: [EmailVerificationService, EmailVerificationRepository],
-  exports: [EmailVerificationService],
+  exports: [EmailVerificationService, EmailVerificationRepository],
 })
 export class EmailVerificationModule {}
 

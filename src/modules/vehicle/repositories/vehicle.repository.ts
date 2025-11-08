@@ -90,20 +90,6 @@ export class VehicleRepository {
     return count > 0;
   }
 
-  async existsByRenavam(renavam: string, excludeId?: string): Promise<boolean> {
-    const whereCondition: FindOptionsWhere<Vehicle> = { renavam };
-    
-    if (excludeId) {
-      whereCondition.id = { $ne: excludeId } as any;
-    }
-
-    const count = await this.vehicleRepository.count({
-      where: whereCondition,
-    });
-
-    return count > 0;
-  }
-
   async update(
     id: string,
     updateVehicleDto: UpdateVehicleDto,

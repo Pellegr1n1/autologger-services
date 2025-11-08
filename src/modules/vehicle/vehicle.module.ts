@@ -13,7 +13,7 @@ import { VehicleServiceController } from './controllers/vehicle-service.controll
 import { VehicleShare } from './entities/vehicle-share.entity';
 import { VehicleShareService } from './services/vehicle-share.service';
 import { VehicleShareController } from './controllers/vehicle-share.controller';
-import { BlockchainModule } from '../../blockchain/blockchain.module';
+import { BlockchainModule } from '../blockchain/blockchain.module';
 
 @Module({
   imports: [

@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { PasswordResetService } from './password-reset.service';
 import { PasswordResetRepository } from './password-reset.repository';
 import { TypeOrmModule } from '@nestjs/typeorm';
@@ -10,10 +10,10 @@ import { UserModule } from '../user/user.module';
   imports: [
     TypeOrmModule.forFeature([PasswordResetToken]),
     EmailModule,
-    UserModule,
+    forwardRef(() => UserModule),
   ],
   providers: [PasswordResetService, PasswordResetRepository],
-  exports: [PasswordResetService],
+  exports: [PasswordResetService, PasswordResetRepository],
 })
 export class PasswordResetModule {}
 

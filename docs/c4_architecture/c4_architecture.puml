@@ -20,7 +20,7 @@ System_Ext(cloud_storage, "Armazenamento em Nuvem", "Storage para imagens e docu
 
 Rel(owner, autologger, "Cadastra eventos, gerencia veículos e visualiza relatórios", "HTTPS")
 Rel(buyer, autologger, "Consulta histórico verificado do veículo", "HTTPS")
-Rel(autologger, besu_network, "Registra hash SHA-256 dos eventos confirmados", "Web3/RPC")
+Rel(autologger, besu_network, "Registra hash criptográfico (Keccak256) dos eventos confirmados", "Web3/RPC")
 Rel(autologger, email_service, "Envia notificações e emails", "SMTP/API")
 Rel(autologger, cloud_storage, "Armazena arquivos de comprovação", "REST API")
 
@@ -43,13 +43,17 @@ System_Boundary(autologger_boundary, "Sistema AutoLogger") {
     
     Container(user_module, "User Module", "NestJS", "Gerencia cadastro, edição e exclusão de usuários")
     
+    Container(email_module, "Email Module", "NestJS", "Gerencia envio de emails e notificações")
+    
+    Container(email_verification_module, "Email Verification Module", "NestJS", "Gerencia verificação de email com tokens")
+    
+    Container(password_reset_module, "Password Reset Module", "NestJS", "Gerencia recuperação de senha com tokens")
+    
     Container(vehicle_module, "Vehicle Module", "NestJS", "Gerencia CRUD de veículos e serviços veiculares")
     
     Container(blockchain_module, "Blockchain Module", "NestJS + Ethers.js", "Interage com rede Besu privada, confirma transações e registra hashes")
     
     ContainerDb(main_db, "Banco Principal", "PostgreSQL", "Armazena usuários, veículos, serviços veiculares e metadados")
-    
-    ContainerDb(cache_db, "Cache", "Redis", "Cache de sessões JWT e consultas frequentes")
     
     Container(smart_contracts, "Smart Contracts", "Solidity", "Contratos na rede Besu privada para registro imutável")
 }
@@ -66,17 +70,19 @@ Rel(frontend, vehicle_module, "Requisições de veículo e serviços", "HTTPS/JS
 Rel(frontend, blockchain_module, "Status blockchain", "HTTPS/JSON")
 
 Rel(auth_module, main_db, "Validação de credenciais", "TypeORM/SQL")
+Rel(auth_module, email_verification_module, "Verifica email", "NestJS/HTTP")
+Rel(auth_module, password_reset_module, "Recupera senha", "NestJS/HTTP")
 Rel(user_module, main_db, "CRUD usuários", "TypeORM/SQL")
 Rel(vehicle_module, main_db, "CRUD veículos e serviços", "TypeORM/SQL")
-
-Rel(auth_module, cache_db, "Sessões JWT", "Redis")
 
 Rel(vehicle_module, blockchain_module, "Registra eventos", "NestJS/HTTP")
 Rel(blockchain_module, smart_contracts, "Executa transações", "Ethers.js")
 Rel(smart_contracts, besu_net, "Deploy/Interação", "Web3/RPC")
 
 Rel(vehicle_module, storage_ext, "Armazena arquivos", "REST API")
-Rel(user_module, email_ext, "Envia emails", "SMTP/API")
+Rel(email_verification_module, email_module, "Solicita envio de emails", "NestJS/HTTP")
+Rel(password_reset_module, email_module, "Solicita envio de emails", "NestJS/HTTP")
+Rel(email_module, email_ext, "Envia emails", "SMTP/API")
 
 SHOW_LEGEND()
 @enduml
@@ -95,15 +101,23 @@ Container(storage_ext, "Cloud Storage", "External Service", "Armazenamento de ar
 ContainerDb(database, "PostgreSQL", "Database", "Armazenamento principal")
 
 Container_Boundary(vehicle_module, "Vehicle Module") {
-    Component(vehicle_controller, "Vehicle Controller", "NestJS Controller", "Endpoints REST para veículos e serviços. Implementa validação de entrada e autenticação JWT.")
+    Component(vehicle_controller, "Vehicle Controller", "NestJS Controller", "Endpoints REST para veículos. Aplica validação de entrada e autenticação JWT através de guards.")
+    
+    Component(vehicle_service_controller, "Vehicle Service Controller", "NestJS Controller", "Endpoints REST para serviços veiculares. Aplica validação de entrada e autenticação JWT através de guards.")
+    
+    Component(vehicle_share_controller, "Vehicle Share Controller", "NestJS Controller", "Endpoints REST para compartilhamento público de veículos. Aplica validação de entrada e autenticação JWT através de guards.")
     
     Component(vehicle_service, "Vehicle Service", "Service Class", "Lógica de negócio principal. Orquestra criação, edição e listagem de veículos.")
     
-    Component(service_service, "Service Service", "Service Class", "Gerencia serviços veiculares, gera hash SHA-256 e controla edição.")
+    Component(service_service, "Vehicle Service Service", "Service Class", "Gerencia serviços veiculares, gera hash SHA-256 e controla edição.")
     
-    Component(validation_service, "Validation Service", "Service Class", "Validações de regras de negócio e integridade dos dados.")
+    Component(vehicle_share_service, "Vehicle Share Service", "Service Class", "Gerencia compartilhamento público com tokens seguros e expiração.")
     
-    Component(confirmation_service, "Confirmation Service", "Service Class", "Implementa dupla confirmação antes do registro na blockchain.")
+    Component(file_upload_service, "File Upload Service", "Service Class", "Gerencia upload de imagens e PDFs para serviços veiculares.")
+    
+    Component(validation_service, "Vehicle Business Rules Service", "Service Class", "Validações de regras de negócio e integridade dos dados.")
+    
+    Component(vehicle_factory, "Vehicle Factory", "Factory Pattern", "Criação de instâncias de veículos seguindo padrão Factory.")
     
     Component(vehicle_repository, "Vehicle Repository", "Repository Pattern", "Camada de acesso a dados para veículos. Operações CRUD com controle transacional.")
     
@@ -120,14 +134,23 @@ Container_Boundary(vehicle_module, "Vehicle Module") {
 
 Rel(user, frontend, "Interage com", "HTTPS")
 Rel(frontend, vehicle_controller, "Faz chamadas para", "REST/JSON")
+Rel(frontend, vehicle_service_controller, "Faz chamadas para", "REST/JSON")
+Rel(frontend, vehicle_share_controller, "Faz chamadas para", "REST/JSON")
 
 Rel(vehicle_controller, vehicle_service, "Delegação lógica veículos", "Method calls")
-Rel(vehicle_controller, service_service, "Delegação lógica serviços", "Method calls")
+Rel(vehicle_service_controller, service_service, "Delegação lógica serviços", "Method calls")
+Rel(vehicle_share_controller, vehicle_share_service, "Delegação lógica compartilhamento", "Method calls")
+
 Rel(vehicle_service, validation_service, "Valida dados veículos", "Method calls")
 Rel(service_service, validation_service, "Valida dados serviços", "Method calls")
-Rel(service_service, confirmation_service, "Confirma serviço", "Method calls")
+Rel(vehicle_service, vehicle_factory, "Cria instâncias de veículos", "Method calls")
+
 Rel(vehicle_service, vehicle_repository, "Persistência veículos", "Method calls")
 Rel(service_service, service_repository, "Persistência serviços", "Method calls")
+Rel(service_service, file_upload_service, "Solicita upload de arquivos", "Method calls")
+Rel(file_upload_service, storage_ext, "Armazena arquivos", "HTTP/JSON")
+
+Rel(service_service, blockchain_module, "Registra hash na blockchain", "NestJS/HTTP")
 
 Rel(vehicle_repository, vehicle_entity, "Mapeamento ORM", "TypeORM")
 Rel(service_repository, service_entity, "Mapeamento ORM", "TypeORM")
@@ -135,12 +158,11 @@ Rel(vehicle_repository, database, "Operações SQL veículos", "TypeORM/SQL")
 Rel(service_repository, database, "Operações SQL serviços", "TypeORM/SQL")
 
 Rel(vehicle_controller, vehicle_dto, "Serialização veículos", "JSON")
-Rel(vehicle_controller, service_dto, "Serialização serviços", "JSON")
+Rel(vehicle_service_controller, service_dto, "Serialização serviços", "JSON")
+Rel(vehicle_share_controller, vehicle_dto, "Serialização compartilhamento", "JSON")
 Rel(vehicle_service, vehicle_dto, "Transferência dados veículos", "Objects")
 Rel(service_service, service_dto, "Transferência dados serviços", "Objects")
-
-Rel(confirmation_service, blockchain_module, "Registra hash confirmado", "HTTP/JSON")
-Rel(service_service, storage_ext, "Anexa arquivos", "HTTP/JSON")
+Rel(vehicle_share_service, vehicle_dto, "Transferência dados compartilhamento", "Objects")
 
 SHOW_LEGEND()
 @enduml
@@ -168,9 +190,8 @@ Container_Boundary(vehicle_service_code, "Vehicle Service - Estrutura de Código
         Component(service_types, "Service Types", "Component", "Enums e Status de serviços")
     }
     
-    Component(business_rules, "Business Rules", "Component", "Validações e regras de negócio")
+    Component(business_rules, "Vehicle Business Rules Service", "Component", "Validações e regras de negócio")
     Component(vehicle_factory, "Vehicle Factory", "Component", "Criação de veículos")
-    Component(service_factory, "Service Factory", "Component", "Criação de serviços")
 }
 
 Rel(vehicle_service_impl, ivehicle_service, "implementa")
@@ -180,17 +201,16 @@ Rel(service_service_impl, service_data, "manipula")
 Rel(vehicle_service_impl, business_rules, "usa")
 Rel(service_service_impl, business_rules, "usa")
 Rel(vehicle_service_impl, vehicle_factory, "usa")
-Rel(service_service_impl, service_factory, "usa")
 Rel(vehicle_factory, vehicle_data, "transforma")
-Rel(service_factory, service_data, "transforma")
 Rel(business_rules, vehicle_data, "valida")
 Rel(business_rules, service_data, "valida")
 
 System_Boundary(external, "Dependências Externas") {
     Component(vehicle_repository, "VehicleRepository", "Interface", "Persistência de veículos")
     Component(service_repository, "ServiceRepository", "Interface", "Persistência de serviços")
-    Component(validation, "ValidationService", "Interface", "Validações externas")
+    Component(validation, "VehicleBusinessRulesService", "Interface", "Validações e regras de negócio")
     Component(blockchain, "BlockchainService", "Interface", "Integração com blockchain")
+    Component(file_upload, "FileUploadService", "Interface", "Upload de arquivos")
 }
 
 Rel(vehicle_service_impl, vehicle_repository, "depende de")
@@ -198,6 +218,7 @@ Rel(service_service_impl, service_repository, "depende de")
 Rel(vehicle_service_impl, validation, "depende de")
 Rel(service_service_impl, validation, "depende de")
 Rel(service_service_impl, blockchain, "depende de")
+Rel(service_service_impl, file_upload, "depende de")
 
 SHOW_LEGEND()
 @enduml

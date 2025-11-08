@@ -37,5 +37,9 @@ export class PasswordResetRepository {
       { used: true }
     );
   }
+
+  async deleteUserTokens(userId: string): Promise<void> {
+    await this.tokenRepository.delete({ userId });
+  }
 }
 

@@ -29,27 +29,19 @@ export class PasswordResetService {
    * Solicitar reset de senha
    */
   async requestPasswordReset(email: string): Promise<void> {
-    // Buscar usuário usando UserService
     const user = await this.userService.findByEmail(email);
     
-    // Por segurança, não revelar se o email existe
     if (!user) {
-      // Simular envio mesmo se não existe (segurança)
       return;
     }
 
-    // Invalidar tokens anteriores
     await this.tokenRepository.invalidateUserTokens(user.id);
 
-    // Gerar novo token
     const token = this.generateToken();
     const expiresAt = new Date();
-    expiresAt.setHours(expiresAt.getHours() + 1); // Expira em 1 hora
+    expiresAt.setHours(expiresAt.getHours() + 1);
 
-    // Salvar token
     await this.tokenRepository.create(token, user.id, expiresAt);
-
-    // Enviar email
     await this.emailService.sendPasswordResetEmail(
       user.email,
       token,
@@ -61,17 +53,14 @@ export class PasswordResetService {
    * Resetar senha com token
    */
   async resetPassword(token: string, newPassword: string, confirmPassword: string): Promise<void> {
-    // Validar senhas coincidem
     if (newPassword !== confirmPassword) {
       throw new BadRequestException('As senhas não coincidem');
     }
 
-    // Validar força da senha
     if (!this.isPasswordStrong(newPassword)) {
       throw new BadRequestException('A senha não atende aos requisitos mínimos de segurança');
     }
 
-    // Validar token
     const resetToken = await this.tokenRepository.findByToken(token);
 
     if (!resetToken) {
@@ -86,14 +75,11 @@ export class PasswordResetService {
       throw new BadRequestException('Token expirado. Solicite um novo link.');
     }
 
-    // Marcar token como usado
     await this.tokenRepository.markAsUsed(token);
 
-    // Criptografar nova senha
     const saltRounds = 12;
     const hashedPassword = await bcrypt.hash(newPassword, saltRounds);
 
-    // Atualizar senha do usuário
     await this.userRepository.update(resetToken.userId, {
       password: hashedPassword,
     });
@@ -103,19 +89,11 @@ export class PasswordResetService {
    * Validar força da senha
    */
   private isPasswordStrong(password: string): boolean {
-    // Mínimo 8 caracteres
     if (password.length < 8) return false;
     
-    // Deve conter letra minúscula
     if (!/[a-z]/.test(password)) return false;
-    
-    // Deve conter letra maiúscula
     if (!/[A-Z]/.test(password)) return false;
-    
-    // Deve conter número
     if (!/\d/.test(password)) return false;
-    
-    // Deve conter caractere especial
     if (!/[!@#$%^&*(),.?":{}|<>]/.test(password)) return false;
     
     return true;

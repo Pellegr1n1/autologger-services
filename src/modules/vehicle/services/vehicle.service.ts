@@ -25,7 +25,6 @@ export class VehicleService implements IVehicleService {
     // Validar regras de negócio
     await this.businessRules.validateActiveVehicleLimit(userId);
     await this.businessRules.validateUniquePlate(createVehicleDto.plate);
-    await this.businessRules.validateUniqueRenavam(createVehicleDto.renavam);
 
     // Upload da foto se fornecida
     let photoUrl: string = null;

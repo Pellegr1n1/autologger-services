@@ -3,12 +3,14 @@ import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { ValidationPipe } from '@nestjs/common';
 import { AppModule } from './app.module';
 import * as express from 'express';
+import * as cookieParser from 'cookie-parser';
 import * as path from 'path';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
   
-  // Configurar CORS com variáveis de ambiente
+  app.use(cookieParser());
+
   const corsOrigins = process.env.CORS_ORIGINS 
     ? process.env.CORS_ORIGINS.split(',') 
     : ['http://localhost:5173', 'http://localhost:3000'];
@@ -18,17 +20,14 @@ async function bootstrap() {
     credentials: true,
   });
 
-  // Configurar validação global
   app.useGlobalPipes(new ValidationPipe({
     transform: true,
     whitelist: true,
     forbidNonWhitelisted: true,
   }));
 
-  // Configurar arquivos estáticos
-  app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));
+  app.use('/uploads', express.static(path.join(process.cwd(), 'storage', 'uploads')));
 
-  // Configurar Swagger
   const config = new DocumentBuilder()
     .setTitle('AutoLogger API')
     .setDescription('API para gerenciamento de veículos e serviços')
@@ -42,9 +41,9 @@ async function bootstrap() {
   const port = process.env.PORT || 3001;
   await app.listen(port);
   
-  console.log(`🚗 AutoLogger API rodando na porta ${port}`);
-  console.log(`📚 Swagger disponível em: http://localhost:${port}/api`);
-  console.log(`📁 Arquivos estáticos em: http://localhost:${port}/uploads`);
-  console.log(`🌐 CORS configurado para: ${corsOrigins.join(', ')}`);
+  console.log(`AutoLogger API rodando na porta ${port}`);
+  console.log(`Swagger disponível em: http://localhost:${port}/api`);
+  console.log(`Arquivos estáticos em: http://localhost:${port}/uploads`);
+  console.log(`CORS configurado para: ${corsOrigins.join(', ')}`);
 }
 bootstrap();

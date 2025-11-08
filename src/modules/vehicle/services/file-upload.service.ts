@@ -14,7 +14,7 @@ export class FileUploadService {
     }
 
     // Criar diretório de uploads se não existir
-    const uploadDir = path.join(process.cwd(), 'uploads', 'vehicles');
+    const uploadDir = path.join(process.cwd(), 'storage', 'uploads', 'vehicles');
     if (!fs.existsSync(uploadDir)) {
       fs.mkdirSync(uploadDir, { recursive: true });
     }
@@ -62,7 +62,7 @@ export class FileUploadService {
     }
 
     // Criar diretório de uploads se não existir
-    const uploadDir = path.join(process.cwd(), 'uploads', 'attachments');
+    const uploadDir = path.join(process.cwd(), 'storage', 'uploads', 'attachments');
     if (!fs.existsSync(uploadDir)) {
       fs.mkdirSync(uploadDir, { recursive: true });
     }

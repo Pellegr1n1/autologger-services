@@ -5,7 +5,7 @@ import { ethers } from 'ethers';
 import { VehicleService, ServiceStatus, ServiceType } from '../entities/vehicle-service.entity';
 import { CreateVehicleServiceDto } from '../dto/create-vehicle-service.dto';
 import { UpdateVehicleServiceDto } from '../dto/update-vehicle-service.dto';
-import { BlockchainService } from '../../../blockchain/blockchain.service';
+import { BlockchainService } from '../../blockchain/blockchain.service';
 import { Vehicle } from '../entities/vehicle.entity';
 
 @Injectable()
@@ -37,8 +37,8 @@ export class VehicleServiceService {
     const savedService = await this.vehicleServiceRepository.save(vehicleService);
 
     // Processar blockchain de forma assíncrona (não bloquear a resposta)
-    this.processBlockchainAsync(savedService).catch(error => {
-      console.error('Erro ao processar blockchain de forma assíncrona:', error);
+    this.processBlockchainAsync(savedService).catch(() => {
+      // Erro silenciosamente processado
     });
 
     return savedService;
@@ -50,8 +50,6 @@ export class VehicleServiceService {
    */
   private async processBlockchainAsync(service: VehicleService): Promise<void> {
     try {
-      console.log(`🔄 Iniciando processamento blockchain para serviço: ${service.id}`);
-      
       // Primeiro, gerar o hash do serviço
       const eventData = {
         serviceId: service.id,
@@ -63,17 +61,13 @@ export class VehicleServiceService {
       };
       
       const serviceHash = ethers.keccak256(ethers.toUtf8Bytes(JSON.stringify(eventData)));
-      console.log(`🔑 Hash gerado para serviço ${service.id}: ${serviceHash}`);
       
       // Registrar o hash no contrato blockchain
-      console.log(`📝 Tentando registrar hash no contrato blockchain...`);
       const hashResult = await this.blockchainService.registerHashInContract(
         serviceHash,
         service.vehicleId,
         service.type || 'MANUTENCAO'
       );
-
-      console.log(`📊 Resultado do registro:`, hashResult);
 
       if (hashResult.success) {
         // Atualizar o serviço com informações da blockchain
@@ -85,14 +79,12 @@ export class VehicleServiceService {
         service.confirmedBy = 'blockchain';
 
         await this.vehicleServiceRepository.save(service);
-        console.log(`✅ Serviço ${service.id} registrado na blockchain com sucesso - Hash: ${serviceHash}`);
       } else {
         // Marcar como rejeitado quando falha na blockchain
         service.status = ServiceStatus.REJECTED;
         service.canEdit = true; // Permite edição quando rejeitado
         
         await this.vehicleServiceRepository.save(service);
-        console.warn(`⚠️ Serviço ${service.id} rejeitado pela blockchain: ${hashResult.error}`);
       }
     } catch (error) {
       // Marcar como rejeitado quando há exceção na blockchain
@@ -100,7 +92,6 @@ export class VehicleServiceService {
       service.canEdit = true; // Permite edição quando rejeitado
       
       await this.vehicleServiceRepository.save(service);
-      console.error(`❌ Serviço ${service.id} rejeitado por erro na blockchain:`, error);
     }
   }
 
@@ -179,12 +170,13 @@ export class VehicleServiceService {
       hash = ethers.keccak256(ethers.toUtf8Bytes(JSON.stringify(eventData)));
     }
 
+    // Marcar como submetido/pendente até confirmação real da blockchain
     vehicleService.blockchainHash = hash;
-    vehicleService.status = ServiceStatus.CONFIRMED;
-    vehicleService.isImmutable = true;
-    vehicleService.canEdit = false;
-    vehicleService.blockchainConfirmedAt = new Date();
-    vehicleService.confirmedBy = confirmedBy;
+    vehicleService.status = ServiceStatus.PENDING;
+    vehicleService.isImmutable = false;
+    vehicleService.canEdit = true;
+    vehicleService.blockchainConfirmedAt = null;
+    vehicleService.confirmedBy = null;
 
     return await this.vehicleServiceRepository.save(vehicleService);
   }

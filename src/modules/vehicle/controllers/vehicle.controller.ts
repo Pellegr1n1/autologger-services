@@ -15,7 +15,6 @@ import {
   ParseFilePipe,
   MaxFileSizeValidator,
   FileTypeValidator,
-  Res,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -31,12 +30,9 @@ import { CreateVehicleDto } from '../dto/create-vehicle.dto';
 import { UpdateVehicleDto } from '../dto/update-vehicle.dto';
 import { VehicleResponseDto } from '../dto/vehicle-response.dto';
 import { MarkVehicleSoldDto } from '../dto/mark-vehicle-sold.dto';
-import { JwtAuthGuard } from '../../../auth/guards/jwt-auth.guard';
+import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../../../common/decorators/current-user.decorator';
 import { UserResponseDto } from '@/modules/user/dto/user-response.dto';
-import { Response } from 'express';
-import * as path from 'path';
-import * as fs from 'fs';
 
 @ApiTags('Veículos')
 @ApiBearerAuth()
@@ -61,7 +57,7 @@ export class VehicleController {
   })
   @ApiResponse({
     status: HttpStatus.CONFLICT,
-    description: 'Placa ou RENAVAM já cadastrados',
+    description: 'Placa já cadastrada',
   })
   async createVehicle(
     @Body() createVehicleDto: CreateVehicleDto,
@@ -69,7 +65,7 @@ export class VehicleController {
     @UploadedFile(
       new ParseFilePipe({
         validators: [
-          new MaxFileSizeValidator({ maxSize: 5 * 1024 * 1024 }), // 5MB
+          new MaxFileSizeValidator({ maxSize: 5 * 1024 * 1024 }),
           new FileTypeValidator({ fileType: '.(jpg|jpeg|png|gif|webp)' }),
         ],
         fileIsRequired: false,
@@ -77,7 +73,6 @@ export class VehicleController {
     )
     photo?: any,
   ): Promise<VehicleResponseDto> {
-    // Converter dados para os tipos corretos
     const vehicleData = {
       ...createVehicleDto,
       year: parseInt(createVehicleDto.year as any),
@@ -155,7 +150,7 @@ export class VehicleController {
     @UploadedFile(
       new ParseFilePipe({
         validators: [
-          new MaxFileSizeValidator({ maxSize: 5 * 1024 * 1024 }), // 5MB
+          new MaxFileSizeValidator({ maxSize: 5 * 1024 * 1024 }),
           new FileTypeValidator({ fileType: '.(jpg|jpeg|png|gif|webp)' }),
         ],
         fileIsRequired: false,
@@ -163,7 +158,6 @@ export class VehicleController {
     )
     photo?: any,
   ): Promise<VehicleResponseDto> {
-    // Converter dados para os tipos corretos
     const vehicleData = {
       ...updateVehicleDto,
       year: updateVehicleDto.year ? parseInt(updateVehicleDto.year as any) : undefined,
