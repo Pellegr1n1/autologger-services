@@ -26,7 +26,6 @@ export class EmailVerificationService {
    * Enviar email de verificação
    */
   async sendVerificationEmail(userId: string): Promise<void> {
-    // Buscar usuário
     const user = await this.userService.findById(userId);
     if (!user) {
       throw new NotFoundException('Usuário não encontrado');
@@ -36,18 +35,14 @@ export class EmailVerificationService {
       throw new BadRequestException('Email já verificado');
     }
 
-    // Invalidar tokens anteriores
     await this.tokenRepository.invalidateUserTokens(userId);
 
-    // Gerar novo token
     const token = this.generateToken();
     const expiresAt = new Date();
-    expiresAt.setHours(expiresAt.getHours() + 24); // Expira em 24 horas
+    expiresAt.setHours(expiresAt.getHours() + 24);
 
-    // Salvar token
     await this.tokenRepository.create(token, userId, expiresAt);
 
-    // Enviar email
     await this.emailService.sendVerificationEmail(
       user.email,
       token,
@@ -73,13 +68,8 @@ export class EmailVerificationService {
       throw new BadRequestException('Token expirado. Solicite um novo link.');
     }
 
-    // Marcar token como usado
     await this.tokenRepository.markAsUsed(token);
-
-    // Marcar email como verificado no usuário
     await this.userService.markEmailAsVerified(verificationToken.userId);
-
-    // Invalidar outros tokens do usuário
     await this.tokenRepository.invalidateUserTokens(verificationToken.userId);
   }
 

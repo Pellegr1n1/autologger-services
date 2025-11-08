@@ -1,0 +1,161 @@
+version: '3.8'
+
+services:
+  # Node 1: Bootnode + Validador Principal
+  besu-node1:
+    image: hyperledger/besu:24.1.2
+    container_name: besu-node1
+    user: "0:0"
+    ports:
+      - "8545:8545"
+      - "30303:30303"
+    command:
+      - "--data-path=/opt/besu/data"
+      - "--genesis-file=/opt/besu/genesis.json"
+      - "--node-private-key-file=/opt/besu/nodes/node1/key"
+      - "--rpc-http-enabled"
+      - "--rpc-http-host=0.0.0.0"
+      - "--rpc-http-port=8545"
+      - "--rpc-http-cors-origins=*"
+      - "--rpc-http-api=ETH,NET,WEB3,CLIQUE,ADMIN"
+      - "--host-allowlist=*"
+      - "--p2p-port=30303"
+      - "--p2p-host=0.0.0.0"
+      - "--min-gas-price=0"
+      - "--logging=INFO"
+    volumes:
+      - ../blockchain/besu-network/genesis.json:/opt/besu/genesis.json
+      - ../blockchain/besu-network/node/besu-0/data:/opt/besu/nodes/node1
+      - besu_node1_data:/opt/besu/data
+    networks:
+      - besu-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "-X", "POST", "--data", "{\"jsonrpc\":\"2.0\",\"method\":\"eth_blockNumber\",\"params\":[],\"id\":1}", "localhost:8545"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  # Node 2: Validador Secundário
+  besu-node2:
+    image: hyperledger/besu:24.1.2
+    container_name: besu-node2
+    user: "0:0"
+    ports:
+      - "8546:8546"
+      - "30304:30304"
+    command:
+      - "--data-path=/opt/besu/data"
+      - "--genesis-file=/opt/besu/genesis.json"
+      - "--node-private-key-file=/opt/besu/nodes/node2/key"
+      - "--rpc-http-enabled"
+      - "--rpc-http-host=0.0.0.0"
+      - "--rpc-http-port=8546"
+      - "--rpc-http-cors-origins=*"
+      - "--rpc-http-api=ETH,NET,WEB3,IBFT"
+      - "--host-allowlist=*"
+      - "--p2p-port=30304"
+      - "--p2p-host=0.0.0.0"
+      - "--bootnodes=enode://be35e3c41103b56c413830ccd2a27077b099c14734cc150dfd119c46b2bac9f56891d011321bca3c2192404b9d130e0c9aedae6588254c8a7b0d3d51240399d5@0.0.0.0:30303"
+      - "--min-gas-price=0"
+      - "--logging=INFO"
+    volumes:
+      - ./besu-network/genesis.json:/opt/besu/genesis.json
+      - ../blockchain/besu-network/node/besu-1/data:/opt/besu/nodes/node2
+      - besu_node2_data:/opt/besu/data
+    networks:
+      - besu-network
+    depends_on:
+      - besu-node1
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "-X", "POST", "--data", "{\"jsonrpc\":\"2.0\",\"method\":\"eth_blockNumber\",\"params\":[],\"id\":1}", "localhost:8546"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  # Node 3: Validador Terciário
+  besu-node3:
+    image: hyperledger/besu:24.1.2
+    container_name: besu-node3
+    user: "0:0"
+    ports:
+      - "8547:8547"
+      - "30305:30305"
+    command:
+      - "--data-path=/opt/besu/data"
+      - "--genesis-file=/opt/besu/genesis.json"
+      - "--node-private-key-file=/opt/besu/nodes/node3/key"
+      - "--rpc-http-enabled"
+      - "--rpc-http-host=0.0.0.0"
+      - "--rpc-http-port=8547"
+      - "--rpc-http-cors-origins=*"
+      - "--rpc-http-api=ETH,NET,WEB3,IBFT"
+      - "--host-allowlist=*"
+      - "--p2p-port=30305"
+      - "--p2p-host=0.0.0.0"
+      - "--bootnodes=enode://be35e3c41103b56c413830ccd2a27077b099c14734cc150dfd119c46b2bac9f56891d011321bca3c2192404b9d130e0c9aedae6588254c8a7b0d3d51240399d5@0.0.0.0:30303"
+      - "--min-gas-price=0"
+      - "--logging=INFO"
+    volumes:
+      - ./besu-network/genesis.json:/opt/besu/genesis.json
+      - ../blockchain/besu-network/node/besu-2/data:/opt/besu/nodes/node3
+      - besu_node3_data:/opt/besu/data
+    networks:
+      - besu-network
+    depends_on:
+      - besu-node1
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "-X", "POST", "--data", "{\"jsonrpc\":\"2.0\",\"method\":\"eth_blockNumber\",\"params\":[],\"id\":1}", "localhost:8547"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  # Node 4: Observador (não participa do consenso)
+  besu-node4:
+    image: hyperledger/besu:24.1.2
+    container_name: besu-node4
+    user: "0:0"
+    ports:
+      - "8548:8548"
+      - "30306:30306"
+    command:
+      - "--data-path=/opt/besu/data"
+      - "--genesis-file=/opt/besu/genesis.json"
+      - "--node-private-key-file=/opt/besu/nodes/node4/key"
+      - "--rpc-http-enabled"
+      - "--rpc-http-host=0.0.0.0"
+      - "--rpc-http-port=8548"
+      - "--rpc-http-cors-origins=*"
+      - "--rpc-http-api=ETH,NET,WEB3"
+      - "--host-allowlist=*"
+      - "--p2p-port=30306"
+      - "--p2p-host=0.0.0.0"
+      - "--bootnodes=enode://be35e3c41103b56c413830ccd2a27077b099c14734cc150dfd119c46b2bac9f56891d011321bca3c2192404b9d130e0c9aedae6588254c8a7b0d3d51240399d5@0.0.0.0:30303"
+      - "--min-gas-price=0"
+      - "--logging=INFO"
+    volumes:
+      - ./besu-network/genesis.json:/opt/besu/genesis.json
+      - ../blockchain/besu-network/node/besu-2/data:/opt/besu/nodes/node4
+      - besu_node4_data:/opt/besu/data
+    networks:
+      - besu-network
+    depends_on:
+      - besu-node1
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "-X", "POST", "--data", "{\"jsonrpc\":\"2.0\",\"method\":\"eth_blockNumber\",\"params\":[],\"id\":1}", "localhost:8548"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+volumes:
+  besu_node1_data:
+  besu_node2_data:
+  besu_node3_data:
+  besu_node4_data:
+
+networks:
+  besu-network:
+    driver: bridge

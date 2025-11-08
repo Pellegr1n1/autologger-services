@@ -18,9 +18,6 @@ export class PublicVehicleInfoDto {
   @ApiProperty({ description: 'ID do veículo' })
   id: string;
 
-  @ApiProperty({ description: 'Placa do veículo' })
-  plate: string;
-
   @ApiProperty({ description: 'Marca do veículo' })
   brand: string;
 
@@ -45,7 +42,7 @@ export class PublicVehicleInfoDto {
   @ApiProperty({ description: 'URL da foto do veículo' })
   photoUrl?: string;
 
-  @ApiProperty({ description: 'Histórico de manutenções' })
+  @ApiProperty({ description: 'Histórico de serviços' })
   maintenanceHistory: PublicMaintenanceInfoDto[];
 }
 
@@ -77,7 +74,7 @@ export class PublicMaintenanceInfoDto {
   @ApiProperty({ description: 'Se tem garantia' })
   warranty: boolean;
 
-  @ApiProperty({ description: 'Próxima data de manutenção' })
+  @ApiProperty({ description: 'Próxima data de serviço' })
   nextServiceDate?: Date;
 
   @ApiProperty({ description: 'Observações' })
@@ -88,6 +85,9 @@ export class PublicMaintenanceInfoDto {
 
   @ApiProperty({ description: 'Hash blockchain' })
   blockchainHash?: string;
+
+  @ApiProperty({ description: 'Data de registro do serviço no sistema' })
+  createdAt: Date;
 
   @ApiProperty({ description: 'Anexos do serviço', type: [Object] })
   attachments?: PublicAttachmentDto[];

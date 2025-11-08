@@ -1,4 +1,4 @@
-import { IsEmail, IsString, MinLength, IsOptional, Matches, IsEnum } from 'class-validator';
+import { IsEmail, IsString, MinLength, IsOptional, Matches, IsEnum, IsBoolean } from 'class-validator';
 
 export class UpdateUserDto {
   @IsOptional()
@@ -22,4 +22,8 @@ export class UpdateUserDto {
   @IsOptional()
   @IsEnum(['local', 'google'], { message: 'Provedor de autenticação deve ser local ou google' })
   authProvider?: 'local' | 'google';
+
+  @IsOptional()
+  @IsBoolean({ message: 'isActive deve ser um boolean' })
+  isActive?: boolean;
 }

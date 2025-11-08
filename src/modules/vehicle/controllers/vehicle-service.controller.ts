@@ -18,7 +18,7 @@ import { VehicleServiceService } from '../services/vehicle-service.service';
 import { CreateVehicleServiceDto } from '../dto/create-vehicle-service.dto';
 import { UpdateVehicleServiceDto } from '../dto/update-vehicle-service.dto';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiConsumes, ApiBody } from '@nestjs/swagger';
-import { JwtAuthGuard } from '../../../auth/guards/jwt-auth.guard';
+import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 import { VehicleService } from '../../vehicle/services/vehicle.service';
 import { FileUploadService } from '../services/file-upload.service';
 
@@ -40,13 +40,11 @@ export class VehicleServiceController {
   async create(@Body() createVehicleServiceDto: CreateVehicleServiceDto, @Request() req) {
     const userId = req.user?.id;
     
-    // Verificar se o usuário tem veículos cadastrados
     const userVehicles = await this.vehicleService.findUserVehicles(userId);
     if (!userVehicles.active || userVehicles.active.length === 0) {
-      throw new BadRequestException('Você precisa ter pelo menos um veículo cadastrado para criar manutenções');
+      throw new BadRequestException('Você precisa ter pelo menos um veículo cadastrado para criar serviços');
     }
 
-    // Verificar se o veículo especificado pertence ao usuário
     const vehicleExists = userVehicles.active.some(vehicle => vehicle.id === createVehicleServiceDto.vehicleId);
     if (!vehicleExists) {
       throw new BadRequestException('Veículo não encontrado ou não pertence ao usuário');
@@ -76,15 +74,12 @@ export class VehicleServiceController {
     },
   })
   async uploadAttachments(@UploadedFiles() files: any[]) {
-    console.log('📎 Recebendo arquivos para upload:', files?.length || 0);
-    
     if (!files || files.length === 0) {
       throw new BadRequestException('Nenhum arquivo foi enviado');
     }
 
     try {
       const uploadedUrls = await this.fileUploadService.uploadMultipleAttachments(files);
-      console.log('✅ Arquivos enviados com sucesso:', uploadedUrls);
       
       return {
         success: true,
@@ -92,7 +87,6 @@ export class VehicleServiceController {
         count: uploadedUrls.length,
       };
     } catch (error) {
-      console.error('❌ Erro ao fazer upload de anexos:', error);
       throw new BadRequestException('Erro ao fazer upload dos arquivos');
     }
   }
@@ -167,8 +161,9 @@ export class VehicleServiceController {
   @Get('vehicle/:vehicleId/count')
   @ApiOperation({ summary: 'Obter quantidade de serviços de um veículo' })
   @ApiResponse({ status: 200, description: 'Quantidade retornada' })
-  getServicesCountByVehicle(@Param('vehicleId') vehicleId: string) {
-    return this.vehicleServiceService.getServicesCountByVehicle(vehicleId);
+  async getServicesCountByVehicle(@Param('vehicleId') vehicleId: string) {
+    const count = await this.vehicleServiceService.getServicesCountByVehicle(vehicleId);
+    return { count };
   }
 
   @Get(':id')

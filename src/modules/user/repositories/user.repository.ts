@@ -25,12 +25,20 @@ export class UserRepository {
   }
 
   async update(id: string, updateData: Partial<User>): Promise<User | null> {
-    await this.userRepository.update(id, updateData);
+    const filteredData = Object.fromEntries(
+      Object.entries(updateData).filter(([_, value]) => value !== undefined)
+    );
+    
+    await this.userRepository.update(id, filteredData);
     return await this.findById(id);
   }
 
   async softDelete(id: string): Promise<void> {
     await this.userRepository.update(id, { isActive: false });
+  }
+
+  async hardDelete(id: string): Promise<void> {
+    await this.userRepository.delete(id);
   }
 
   async findByGoogleId(googleId: string): Promise<User | null> {

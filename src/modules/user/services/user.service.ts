@@ -2,9 +2,14 @@ import {
   Injectable,
   ConflictException,
   NotFoundException,
+  BadRequestException,
+  Inject,
+  forwardRef,
 } from '@nestjs/common';
 import * as bcrypt from 'bcryptjs';
 import { UserRepository } from '../repositories/user.repository';
+import { EmailVerificationRepository } from '../../email-verification/email-verification.repository';
+import { PasswordResetRepository } from '../../password-reset/password-reset.repository';
 import { CreateUserDto } from '../dto/create-user.dto';
 import { UpdateUserDto } from '../dto/update-user.dto';
 import { UserResponseDto } from '../dto/user-response.dto';
@@ -12,7 +17,13 @@ import { User } from '../entities/user.entity';
 
 @Injectable()
 export class UserService {
-  constructor(private readonly userRepository: UserRepository) {}
+  constructor(
+    private readonly userRepository: UserRepository,
+    @Inject(forwardRef(() => EmailVerificationRepository))
+    private readonly emailVerificationRepository: EmailVerificationRepository,
+    @Inject(forwardRef(() => PasswordResetRepository))
+    private readonly passwordResetRepository: PasswordResetRepository,
+  ) {}
 
   async create(createUserDto: CreateUserDto): Promise<UserResponseDto> {
     // Verifica se o usuário já existe
@@ -23,12 +34,10 @@ export class UserService {
       throw new ConflictException('Email já está em uso');
     }
 
-    // Cria o usuário
     const userData = {
       ...createUserDto,
     };
 
-    // Se tem senha, criptografa
     if (createUserDto.password) {
       const saltRounds = 12;
       userData.password = await bcrypt.hash(createUserDto.password, saltRounds);
@@ -51,13 +60,15 @@ export class UserService {
   }
 
   async updateProfile(id: string, updateUserDto: UpdateUserDto): Promise<UserResponseDto> {
-    // Verifica se o usuário existe
     const existingUser = await this.userRepository.findById(id);
     if (!existingUser || !existingUser.isActive) {
       throw new NotFoundException('Usuário não encontrado');
     }
 
-    // Se o email está sendo alterado, verifica se já não está em uso por outro usuário
+    if (existingUser.authProvider === 'google' && updateUserDto.email && updateUserDto.email !== existingUser.email) {
+      throw new BadRequestException('Não é possível alterar o email de uma conta autenticada via Google. O email é sincronizado automaticamente com sua conta Google.');
+    }
+
     if (updateUserDto.email && updateUserDto.email !== existingUser.email) {
       const userWithEmail = await this.userRepository.findByEmail(updateUserDto.email);
       if (userWithEmail && userWithEmail.id !== id) {
@@ -65,14 +76,14 @@ export class UserService {
       }
     }
 
-    // Atualiza apenas os campos fornecidos
     const updateData: Partial<User> = {};
     
     if (updateUserDto.name) {
       updateData.name = updateUserDto.name;
     }
     
-    if (updateUserDto.email) {
+    // Para contas Google, não atualizar o email mesmo se fornecido
+    if (updateUserDto.email && existingUser.authProvider !== 'google') {
       updateData.email = updateUserDto.email;
     }
     
@@ -89,13 +100,60 @@ export class UserService {
       updateData.authProvider = updateUserDto.authProvider;
     }
 
-    // Atualiza no banco
+    if (updateUserDto.isActive !== undefined) {
+      updateData.isActive = updateUserDto.isActive;
+    }
+
     const updatedUser = await this.userRepository.update(id, updateData);
     
     if (!updatedUser) {
       throw new NotFoundException('Erro ao atualizar usuário');
     }
     
+    return this.toUserResponseDto(updatedUser);
+  }
+
+  /**
+   * Atualiza o usuário mesmo se estiver inativo (usado para reativação via OAuth)
+   */
+  async updateProfileAllowInactive(id: string, updateUserDto: UpdateUserDto): Promise<UserResponseDto> {
+    const existingUser = await this.userRepository.findById(id);
+    if (!existingUser) {
+      throw new NotFoundException('Usuário não encontrado');
+    }
+
+    if (updateUserDto.email && updateUserDto.email !== existingUser.email) {
+      const userWithEmail = await this.userRepository.findByEmail(updateUserDto.email);
+      if (userWithEmail && userWithEmail.id !== id) {
+        throw new ConflictException('Email já está em uso por outro usuário');
+      }
+    }
+
+    const updateData: Partial<User> = {};
+
+    if (updateUserDto.name) {
+      updateData.name = updateUserDto.name;
+    }
+    if (updateUserDto.email) {
+      updateData.email = updateUserDto.email;
+    }
+    if (updateUserDto.googleId !== undefined) {
+      updateData.googleId = updateUserDto.googleId;
+    }
+    if (updateUserDto.avatar !== undefined) {
+      updateData.avatar = updateUserDto.avatar;
+    }
+    if (updateUserDto.authProvider !== undefined) {
+      updateData.authProvider = updateUserDto.authProvider;
+    }
+    if (updateUserDto.isActive !== undefined) {
+      updateData.isActive = updateUserDto.isActive;
+    }
+
+    const updatedUser = await this.userRepository.update(id, updateData);
+    if (!updatedUser) {
+      throw new NotFoundException('Erro ao atualizar usuário');
+    }
     return this.toUserResponseDto(updatedUser);
   }
 
@@ -111,7 +169,10 @@ export class UserService {
     if (!user) {
       throw new NotFoundException('Usuário não encontrado');
     }
-    await this.userRepository.softDelete(userId);
+    
+    await this.emailVerificationRepository.deleteUserTokens(userId);
+    await this.passwordResetRepository.deleteUserTokens(userId);
+    await this.userRepository.hardDelete(userId);
   }
 
   async findByGoogleId(googleId: string): Promise<User | null> {

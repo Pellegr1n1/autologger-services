@@ -32,6 +32,9 @@ export class VehicleShare {
   @Column({ type: 'boolean', default: true })
   isActive: boolean;
 
+  @Column({ type: 'boolean', default: false })
+  includeAttachments: boolean;
+
   @Column({ type: 'integer', default: 0 })
   viewCount: number;
 

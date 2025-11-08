@@ -6,9 +6,6 @@ export class EmailService {
   private readonly logger = new Logger(EmailService.name);
 
   private getTransporter(): nodemailer.Transporter {
-    // Configurar o transporter dinamicamente
-    // Para desenvolvimento, usa Ethereal Email (fake SMTP)
-    // Para produção, configure com SendGrid, AWS SES, ou Gmail
     return nodemailer.createTransport({
       host: process.env.SMTP_HOST || 'smtp.ethereal.email',
       port: parseInt(process.env.SMTP_PORT || '587'),

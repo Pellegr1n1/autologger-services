@@ -17,7 +17,6 @@ export class VehicleFactory {
       model: vehicle.model,
       year: vehicle.year,
       color: vehicle.color,
-      renavam: vehicle.renavam,
       mileage: vehicle.mileage,
       photoUrl: vehicle.photoUrl,
       status: vehicle.status,
@@ -40,7 +39,6 @@ export class VehicleFactory {
       model: this.capitalizeFirstLetter(createVehicleDto.model),
       year: createVehicleDto.year,
       color: this.capitalizeFirstLetter(createVehicleDto.color),
-      renavam: createVehicleDto.renavam,
       mileage: createVehicleDto.mileage || 0,
       status: VehicleStatus.ACTIVE,
       userId,
@@ -78,11 +76,9 @@ export class VehicleFactory {
     const cleanPlate = plate.toUpperCase().replace(/[^A-Z0-9]/g, '');
     
     if (cleanPlate.length === 7) {
-      // Formato antigo: ABC1234 -> ABC-1234
       if (/^[A-Z]{3}[0-9]{4}$/.test(cleanPlate)) {
         return cleanPlate.replace(/^([A-Z]{3})([0-9]{4})$/, '$1-$2');
       }
-      // Formato Mercosul: ABC1D23 (sem hífen)
       else if (/^[A-Z]{3}[0-9][A-Z][0-9]{2}$/.test(cleanPlate)) {
         return cleanPlate;
       }
@@ -101,14 +97,6 @@ export class VehicleFactory {
     const mercosulFormat = /^[A-Z]{3}[0-9][A-Z][0-9]{2}$/;
     
     return oldFormat.test(cleanPlate) || mercosulFormat.test(cleanPlate);
-  }
-
-  /**
-   * Valida se o RENAVAM está no formato correto
-   */
-  isValidRenavam(renavam: string): boolean {
-    const cleanRenavam = renavam.replace(/\D/g, '');
-    return cleanRenavam.length === 11 && /^[0-9]{11}$/.test(cleanRenavam);
   }
 
   /**
@@ -164,7 +152,6 @@ export class VehicleFactory {
       brand: data.brand ? this.capitalizeFirstLetter(data.brand) : undefined,
       model: data.model ? this.capitalizeFirstLetter(data.model) : undefined,
       color: data.color ? this.capitalizeFirstLetter(data.color) : undefined,
-      renavam: data.renavam ? data.renavam.replace(/\D/g, '') : undefined,
     };
   }
 }

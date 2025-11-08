@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, UnauthorizedException } from '@nestjs/common';
+import { Injectable, NotFoundException, UnauthorizedException, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { VehicleShare } from '../entities/vehicle-share.entity';
@@ -7,6 +7,7 @@ import { VehicleServiceService } from './vehicle-service.service';
 import { VehicleShareResponseDto, PublicVehicleInfoDto, PublicMaintenanceInfoDto } from '../dto/vehicle-share-response.dto';
 import { VehicleResponseDto } from '../dto/vehicle-response.dto';
 import { ServiceType, ServiceStatus } from '../entities/vehicle-service.entity';
+import { VehicleStatus } from '../enums/vehicle-status.enum';
 import * as crypto from 'crypto';
 
 @Injectable()
@@ -21,9 +22,14 @@ export class VehicleShareService {
   /**
    * Gerar token de compartilhamento para um veículo
    */
-  async generateShareToken(vehicleId: string, userId: string, expiresInDays: number = 30): Promise<VehicleShareResponseDto> {
+  async generateShareToken(vehicleId: string, userId: string, expiresInDays: number = 30, includeAttachments: boolean = false): Promise<VehicleShareResponseDto> {
     // Verificar se o veículo pertence ao usuário
-    await this.vehicleService.findVehicleById(vehicleId, userId);
+    const vehicle = await this.vehicleService.findVehicleById(vehicleId, userId);
+
+    // Verificar se o veículo foi vendido e bloquear geração de link
+    if (vehicle.status === VehicleStatus.SOLD) {
+      throw new BadRequestException('Não é possível gerar link de compartilhamento para veículos vendidos');
+    }
 
     // Gerar token único
     const shareToken = crypto.randomBytes(32).toString('hex');
@@ -38,6 +44,7 @@ export class VehicleShareService {
       vehicleId,
       expiresAt,
       isActive: true,
+      includeAttachments,
     });
 
     await this.vehicleShareRepository.save(vehicleShare);
@@ -66,24 +73,24 @@ export class VehicleShareService {
       throw new NotFoundException('Link de compartilhamento não encontrado ou expirado');
     }
 
-    // Verificar se não expirou
     if (vehicleShare.expiresAt && vehicleShare.expiresAt < new Date()) {
       throw new UnauthorizedException('Link de compartilhamento expirado');
     }
 
-    // Incrementar contador de visualizações
+    const vehicle = vehicleShare.vehicle;
+
+    if (vehicle.status !== 'active') {
+      throw new UnauthorizedException('Este veículo foi vendido e não está mais disponível para visualização pública');
+    }
+
     vehicleShare.viewCount += 1;
     vehicleShare.lastViewedAt = new Date();
     await this.vehicleShareRepository.save(vehicleShare);
 
-    const vehicle = vehicleShare.vehicle;
-
-    // Buscar histórico de manutenções do veículo
-    const maintenanceHistory = await this.getPublicMaintenanceHistory(vehicle.id);
+    const maintenanceHistory = await this.getPublicMaintenanceHistory(vehicle.id, vehicleShare.includeAttachments);
 
     return {
       id: vehicle.id,
-      plate: vehicle.plate,
       brand: vehicle.brand,
       model: vehicle.model,
       year: vehicle.year,
@@ -97,20 +104,22 @@ export class VehicleShareService {
   }
 
   /**
-   * Buscar histórico de manutenções público (sem dados sensíveis)
+   * Buscar histórico de serviços público (sem dados sensíveis)
    */
-  private async getPublicMaintenanceHistory(vehicleId: string): Promise<PublicMaintenanceInfoDto[]> {
+  private async getPublicMaintenanceHistory(vehicleId: string, includeAttachments: boolean = false): Promise<PublicMaintenanceInfoDto[]> {
     const services = await this.vehicleServiceService.findByVehicleId(vehicleId);
 
     return services.map(service => {
-      // Converter anexos de string[] para PublicAttachmentDto[]
-      const attachments = (service.attachments || []).map((url, index) => ({
-        id: `attachment-${service.id}-${index}`,
-        fileName: this.getFileNameFromUrl(url),
-        fileUrl: url,
-        fileType: this.getFileTypeFromUrl(url),
-        fileSize: 0 // Não temos o tamanho salvo no banco
-      }));
+      // Converter anexos de string[] para PublicAttachmentDto[] apenas se includeAttachments for true
+      const attachments = includeAttachments
+        ? (service.attachments || []).map((url, index) => ({
+            id: `attachment-${service.id}-${index}`,
+            fileName: this.getFileNameFromUrl(url),
+            fileUrl: url,
+            fileType: this.getFileTypeFromUrl(url),
+            fileSize: 0 // Não temos o tamanho salvo no banco
+          }))
+        : undefined;
 
       return {
         type: this.mapServiceType(service.type),
@@ -126,6 +135,7 @@ export class VehicleShareService {
         notes: service.notes,
         blockchainStatus: this.mapBlockchainStatus(service.status),
         blockchainHash: service.blockchainHash,
+        createdAt: service.createdAt,
         attachments: attachments,
       };
     });

@@ -27,7 +27,6 @@ export interface IVehicleRepository {
   findSoldByUserId(userId: string): Promise<Vehicle[]>;
   countActiveByUserId(userId: string): Promise<number>;
   existsByPlate(plate: string, excludeId?: string): Promise<boolean>;
-  existsByRenavam(renavam: string, excludeId?: string): Promise<boolean>;
   update(id: string, updateVehicleDto: UpdateVehicleDto): Promise<Vehicle>;
   markAsSold(id: string, soldAt?: Date): Promise<Vehicle>;
   delete(id: string): Promise<void>;
@@ -37,7 +36,6 @@ export interface IVehicleRepository {
 export interface IVehicleBusinessRules {
   validateActiveVehicleLimit(userId: string): Promise<void>;
   validateUniquePlate(plate: string, excludeId?: string): Promise<void>;
-  validateUniqueRenavam(renavam: string, excludeId?: string): Promise<void>;
   validateVehicleOwnership(vehicleId: string, userId: string): Promise<void>;
   validateVehicleCanBeUpdated(vehicleId: string): Promise<void>;
   validateVehicleCanBeSold(vehicleId: string, userId: string): Promise<void>;
@@ -50,7 +48,6 @@ export interface IVehicleFactory {
   createVehicle(data: Partial<Vehicle>): Vehicle;
   formatPlate(plate: string): string;
   isValidPlate(plate: string): boolean;
-  isValidRenavam(renavam: string): boolean;
   getVehicleSummary(vehicle: Vehicle): string;
   isActive(vehicle: Vehicle): boolean;
   isSold(vehicle: Vehicle): boolean;

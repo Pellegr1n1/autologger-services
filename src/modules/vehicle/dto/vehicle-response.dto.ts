@@ -21,9 +21,6 @@ export class VehicleResponseDto {
   color: string;
 
   @ApiProperty()
-  renavam: string;
-
-  @ApiProperty()
   mileage: number;
 
   @ApiProperty({ required: false })
