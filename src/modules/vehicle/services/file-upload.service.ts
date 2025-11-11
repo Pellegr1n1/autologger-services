@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -6,6 +6,8 @@ import { v4 as uuidv4 } from 'uuid';
 
 @Injectable()
 export class FileUploadService {
+  private readonly logger = new Logger(FileUploadService.name);
+
   constructor(private configService: ConfigService) {}
 
   async uploadPhoto(file: any): Promise<string> {
@@ -44,7 +46,7 @@ export class FileUploadService {
         fs.unlinkSync(filePath);
       }
     } catch (error) {
-      console.error('Erro ao deletar foto:', error);
+      this.logger.error('Erro ao deletar foto:', error);
     }
   }
 
@@ -101,7 +103,7 @@ export class FileUploadService {
         fs.unlinkSync(filePath);
       }
     } catch (error) {
-      console.error('Erro ao deletar anexo:', error);
+      this.logger.error('Erro ao deletar anexo:', error);
     }
   }
 }

@@ -65,28 +65,54 @@ export class UserService {
       throw new NotFoundException('Usuário não encontrado');
     }
 
-    if (existingUser.authProvider === 'google' && updateUserDto.email && updateUserDto.email !== existingUser.email) {
-      throw new BadRequestException('Não é possível alterar o email de uma conta autenticada via Google. O email é sincronizado automaticamente com sua conta Google.');
+    await this.validateEmailUpdate(id, existingUser, updateUserDto);
+    const updateData = this.buildUpdateData(existingUser, updateUserDto);
+    const updatedUser = await this.userRepository.update(id, updateData);
+    
+    if (!updatedUser) {
+      throw new NotFoundException('Erro ao atualizar usuário');
+    }
+    
+    return this.toUserResponseDto(updatedUser);
+  }
+
+  /**
+   * Valida se a atualização de email é permitida
+   */
+  private async validateEmailUpdate(
+    id: string,
+    existingUser: User,
+    updateUserDto: UpdateUserDto,
+  ): Promise<void> {
+    if (!updateUserDto.email || updateUserDto.email === existingUser.email) {
+      return;
     }
 
-    if (updateUserDto.email && updateUserDto.email !== existingUser.email) {
-      const userWithEmail = await this.userRepository.findByEmail(updateUserDto.email);
-      if (userWithEmail && userWithEmail.id !== id) {
-        throw new ConflictException('Email já está em uso por outro usuário');
-      }
+    if (existingUser.authProvider === 'google') {
+      throw new BadRequestException(
+        'Não é possível alterar o email de uma conta autenticada via Google. O email é sincronizado automaticamente com sua conta Google.',
+      );
     }
 
+    const userWithEmail = await this.userRepository.findByEmail(updateUserDto.email);
+    if (userWithEmail && userWithEmail.id !== id) {
+      throw new ConflictException('Email já está em uso por outro usuário');
+    }
+  }
+
+  /**
+   * Constrói o objeto de dados para atualização
+   */
+  private buildUpdateData(existingUser: User, updateUserDto: UpdateUserDto): Partial<User> {
     const updateData: Partial<User> = {};
     
     if (updateUserDto.name) {
       updateData.name = updateUserDto.name;
     }
     
-    // Para contas Google, não atualizar o email mesmo se fornecido
     if (updateUserDto.email && existingUser.authProvider !== 'google') {
       updateData.email = updateUserDto.email;
     }
-    
 
     if (updateUserDto.googleId !== undefined) {
       updateData.googleId = updateUserDto.googleId;
@@ -104,13 +130,7 @@ export class UserService {
       updateData.isActive = updateUserDto.isActive;
     }
 
-    const updatedUser = await this.userRepository.update(id, updateData);
-    
-    if (!updatedUser) {
-      throw new NotFoundException('Erro ao atualizar usuário');
-    }
-    
-    return this.toUserResponseDto(updatedUser);
+    return updateData;
   }
 
   /**

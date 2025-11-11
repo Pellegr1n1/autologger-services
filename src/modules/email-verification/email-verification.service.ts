@@ -5,7 +5,7 @@ import { EmailVerificationRepository } from './email-verification.repository';
 import { EmailVerificationToken } from './entities/email-verification-token.entity';
 import { EmailService } from '../email/email.service';
 import { UserService } from '../user/services/user.service';
-import * as crypto from 'crypto';
+import { generateSecureToken } from '../../common/utils/token.util';
 
 @Injectable()
 export class EmailVerificationService {
@@ -15,12 +15,6 @@ export class EmailVerificationService {
     private readonly userService: UserService,
   ) {}
 
-  /**
-   * Gerar token de verificação
-   */
-  private generateToken(): string {
-    return crypto.randomBytes(32).toString('hex');
-  }
 
   /**
    * Enviar email de verificação
@@ -37,7 +31,7 @@ export class EmailVerificationService {
 
     await this.tokenRepository.invalidateUserTokens(userId);
 
-    const token = this.generateToken();
+    const token = generateSecureToken();
     const expiresAt = new Date();
     expiresAt.setHours(expiresAt.getHours() + 24);
 
