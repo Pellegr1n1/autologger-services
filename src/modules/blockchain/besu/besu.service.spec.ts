@@ -6,6 +6,32 @@ describe('BesuService', () => {
   let service: BesuService;
   let configService: jest.Mocked<ConfigService>;
 
+  // Helper function to create a never-resolving promise (for timeout simulation)
+  // This avoids deep nesting in test cases
+  const createNeverResolvingPromise = (): Promise<any> => {
+    // eslint-disable-next-line @typescript-eslint/no-empty-function
+    return new Promise(() => {});
+  };
+
+  // Helper function to create mock contract with registerService
+  const createMockContractWithRegisterService = (waitMock: jest.Mock) => ({
+    registerService: jest.fn().mockResolvedValue({
+      hash: '0x1234567890abcdef',
+      wait: waitMock,
+    }),
+    interface: {
+      parseLog: jest.fn(),
+    },
+  });
+
+  // Helper function to create mock contract with registerHash
+  const createMockContractWithRegisterHash = (waitMock: jest.Mock) => ({
+    registerHash: jest.fn().mockResolvedValue({
+      hash: '0x1234567890abcdef',
+      wait: waitMock,
+    }),
+  });
+
   beforeEach(async () => {
     const mockConfigService = {
       get: jest.fn((key: string, defaultValue?: string) => {
@@ -96,21 +122,9 @@ describe('BesuService', () => {
       };
 
       // Mock wait to never resolve (simulating timeout)
-      const mockWait = jest.fn().mockImplementation(() => {
-        return new Promise(() => {
-          // Never resolves to simulate timeout
-        });
-      });
+      const mockWait = jest.fn().mockImplementation(createNeverResolvingPromise);
 
-      (service as any).contract = {
-        registerService: jest.fn().mockResolvedValue({
-          hash: '0x1234567890abcdef',
-          wait: mockWait,
-        }),
-        interface: {
-          parseLog: jest.fn(),
-        },
-      };
+      (service as any).contract = createMockContractWithRegisterService(mockWait);
 
       // Mock Promise.race to immediately reject with timeout
       const originalPromiseRace = Promise.race;
@@ -190,18 +204,9 @@ describe('BesuService', () => {
 
     it('should handle timeout when waiting for transaction', async () => {
       // Mock wait to never resolve (simulating timeout)
-      const mockWait = jest.fn().mockImplementation(() => {
-        return new Promise(() => {
-          // Never resolves to simulate timeout
-        });
-      });
+      const mockWait = jest.fn().mockImplementation(createNeverResolvingPromise);
 
-      (service as any).contract = {
-        registerHash: jest.fn().mockResolvedValue({
-          hash: '0x1234567890abcdef',
-          wait: mockWait,
-        }),
-      };
+      (service as any).contract = createMockContractWithRegisterHash(mockWait);
 
       // Mock Promise.race to immediately reject with timeout
       const originalPromiseRace = Promise.race;

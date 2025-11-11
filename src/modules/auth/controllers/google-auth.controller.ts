@@ -4,6 +4,7 @@ import { Request, Response } from 'express';
 import { AuthService } from '../auth.service';
 import { Public } from '../../../common/decorators/public.decorator';
 import { AuthResponseDto } from '../dto/auth-response.dto';
+import { validateGoogleOAuthEnvVars } from '../../../common/utils/env.util';
 
 @Controller('auth/google')
 export class GoogleAuthController {
@@ -36,13 +37,22 @@ export class GoogleAuthController {
         path: '/',
       });
       
-      const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
-      const redirectUrl = `${frontendUrl}/auth/callback?user=${encodeURIComponent(JSON.stringify(result.user))}`;
+      const { frontendUrl } = validateGoogleOAuthEnvVars();
+      // Usar apenas campos seguros do usuário na URL
+      const safeUserData = {
+        id: result.user.id,
+        name: result.user.name,
+        email: result.user.email,
+        isEmailVerified: result.user.isEmailVerified,
+      };
+      const redirectUrl = `${frontendUrl}/auth/callback?user=${encodeURIComponent(JSON.stringify(safeUserData))}`;
       
       res.redirect(redirectUrl);
     } catch (error) {
-      const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
-      const redirectUrl = `${frontendUrl}/auth/callback?error=${encodeURIComponent(error.message)}`;
+      const { frontendUrl } = validateGoogleOAuthEnvVars();
+      // Sanitizar mensagem de erro para prevenir XSS
+      const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido';
+      const redirectUrl = `${frontendUrl}/auth/callback?error=${encodeURIComponent(errorMessage)}`;
       res.redirect(redirectUrl);
     }
   }
@@ -63,7 +73,14 @@ export class GoogleAuthController {
           throw new BadRequestException('Invalid JWT format');
         }
 
-        const payload = JSON.parse(Buffer.from(parts[1], 'base64').toString());
+        // Validar e decodificar payload do JWT de forma segura
+        let payload: any;
+        try {
+          const decoded = Buffer.from(parts[1], 'base64').toString('utf-8');
+          payload = JSON.parse(decoded);
+        } catch (parseError) {
+          throw new BadRequestException('Invalid Google credential: malformed JWT payload');
+        }
         
         if (!payload.sub || !payload.email) {
           throw new BadRequestException('Invalid Google credential: missing required fields');
@@ -130,9 +147,13 @@ export class GoogleAuthController {
 
   private async exchangeCodeForToken(code: string): Promise<any> {
     const tokenUrl = 'https://oauth2.googleapis.com/token';
-    const clientId = process.env.GOOGLE_CLIENT_ID;
-    const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
-    const redirectUri = `${process.env.FRONTEND_URL}/auth/callback`;
+    const { clientId, clientSecret, frontendUrl } = validateGoogleOAuthEnvVars();
+    
+    if (!clientId || !clientSecret) {
+      throw new BadRequestException('Google OAuth não está configurado. Configure GOOGLE_CLIENT_ID e GOOGLE_CLIENT_SECRET.');
+    }
+    
+    const redirectUri = `${frontendUrl}/auth/callback`;
 
     const response = await fetch(tokenUrl, {
       method: 'POST',

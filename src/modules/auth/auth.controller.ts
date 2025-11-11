@@ -1,4 +1,4 @@
-import { Controller, Post, Body, HttpCode, HttpStatus, Get, Param, Req, UseGuards, Res, Put } from '@nestjs/common';
+import { Controller, Post, Body, HttpCode, HttpStatus, Get, Param, Req, UseGuards, Res, Put, UnauthorizedException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Response } from 'express';
 import { AuthService } from './auth.service';
@@ -66,7 +66,7 @@ export class AuthController {
   async sendVerificationEmail(@Req() request): Promise<{ message: string }> {
     const userId = request.user?.id;
     if (!userId) {
-      throw new Error('Usuário não autenticado');
+      throw new UnauthorizedException('Usuário não autenticado');
     }
     
     await this.emailVerificationService.sendVerificationEmail(userId);
@@ -92,7 +92,7 @@ export class AuthController {
     const userId = request.user?.id;
     
     if (!userId) {
-      throw new Error('Usuário não autenticado');
+      throw new UnauthorizedException('Usuário não autenticado');
     }
     
     try {

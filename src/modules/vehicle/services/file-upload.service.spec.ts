@@ -1,5 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { ConfigService } from '@nestjs/config';
+import { Logger } from '@nestjs/common';
 import { FileUploadService } from './file-upload.service';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -10,6 +11,7 @@ jest.mock('path');
 describe('FileUploadService', () => {
   let service: FileUploadService;
   let configService: jest.Mocked<ConfigService>;
+  let loggerErrorSpy: jest.SpyInstance;
 
   beforeEach(async () => {
     const mockConfigService = {
@@ -28,6 +30,13 @@ describe('FileUploadService', () => {
 
     service = module.get<FileUploadService>(FileUploadService);
     configService = module.get(ConfigService);
+    
+    // Spy on Logger.error method
+    loggerErrorSpy = jest.spyOn(Logger.prototype, 'error').mockImplementation();
+  });
+
+  afterEach(() => {
+    loggerErrorSpy.mockRestore();
   });
 
   it('should be defined', () => {
@@ -116,12 +125,12 @@ describe('FileUploadService', () => {
         throw error;
       });
 
-      const consoleSpy = jest.spyOn(console, 'error').mockImplementation();
-
       await service.deletePhoto(photoUrl);
 
-      expect(consoleSpy).toHaveBeenCalled();
-      consoleSpy.mockRestore();
+      expect(loggerErrorSpy).toHaveBeenCalledWith(
+        'Erro ao deletar foto:',
+        error,
+      );
     });
   });
 
@@ -264,12 +273,12 @@ describe('FileUploadService', () => {
         throw error;
       });
 
-      const consoleSpy = jest.spyOn(console, 'error').mockImplementation();
-
       await service.deleteAttachment(attachmentUrl);
 
-      expect(consoleSpy).toHaveBeenCalled();
-      consoleSpy.mockRestore();
+      expect(loggerErrorSpy).toHaveBeenCalledWith(
+        'Erro ao deletar anexo:',
+        error,
+      );
     });
   });
 });

@@ -8,7 +8,7 @@ import { VehicleShareResponseDto, PublicVehicleInfoDto, PublicMaintenanceInfoDto
 import { VehicleResponseDto } from '../dto/vehicle-response.dto';
 import { ServiceType, ServiceStatus } from '../entities/vehicle-service.entity';
 import { VehicleStatus } from '../enums/vehicle-status.enum';
-import * as crypto from 'crypto';
+import { generateSecureToken } from '../../../common/utils/token.util';
 
 @Injectable()
 export class VehicleShareService {
@@ -32,7 +32,7 @@ export class VehicleShareService {
     }
 
     // Gerar token único
-    const shareToken = crypto.randomBytes(32).toString('hex');
+    const shareToken = generateSecureToken();
 
     // Calcular data de expiração
     const expiresAt = new Date();

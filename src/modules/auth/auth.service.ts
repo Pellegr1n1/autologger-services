@@ -13,6 +13,7 @@ import { AuthResponseDto } from './dto/auth-response.dto';
 import { CreateUserDto } from '../user/dto/create-user.dto';
 import { JwtPayload } from '../../common/interfaces/jwt-payload.interface';
 import { UserRepository } from '../user/repositories/user.repository';
+import { isPasswordStrong } from '../../common/utils/password.util';
 
 @Injectable()
 export class AuthService {
@@ -183,7 +184,7 @@ export class AuthService {
       throw new BadRequestException('As senhas não coincidem');
     }
 
-    if (!this.isPasswordStrong(changePasswordDto.newPassword)) {
+    if (!isPasswordStrong(changePasswordDto.newPassword)) {
       throw new BadRequestException('A senha não atende aos requisitos mínimos de segurança');
     }
 
@@ -219,17 +220,4 @@ export class AuthService {
     return { message: 'Senha alterada com sucesso' };
   }
 
-  /**
-   * Validar força da senha
-   */
-  private isPasswordStrong(password: string): boolean {
-    if (password.length < 8) return false;
-    
-    if (!/[a-z]/.test(password)) return false;
-    if (!/[A-Z]/.test(password)) return false;
-    if (!/\d/.test(password)) return false;
-    if (!/[!@#$%^&*(),.?":{}|<>]/.test(password)) return false;
-    
-    return true;
-  }
 }

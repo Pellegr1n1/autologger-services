@@ -8,6 +8,7 @@ node_modules/
 # Environment files
 .env
 .env.local
+.env.*.local
 
 # Logs
 *.log
@@ -31,3 +32,14 @@ Thumbs.db
 # Temporary files
 *.tmp
 *.temp
+
+node/*/data/
+node/*/keys/
+
+scripts
+genesis/genesis.json
+config/qbftConfigFile.json
+
+contracts/truffle-config.js
+contracts/truffle-bob.js
+contracts/tuffle-alice.js

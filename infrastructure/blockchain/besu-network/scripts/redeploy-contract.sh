@@ -5,7 +5,6 @@ cd "$(dirname "$0")/.." || exit 1
 echo "Redeploy Contract Script"
 echo "========================================"
 
-Verify if the Besu network is running
 echo "Verifying if the Besu network is running..."
 if ! curl -s -X POST http://localhost:8545 \
   -H "Content-Type: application/json" \
@@ -64,8 +63,10 @@ if [ -f "build/contracts/VehicleServiceTracker.json" ]; then
     echo "Update your .env file with:"
     echo ""
     echo "BESU_RPC_URL=http://localhost:8545"
-    echo "BESU_PRIVATE_KEY=0x8f2a55949038a9610f50fb23b5883af3b4ecb3c3bb792cbcefbd1542c692be63"
+    echo "BESU_PRIVATE_KEY=0x<YOUR_PRIVATE_KEY_HERE>"
     echo "BESU_CONTRACT_ADDRESS=$CONTRACT_ADDRESS"
+    echo ""
+    echo "⚠️  WARNING: Never commit private keys to git!"
     echo ""
     echo "========================="
 fi

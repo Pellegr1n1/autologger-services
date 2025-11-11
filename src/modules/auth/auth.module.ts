@@ -19,12 +19,26 @@ import { GoogleStrategy } from './strategies/google.strategy';
     PassportModule,
     JwtModule.registerAsync({
       imports: [ConfigModule],
-      useFactory: async (configService: ConfigService) => ({
-        secret: configService.get<string>('JWT_SECRET', 'your-secret-key'),
-        signOptions: { 
-          expiresIn: configService.get<string>('JWT_EXPIRES_IN', '24h') 
-        },
-      }),
+      useFactory: async (configService: ConfigService) => {
+        const isDevelopment = configService.get<string>('NODE_ENV') !== 'production';
+        const jwtSecret = configService.get<string>('JWT_SECRET', isDevelopment ? 'your-secret-key' : undefined);
+        
+        if (!jwtSecret) {
+          throw new Error('JWT_SECRET não está configurada. Configure esta variável de ambiente antes de iniciar a aplicação.');
+        }
+        
+        // Avisar se estiver usando valor padrão em desenvolvimento
+        if (isDevelopment && jwtSecret === 'your-secret-key') {
+          console.warn('⚠️  AVISO: Usando JWT_SECRET padrão. Configure JWT_SECRET em produção!');
+        }
+        
+        return {
+          secret: jwtSecret,
+          signOptions: { 
+            expiresIn: configService.get<string>('JWT_EXPIRES_IN', '24h') 
+          },
+        };
+      },
       inject: [ConfigService],
     }),
   ],

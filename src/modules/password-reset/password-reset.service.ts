@@ -7,7 +7,8 @@ import { EmailService } from '../email/email.service';
 import { UserService } from '../user/services/user.service';
 import { UserRepository } from '../user/repositories/user.repository';
 import * as bcrypt from 'bcryptjs';
-import * as crypto from 'crypto';
+import { generateSecureToken } from '../../common/utils/token.util';
+import { isPasswordStrong } from '../../common/utils/password.util';
 
 @Injectable()
 export class PasswordResetService {
@@ -18,12 +19,6 @@ export class PasswordResetService {
     private readonly userRepository: UserRepository,
   ) {}
 
-  /**
-   * Gerar token de reset
-   */
-  private generateToken(): string {
-    return crypto.randomBytes(32).toString('hex');
-  }
 
   /**
    * Solicitar reset de senha
@@ -37,7 +32,7 @@ export class PasswordResetService {
 
     await this.tokenRepository.invalidateUserTokens(user.id);
 
-    const token = this.generateToken();
+    const token = generateSecureToken();
     const expiresAt = new Date();
     expiresAt.setHours(expiresAt.getHours() + 1);
 
@@ -57,7 +52,7 @@ export class PasswordResetService {
       throw new BadRequestException('As senhas não coincidem');
     }
 
-    if (!this.isPasswordStrong(newPassword)) {
+    if (!isPasswordStrong(newPassword)) {
       throw new BadRequestException('A senha não atende aos requisitos mínimos de segurança');
     }
 
@@ -85,19 +80,6 @@ export class PasswordResetService {
     });
   }
 
-  /**
-   * Validar força da senha
-   */
-  private isPasswordStrong(password: string): boolean {
-    if (password.length < 8) return false;
-    
-    if (!/[a-z]/.test(password)) return false;
-    if (!/[A-Z]/.test(password)) return false;
-    if (!/\d/.test(password)) return false;
-    if (!/[!@#$%^&*(),.?":{}|<>]/.test(password)) return false;
-    
-    return true;
-  }
 
   /**
    * Validar token de reset

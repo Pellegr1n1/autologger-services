@@ -1,30 +1,42 @@
 import { Injectable, Logger } from '@nestjs/common';
 import * as nodemailer from 'nodemailer';
+import { validateEmailEnvVars } from '../../common/utils/env.util';
+import { sanitizeUserName } from '../../common/utils/sanitize.util';
 
 @Injectable()
 export class EmailService {
   private readonly logger = new Logger(EmailService.name);
 
   private getTransporter(): nodemailer.Transporter {
-    return nodemailer.createTransport({
-      host: process.env.SMTP_HOST || 'smtp.ethereal.email',
-      port: parseInt(process.env.SMTP_PORT || '587'),
-      secure: false,
-      auth: {
-        user: process.env.SMTP_USER || 'default_user',
-        pass: process.env.SMTP_PASS || 'default_pass',
-      },
-    });
+    try {
+      const { smtpHost, smtpPort, smtpUser, smtpPass } = validateEmailEnvVars();
+      
+      return nodemailer.createTransport({
+        host: smtpHost,
+        port: smtpPort,
+        secure: smtpPort === 465,
+        auth: {
+          user: smtpUser,
+          pass: smtpPass,
+        },
+      });
+    } catch (error) {
+      this.logger.error(`Erro ao configurar transporte de email: ${error.message}`);
+      throw new Error(`Configuração de email inválida: ${error.message}`);
+    }
   }
 
   /**
    * Enviar email de verificação
    */
   async sendVerificationEmail(email: string, token: string, userName: string): Promise<void> {
-    const verificationUrl = `${process.env.FRONTEND_URL}/verify-email/${token}`;
+    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+    const verificationUrl = `${frontendUrl}/verify-email/${token}`;
+    const { smtpFrom } = validateEmailEnvVars();
+    const sanitizedUserName = sanitizeUserName(userName);
 
     const mailOptions = {
-      from: process.env.SMTP_FROM || 'noreply@autologger.com',
+      from: smtpFrom,
       to: email,
       subject: 'Verifique seu email - AutoLogger',
       html: `
@@ -38,7 +50,7 @@ export class EmailService {
           <div style="max-width: 600px; margin: 0 auto; padding: 20px;">
             <h1 style="color: #8b5cf6;">Bem-vindo ao AutoLogger!</h1>
             
-            <p>Olá ${userName},</p>
+            <p>Olá ${sanitizedUserName},</p>
             
             <p>Obrigado por se cadastrar no AutoLogger. Para completar seu cadastro, 
             por favor verifique seu email clicando no botão abaixo:</p>
@@ -82,10 +94,13 @@ export class EmailService {
    * Enviar email de recuperação de senha
    */
   async sendPasswordResetEmail(email: string, token: string, userName: string): Promise<void> {
-    const resetUrl = `${process.env.FRONTEND_URL}/reset-password/${token}`;
+    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+    const resetUrl = `${frontendUrl}/reset-password/${token}`;
+    const { smtpFrom } = validateEmailEnvVars();
+    const sanitizedUserName = sanitizeUserName(userName);
 
     const mailOptions = {
-      from: process.env.SMTP_FROM || 'noreply@autologger.com',
+      from: smtpFrom,
       to: email,
       subject: 'Redefinição de senha - AutoLogger',
       html: `
@@ -99,7 +114,7 @@ export class EmailService {
           <div style="max-width: 600px; margin: 0 auto; padding: 20px;">
             <h1 style="color: #8b5cf6;">Redefinir Senha</h1>
             
-            <p>Olá ${userName},</p>
+            <p>Olá ${sanitizedUserName},</p>
             
             <p>Você solicitou a redefinição de senha para sua conta no AutoLogger.</p>
             
