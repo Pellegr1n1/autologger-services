@@ -96,7 +96,6 @@ describe('VehicleServiceService', () => {
     vehicleServiceRepository = module.get(getRepositoryToken(VehicleService));
     vehicleRepository = module.get(getRepositoryToken(Vehicle));
     blockchainService = module.get(BlockchainService);
-    vehicleServiceFactory = module.get(VehicleServiceFactory);
   });
 
   it('should be defined', () => {
