@@ -23,14 +23,15 @@ jobs:
         uses: actions/setup-node@39370e3970a6d050c480ffad4ff0ed4d3fdee5af
         with:
           node-version: '20'
-          cache: 'npm'
 
-      - name: Install dependencies
-        run: npm ci
+      - name: Clean install dependencies
+        run: |
+          npm ci --legacy-peer-deps || npm install --legacy-peer-deps
+        env:
+          npm_config_optional: false
 
       - name: Run linter
         run: npm run lint
 
       - name: Run tests
         run: npm test
-
