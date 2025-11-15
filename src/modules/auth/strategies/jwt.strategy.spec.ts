@@ -8,7 +8,6 @@ import { JwtPayload } from '../../../common/interfaces/jwt-payload.interface';
 describe('JwtStrategy', () => {
   let strategy: JwtStrategy;
   let userService: jest.Mocked<UserService>;
-  let configService: jest.Mocked<ConfigService>;
 
   const mockUser = {
     id: 'user-123',

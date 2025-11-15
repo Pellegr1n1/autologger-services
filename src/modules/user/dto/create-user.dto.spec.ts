@@ -42,7 +42,7 @@ describe('CreateUserDto', () => {
     });
 
     it('should pass validation when password is optional', async () => {
-      const { password, ...dataWithoutPassword } = validData;
+      const { password: _password, ...dataWithoutPassword } = validData;
       await DtoValidationTestHelper.expectValid(CreateUserDto, dataWithoutPassword);
     });
   });

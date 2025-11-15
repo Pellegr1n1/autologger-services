@@ -1,5 +1,4 @@
 import { Repository } from 'typeorm';
-import { getRepositoryToken } from '@nestjs/typeorm';
 import { PasswordResetRepository } from './password-reset.repository';
 import { PasswordResetToken } from './entities/password-reset-token.entity';
 import { TokenRepositoryTestHelper } from '../../common/test-helpers/token-repository.test-helper';

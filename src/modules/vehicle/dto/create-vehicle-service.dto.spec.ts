@@ -24,7 +24,7 @@ describe('CreateVehicleServiceDto', () => {
     });
 
     it('should fail validation when vehicleId is missing', async () => {
-      const { vehicleId, ...dataWithoutVehicleId } = validBaseData;
+      const { vehicleId: _vehicleId, ...dataWithoutVehicleId } = validBaseData;
       await DtoValidationTestHelper.expectInvalid(
         CreateVehicleServiceDto,
         dataWithoutVehicleId,

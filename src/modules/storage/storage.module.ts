@@ -12,7 +12,7 @@ const StorageProvider: Provider = {
       try {
         const provider = new S3StorageProvider(configService);
         return provider;
-      } catch (error) {
+      } catch (_error) {
         return new LocalStorageProvider(configService);
       }
     }

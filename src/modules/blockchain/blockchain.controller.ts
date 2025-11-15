@@ -81,8 +81,7 @@ export class BlockchainController {
   }
 
   @Post('services/fix-dates')
-  async fixIncorrectDates(@Request() req) {
-    const userId = req.user?.id;
+  async fixIncorrectDates(@Request() _req) {
     return this.blockchainService.fixIncorrectDates();
   }
 

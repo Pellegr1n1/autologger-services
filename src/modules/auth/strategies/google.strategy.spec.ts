@@ -6,7 +6,6 @@ import { AuthService } from '../auth.service';
 describe('GoogleStrategy', () => {
   let strategy: GoogleStrategy;
   let authService: jest.Mocked<AuthService>;
-  let configService: jest.Mocked<ConfigService>;
 
   const mockGoogleUser = {
     googleId: 'google-123',

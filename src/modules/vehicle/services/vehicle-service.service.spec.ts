@@ -15,7 +15,6 @@ describe('VehicleServiceService', () => {
   let vehicleServiceRepository: jest.Mocked<Repository<VehicleService>>;
   let vehicleRepository: jest.Mocked<Repository<Vehicle>>;
   let blockchainService: jest.Mocked<BlockchainService>;
-  let vehicleServiceFactory: jest.Mocked<VehicleServiceFactory>;
 
   const mockVehicle = {
     id: 'vehicle-123',

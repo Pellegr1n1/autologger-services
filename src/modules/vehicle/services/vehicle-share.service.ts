@@ -95,8 +95,8 @@ export class VehicleShareService {
     if (photoUrl && this.storage.getAccessibleUrl) {
       try {
         photoUrl = await this.storage.getAccessibleUrl(photoUrl);
-      } catch (error) {
-        this.logger.error(`Erro ao gerar URL acessível para foto do veículo: ${error}`);
+      } catch (_error) {
+        this.logger.error(`Erro ao gerar URL acessível para foto do veículo`);
       }
     }
 
@@ -138,9 +138,9 @@ export class VehicleShareService {
               if (url && this.storage.getAccessibleUrl) {
                 try {
                   accessibleUrl = await this.storage.getAccessibleUrl(url);
-                } catch (error) {
+                } catch (_error) {
                   // Em caso de erro, manter URL original
-                  this.logger.error(`Erro ao gerar URL acessível para anexo: ${error}`);
+                  this.logger.error(`Erro ao gerar URL acessível para anexo`);
                 }
               }
 
@@ -223,7 +223,7 @@ export class VehicleShareService {
       const cleanFileName = fileName.split('?')[0];
       
       return cleanFileName || 'Arquivo';
-    } catch (error) {
+    } catch (_error) {
       return 'Arquivo';
     }
   }

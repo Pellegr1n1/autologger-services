@@ -88,7 +88,7 @@ export class VehicleServiceService {
         
         await this.vehicleServiceRepository.save(service);
       }
-    } catch (error) {
+    } catch (_error) {
       // Marcar como rejeitado quando há exceção na blockchain
       service.status = ServiceStatus.REJECTED;
       service.canEdit = true; // Permite edição quando rejeitado
@@ -157,7 +157,7 @@ export class VehicleServiceService {
   async updateBlockchainStatus(
     id: string,
     hash: string | null,
-    confirmedBy: string,
+    _confirmedBy: string,
   ): Promise<VehicleService> {
     const vehicleService = await this.findOne(id);
 

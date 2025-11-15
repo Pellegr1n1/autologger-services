@@ -1,4 +1,4 @@
-import { IsEmail, IsString, MinLength, IsOptional, Matches, MaxLength } from 'class-validator';
+import { IsEmail, IsString, MinLength, Matches } from 'class-validator';
 
 export class AuthRegisterDto {
   @IsString({ message: 'Nome deve ser uma string' })

@@ -13,7 +13,7 @@ export class GoogleAuthController {
   @Public()
   @Get()
   @UseGuards(AuthGuard('google'))
-  async googleAuth(@Req() req: Request) {
+  async googleAuth(@Req() _req: Request) {
     return { message: 'Redirecting to Google...' };
   }
 
