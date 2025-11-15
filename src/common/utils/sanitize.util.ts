@@ -21,7 +21,7 @@ export function escapeHtml(input: string | null | undefined): string {
     "'": '&#039;',
   };
 
-  return input.replace(/[&<>"']/g, (char) => map[char]);
+  return input.replaceAll(/[&<>"']/g, (char) => map[char]);
 }
 
 /**

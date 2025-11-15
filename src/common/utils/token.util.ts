@@ -2,7 +2,7 @@
  * Utilitário para geração de tokens seguros
  * Centraliza a lógica de geração de tokens criptograficamente seguros
  */
-import * as crypto from 'crypto';
+import * as crypto from 'node:crypto';
 
 /**
  * Gera um token criptograficamente seguro

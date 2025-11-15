@@ -43,3 +43,8 @@ config/qbftConfigFile.json
 contracts/truffle-config.js
 contracts/truffle-bob.js
 contracts/tuffle-alice.js
+
+infrastructure/blockchain/besu-network/node/*/data/database/
+infrastructure/blockchain/besu-network/node/*/data/caches/
+infrastructure/blockchain/besu-network/node/*/data/kvstore/
+infrastructure/blockchain/besu-network/contracts/build/

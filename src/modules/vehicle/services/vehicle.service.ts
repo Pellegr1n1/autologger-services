@@ -41,7 +41,7 @@ export class VehicleService implements IVehicleService {
 
     const vehicle = await this.vehicleRepository.create(vehicleData, userId);
 
-    return this.vehicleFactory.toResponseDto(vehicle);
+    return await this.vehicleFactory.toResponseDto(vehicle);
   }
 
   async findUserVehicles(userId: string): Promise<{
@@ -54,8 +54,8 @@ export class VehicleService implements IVehicleService {
     ]);
 
     return {
-      active: activeVehicles.map(vehicle => this.vehicleFactory.toResponseDto(vehicle)),
-      sold: soldVehicles.map(vehicle => this.vehicleFactory.toResponseDto(vehicle)),
+      active: await Promise.all(activeVehicles.map(vehicle => this.vehicleFactory.toResponseDto(vehicle))),
+      sold: await Promise.all(soldVehicles.map(vehicle => this.vehicleFactory.toResponseDto(vehicle))),
     };
   }
 
@@ -66,7 +66,7 @@ export class VehicleService implements IVehicleService {
       throw new NotFoundException('Veículo não encontrado');
     }
 
-    return this.vehicleFactory.toResponseDto(vehicle);
+    return await this.vehicleFactory.toResponseDto(vehicle);
   }
 
   async updateVehicle(
@@ -102,7 +102,7 @@ export class VehicleService implements IVehicleService {
 
     const vehicle = await this.vehicleRepository.update(id, vehicleData);
 
-    return this.vehicleFactory.toResponseDto(vehicle);
+    return await this.vehicleFactory.toResponseDto(vehicle);
   }
 
   async markVehicleAsSold(
@@ -117,7 +117,7 @@ export class VehicleService implements IVehicleService {
     const soldAt = markVehicleSoldDto.soldAt ? new Date(markVehicleSoldDto.soldAt) : new Date();
     const vehicle = await this.vehicleRepository.markAsSold(id, soldAt);
 
-    return this.vehicleFactory.toResponseDto(vehicle);
+    return await this.vehicleFactory.toResponseDto(vehicle);
   }
 
   async getActiveVehiclesCount(userId: string): Promise<number> {

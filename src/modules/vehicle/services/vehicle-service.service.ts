@@ -7,6 +7,7 @@ import { CreateVehicleServiceDto } from '../dto/create-vehicle-service.dto';
 import { UpdateVehicleServiceDto } from '../dto/update-vehicle-service.dto';
 import { BlockchainService } from '../../blockchain/blockchain.service';
 import { Vehicle } from '../entities/vehicle.entity';
+import { VehicleServiceFactory } from '../factories/vehicle-service.factory';
 
 @Injectable()
 export class VehicleServiceService {
@@ -16,6 +17,7 @@ export class VehicleServiceService {
     @InjectRepository(Vehicle)
     private vehicleRepository: Repository<Vehicle>,
     private blockchainService: BlockchainService,
+    private vehicleServiceFactory: VehicleServiceFactory,
   ) {}
 
   async create(createVehicleServiceDto: CreateVehicleServiceDto): Promise<VehicleService> {
@@ -86,7 +88,7 @@ export class VehicleServiceService {
         
         await this.vehicleServiceRepository.save(service);
       }
-    } catch (error) {
+    } catch (_error) {
       // Marcar como rejeitado quando há exceção na blockchain
       service.status = ServiceStatus.REJECTED;
       service.canEdit = true; // Permite edição quando rejeitado
@@ -105,15 +107,17 @@ export class VehicleServiceService {
       queryBuilder.where('vehicle.userId = :userId', { userId });
     }
 
-    return await queryBuilder.getMany();
+    const services = await queryBuilder.getMany();
+    return await this.vehicleServiceFactory.toResponseDtoArray(services);
   }
 
   async findByVehicleId(vehicleId: string): Promise<VehicleService[]> {
-    return await this.vehicleServiceRepository.find({
+    const services = await this.vehicleServiceRepository.find({
       where: { vehicleId },
       relations: ['vehicle'],
       order: { serviceDate: 'DESC' },
     });
+    return await this.vehicleServiceFactory.toResponseDtoArray(services);
   }
 
   async findOne(id: string): Promise<VehicleService> {
@@ -126,7 +130,7 @@ export class VehicleServiceService {
       throw new NotFoundException(`Serviço com ID ${id} não encontrado`);
     }
 
-    return vehicleService;
+    return await this.vehicleServiceFactory.toResponseDto(vehicleService);
   }
 
   async update(id: string, updateVehicleServiceDto: UpdateVehicleServiceDto): Promise<VehicleService> {
@@ -153,7 +157,7 @@ export class VehicleServiceService {
   async updateBlockchainStatus(
     id: string,
     hash: string | null,
-    confirmedBy: string,
+    _confirmedBy: string,
   ): Promise<VehicleService> {
     const vehicleService = await this.findOne(id);
 

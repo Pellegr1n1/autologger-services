@@ -1,15 +1,34 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Inject, Logger } from '@nestjs/common';
 import { Vehicle } from '../entities/vehicle.entity';
 import { VehicleResponseDto } from '../dto/vehicle-response.dto';
 import { CreateVehicleDto } from '../dto/create-vehicle.dto';
 import { VehicleStatus } from '../enums/vehicle-status.enum';
+import { IStorage } from '../../storage/interfaces/storage.interface';
 
 @Injectable()
 export class VehicleFactory {
+  private readonly logger = new Logger(VehicleFactory.name);
+
+  constructor(
+    @Inject('STORAGE') private readonly storage: IStorage,
+  ) {}
+
   /**
    * Converte uma entidade Vehicle para VehicleResponseDto
+   * Converte URLs do storage (s3://) para URLs acessíveis automaticamente
    */
-  toResponseDto(vehicle: Vehicle): VehicleResponseDto {
+  async toResponseDto(vehicle: Vehicle): Promise<VehicleResponseDto> {
+    // Converter URL do storage para URL acessível (pública ou assinada)
+    let photoUrl = vehicle.photoUrl;
+    if (photoUrl && this.storage.getAccessibleUrl) {
+      try {
+        photoUrl = await this.storage.getAccessibleUrl(photoUrl);
+      } catch (error) {
+        // Em caso de erro, manter a URL original
+        this.logger.error('Erro ao gerar URL acessível:', error);
+      }
+    }
+
     return new VehicleResponseDto({
       id: vehicle.id,
       plate: vehicle.plate,
@@ -18,7 +37,7 @@ export class VehicleFactory {
       year: vehicle.year,
       color: vehicle.color,
       mileage: vehicle.mileage,
-      photoUrl: vehicle.photoUrl,
+      photoUrl,
       status: vehicle.status,
       soldAt: vehicle.soldAt,
       createdAt: vehicle.createdAt,
@@ -48,8 +67,8 @@ export class VehicleFactory {
   /**
    * Converte um array de Vehicle para array de VehicleResponseDto
    */
-  toResponseDtoArray(vehicles: Vehicle[]): VehicleResponseDto[] {
-    return vehicles.map(vehicle => this.toResponseDto(vehicle));
+  async toResponseDtoArray(vehicles: Vehicle[]): Promise<VehicleResponseDto[]> {
+    return await Promise.all(vehicles.map(vehicle => this.toResponseDto(vehicle)));
   }
 
   /**

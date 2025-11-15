@@ -1,8 +1,5 @@
 import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
 import { PasswordResetRepository } from './password-reset.repository';
-import { PasswordResetToken } from './entities/password-reset-token.entity';
 import { EmailService } from '../email/email.service';
 import { UserService } from '../user/services/user.service';
 import { UserRepository } from '../user/repositories/user.repository';

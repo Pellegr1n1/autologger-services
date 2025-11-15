@@ -1,4 +1,4 @@
-import * as crypto from 'crypto';
+import * as crypto from 'node:crypto';
 import { EncryptionUtil } from './encryption.util';
 
 describe('EncryptionUtil', () => {
@@ -129,11 +129,11 @@ describe('EncryptionUtil', () => {
     it('should decrypt multiple encrypted texts correctly', () => {
       const texts = ['plate-1', 'plate-2', 'plate-3'];
 
-      texts.forEach((text) => {
+      for (const text of texts) {
         const encrypted = EncryptionUtil.encrypt(text);
         const decrypted = EncryptionUtil.decrypt(encrypted);
         expect(decrypted).toBe(text);
-      });
+      }
     });
 
     it('should throw error when decrypting invalid encrypted text', () => {
@@ -183,11 +183,11 @@ describe('EncryptionUtil', () => {
         'GHI-3456',
       ];
 
-      plates.forEach((plate) => {
+      for (const plate of plates) {
         const encrypted = EncryptionUtil.encrypt(plate);
         const decrypted = EncryptionUtil.decrypt(encrypted);
         expect(decrypted).toBe(plate);
-      });
+      }
     });
 
     it('should maintain determinism across multiple encryptions', () => {
@@ -211,7 +211,6 @@ describe('EncryptionUtil', () => {
       process.env.ENCRYPTION_KEY = 'a'.repeat(64);
 
       // Mock crypto to throw error
-      const originalCreateCipheriv = crypto.createCipheriv;
       jest.spyOn(crypto, 'createCipheriv').mockImplementation(() => {
         throw new Error('Crypto error');
       });
@@ -227,7 +226,6 @@ describe('EncryptionUtil', () => {
       process.env.ENCRYPTION_KEY = 'a'.repeat(64);
 
       // Mock crypto to throw error
-      const originalCreateDecipheriv = crypto.createDecipheriv;
       jest.spyOn(crypto, 'createDecipheriv').mockImplementation(() => {
         throw new Error('Decrypto error');
       });

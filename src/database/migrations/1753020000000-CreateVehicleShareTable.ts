@@ -1,4 +1,4 @@
-import { MigrationInterface, QueryRunner, Table, Index } from 'typeorm';
+import { MigrationInterface, QueryRunner, Table } from 'typeorm';
 
 export class CreateVehicleShareTable1753020000000 implements MigrationInterface {
   name = 'CreateVehicleShareTable1753020000000';

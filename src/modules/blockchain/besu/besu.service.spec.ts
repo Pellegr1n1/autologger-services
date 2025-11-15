@@ -4,7 +4,6 @@ import { BesuService } from './besu.service';
 
 describe('BesuService', () => {
   let service: BesuService;
-  let configService: jest.Mocked<ConfigService>;
 
   // Helper function to create a never-resolving promise (for timeout simulation)
   // This avoids deep nesting in test cases
@@ -55,7 +54,6 @@ describe('BesuService', () => {
     }).compile();
 
     service = module.get<BesuService>(BesuService);
-    configService = module.get(ConfigService);
   });
 
   it('should be defined', () => {

@@ -1,86 +1,64 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Inject } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import * as fs from 'fs';
-import * as path from 'path';
 import { v4 as uuidv4 } from 'uuid';
+import { IStorage } from '../../storage/interfaces/storage.interface';
 
 @Injectable()
 export class FileUploadService {
   private readonly logger = new Logger(FileUploadService.name);
 
-  constructor(private configService: ConfigService) {}
+  constructor(
+    private configService: ConfigService,
+    @Inject('STORAGE') private storage: IStorage,
+  ) {}
 
-  async uploadPhoto(file: any): Promise<string> {
+  private generateUniqueFileName(originalName: string): string {
+    const fileExtension = originalName.includes('.') 
+      ? originalName.split('.').pop() 
+      : '';
+    return fileExtension 
+      ? `${uuidv4()}.${fileExtension}` 
+      : uuidv4();
+  }
+
+  private async uploadFile(file: any, folder: string): Promise<string> {
     if (!file) {
       return null;
     }
 
-    // Criar diretório de uploads se não existir
-    const uploadDir = path.join(process.cwd(), 'storage', 'uploads', 'vehicles');
-    if (!fs.existsSync(uploadDir)) {
-      fs.mkdirSync(uploadDir, { recursive: true });
-    }
-
-    // Gerar nome único para o arquivo
-    const fileExtension = path.extname(file.originalname);
-    const fileName = `${uuidv4()}${fileExtension}`;
-    const filePath = path.join(uploadDir, fileName);
-
-    // Salvar arquivo
-    fs.writeFileSync(filePath, file.buffer);
-
-    // Retornar URL completa do backend
-    const port = this.configService.get('PORT') || 3001;
-    const host = this.configService.get('HOST') || 'localhost';
-    return `http://${host}:${port}/uploads/vehicles/${fileName}`;
+    const originalName = file.originalname || 'file';
+    const fileName = this.generateUniqueFileName(originalName);
+    return await this.storage.upload(file.buffer, fileName, folder);
   }
 
-  async deletePhoto(photoUrl: string): Promise<void> {
-    if (!photoUrl) {
+  private async deleteFile(fileUrl: string, fileType: string): Promise<void> {
+    if (!fileUrl) {
       return;
     }
 
     try {
-      const filePath = path.join(process.cwd(), photoUrl);
-      if (fs.existsSync(filePath)) {
-        fs.unlinkSync(filePath);
-      }
+      await this.storage.delete(fileUrl);
     } catch (error) {
-      this.logger.error('Erro ao deletar foto:', error);
+      this.logger.error(`Erro ao deletar ${fileType}:`, error);
     }
+  }
+
+  async uploadPhoto(file: any): Promise<string> {
+    return this.uploadFile(file, 'vehicles');
+  }
+
+  async deletePhoto(photoUrl: string): Promise<void> {
+    return this.deleteFile(photoUrl, 'foto');
   }
 
   getPhotoPath(photoUrl: string): string {
-    if (!photoUrl) {
-      return null;
-    }
-
-    return path.join(process.cwd(), photoUrl);
+    // Para AWS S3 e outros storages em nuvem, retornar a URL diretamente
+    // Para local storage, pode ser necessário ajustar conforme necessário
+    return photoUrl;
   }
 
   async uploadAttachment(file: any): Promise<string> {
-    if (!file) {
-      return null;
-    }
-
-    // Criar diretório de uploads se não existir
-    const uploadDir = path.join(process.cwd(), 'storage', 'uploads', 'attachments');
-    if (!fs.existsSync(uploadDir)) {
-      fs.mkdirSync(uploadDir, { recursive: true });
-    }
-
-    // Gerar nome único para o arquivo
-    const fileExtension = path.extname(file.originalname);
-    const fileName = `${uuidv4()}${fileExtension}`;
-    const filePath = path.join(uploadDir, fileName);
-
-    // Salvar arquivo
-    fs.writeFileSync(filePath, file.buffer);
-
-    // Retornar URL completa do backend
-    const port = this.configService.get('PORT') || 3001;
-    const host = this.configService.get('HOST') || 'localhost';
-    return `http://${host}:${port}/uploads/attachments/${fileName}`;
+    return this.uploadFile(file, 'attachments');
   }
 
   async uploadMultipleAttachments(files: any[]): Promise<string[]> {
@@ -93,17 +71,7 @@ export class FileUploadService {
   }
 
   async deleteAttachment(attachmentUrl: string): Promise<void> {
-    if (!attachmentUrl) {
-      return;
-    }
-
-    try {
-      const filePath = path.join(process.cwd(), attachmentUrl);
-      if (fs.existsSync(filePath)) {
-        fs.unlinkSync(filePath);
-      }
-    } catch (error) {
-      this.logger.error('Erro ao deletar anexo:', error);
-    }
+    return this.deleteFile(attachmentUrl, 'anexo');
   }
 }
+

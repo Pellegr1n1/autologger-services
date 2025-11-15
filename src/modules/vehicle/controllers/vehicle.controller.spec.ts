@@ -4,7 +4,6 @@ import { VehicleService } from '../services/vehicle.service';
 import { CreateVehicleDto } from '../dto/create-vehicle.dto';
 import { UpdateVehicleDto } from '../dto/update-vehicle.dto';
 import { MarkVehicleSoldDto } from '../dto/mark-vehicle-sold.dto';
-import { UserResponseDto } from '../../user/dto/user-response.dto';
 
 describe('VehicleController', () => {
   let controller: VehicleController;

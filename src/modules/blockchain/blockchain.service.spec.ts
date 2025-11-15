@@ -8,7 +8,7 @@ import { VehicleService, ServiceStatus } from '../vehicle/entities/vehicle-servi
 
 jest.mock('ethers', () => ({
   ethers: {
-    keccak256: jest.fn((data) => '0x' + 'a'.repeat(64)),
+    keccak256: jest.fn((_data) => '0x' + 'a'.repeat(64)),
     toUtf8Bytes: jest.fn((str) => Buffer.from(str)),
   },
 }));
@@ -796,7 +796,7 @@ describe('BlockchainService', () => {
       });
       besuService.verifyHashInContract.mockResolvedValue(false);
 
-      const result = await service.getAllServices('user-123');
+      await service.getAllServices('user-123');
 
       expect(mockQueryBuilder.andWhere).toHaveBeenCalledWith(
         'vehicle.userId = :userId',

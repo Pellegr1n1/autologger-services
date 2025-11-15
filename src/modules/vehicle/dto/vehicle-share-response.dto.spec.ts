@@ -62,7 +62,7 @@ describe('PublicMaintenanceInfoDto', () => {
     dto.description = 'Troca de oleo';
     dto.serviceDate = new Date();
     dto.mileage = 50000;
-    dto.cost = 150.0;
+    dto.cost = 150;
     dto.location = 'Oficina';
     dto.technician = 'João';
     dto.warranty = true;
@@ -78,7 +78,7 @@ describe('PublicMaintenanceInfoDto', () => {
     expect(dto.description).toBe('Troca de oleo');
     expect(dto.serviceDate).toBeInstanceOf(Date);
     expect(dto.mileage).toBe(50000);
-    expect(dto.cost).toBe(150.0);
+    expect(dto.cost).toBe(150);
     expect(dto.location).toBe('Oficina');
     expect(dto.technician).toBe('João');
     expect(dto.warranty).toBe(true);

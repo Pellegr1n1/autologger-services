@@ -5,8 +5,7 @@ import {
   CreateDateColumn,
   UpdateDateColumn,
   ManyToOne,
-  JoinColumn,
-  OneToMany
+  JoinColumn
 } from 'typeorm';
 import { User } from '../../user/entities/user.entity';
 import { VehicleStatus } from '../enums/vehicle-status.enum';

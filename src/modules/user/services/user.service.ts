@@ -227,7 +227,7 @@ export class UserService {
   }
 
   private toUserResponseDto(user: User): UserResponseDto {
-    const { password, ...userResponse } = user;
+    const { password: _password, ...userResponse } = user;
     return userResponse;
   }
 }

@@ -1,6 +1,6 @@
-import { validate } from 'class-validator';
 import { CreateVehicleServiceDto } from './create-vehicle-service.dto';
 import { ServiceType } from '../entities/vehicle-service.entity';
+import { DtoValidationTestHelper } from '../../../common/test-helpers/dto-validation.test-helper';
 
 describe('CreateVehicleServiceDto', () => {
   it('should be defined', () => {
@@ -8,100 +8,65 @@ describe('CreateVehicleServiceDto', () => {
   });
 
   describe('validation', () => {
-    it('should pass validation with valid data', async () => {
-      const dto = new CreateVehicleServiceDto();
-      dto.vehicleId = 'vehicle-123';
-      dto.type = ServiceType.MAINTENANCE;
-      dto.category = 'Oleo';
-      dto.description = 'Troca de oleo';
-      dto.serviceDate = new Date();
-      dto.mileage = 50000;
-      dto.cost = 150.0;
-      dto.location = 'Oficina';
+    const validBaseData = {
+      vehicleId: 'vehicle-123',
+      type: ServiceType.MAINTENANCE,
+      category: 'Oleo',
+      description: 'Troca de oleo',
+      serviceDate: new Date(),
+      mileage: 50000,
+      cost: 150,
+      location: 'Oficina',
+    };
 
-      const errors = await validate(dto);
-      expect(errors.length).toBe(0);
+    it('should pass validation with valid data', async () => {
+      await DtoValidationTestHelper.expectValid(CreateVehicleServiceDto, validBaseData);
     });
 
     it('should fail validation when vehicleId is missing', async () => {
-      const dto = new CreateVehicleServiceDto();
-      dto.type = ServiceType.MAINTENANCE;
-      dto.category = 'Oleo';
-      dto.description = 'Troca de oleo';
-      dto.serviceDate = new Date();
-      dto.mileage = 50000;
-      dto.cost = 150.0;
-      dto.location = 'Oficina';
-
-      const errors = await validate(dto);
-      expect(errors.length).toBeGreaterThan(0);
-      expect(errors[0].property).toBe('vehicleId');
+      const { vehicleId: _vehicleId, ...dataWithoutVehicleId } = validBaseData;
+      await DtoValidationTestHelper.expectInvalid(
+        CreateVehicleServiceDto,
+        dataWithoutVehicleId,
+        'vehicleId'
+      );
     });
 
     it('should fail validation when type is invalid', async () => {
-      const dto = new CreateVehicleServiceDto();
-      dto.vehicleId = 'vehicle-123';
-      (dto as any).type = 'INVALID_TYPE';
-      dto.category = 'Oleo';
-      dto.description = 'Troca de oleo';
-      dto.serviceDate = new Date();
-      dto.mileage = 50000;
-      dto.cost = 150.0;
-      dto.location = 'Oficina';
-
-      const errors = await validate(dto);
-      expect(errors.length).toBeGreaterThan(0);
-      expect(errors[0].property).toBe('type');
+      await DtoValidationTestHelper.expectInvalid(
+        CreateVehicleServiceDto,
+        { ...validBaseData, type: 'INVALID_TYPE' as any },
+        'type'
+      );
     });
 
     it('should pass validation with optional fields', async () => {
-      const dto = new CreateVehicleServiceDto();
-      dto.vehicleId = 'vehicle-123';
-      dto.type = ServiceType.MAINTENANCE;
-      dto.category = 'Oleo';
-      dto.description = 'Troca de oleo';
-      dto.serviceDate = new Date();
-      dto.mileage = 50000;
-      dto.cost = 150.0;
-      dto.location = 'Oficina';
-      dto.attachments = ['url1', 'url2'];
-      dto.technician = 'João';
-      dto.warranty = true;
-      dto.nextServiceDate = new Date();
-      dto.notes = 'Observações';
-
-      const errors = await validate(dto);
-      expect(errors.length).toBe(0);
+      const dataWithOptionals = {
+        ...validBaseData,
+        attachments: ['url1', 'url2'],
+        technician: 'João',
+        warranty: true,
+        nextServiceDate: new Date(),
+        notes: 'Observações',
+      };
+      
+      await DtoValidationTestHelper.expectValid(CreateVehicleServiceDto, dataWithOptionals);
     });
 
     it('should fail validation when serviceDate is not a date', async () => {
-      const dto = new CreateVehicleServiceDto();
-      dto.vehicleId = 'vehicle-123';
-      dto.type = ServiceType.MAINTENANCE;
-      dto.category = 'Oleo';
-      dto.description = 'Troca de oleo';
-      (dto as any).serviceDate = 'invalid-date';
-      dto.mileage = 50000;
-      dto.cost = 150.0;
-      dto.location = 'Oficina';
-
-      const errors = await validate(dto);
-      expect(errors.length).toBeGreaterThan(0);
+      await DtoValidationTestHelper.expectInvalid(
+        CreateVehicleServiceDto,
+        { ...validBaseData, serviceDate: 'invalid-date' as any },
+        'serviceDate'
+      );
     });
 
     it('should fail validation when mileage is not a number', async () => {
-      const dto = new CreateVehicleServiceDto();
-      dto.vehicleId = 'vehicle-123';
-      dto.type = ServiceType.MAINTENANCE;
-      dto.category = 'Oleo';
-      dto.description = 'Troca de oleo';
-      dto.serviceDate = new Date();
-      (dto as any).mileage = 'not-a-number';
-      dto.cost = 150.0;
-      dto.location = 'Oficina';
-
-      const errors = await validate(dto);
-      expect(errors.length).toBeGreaterThan(0);
+      await DtoValidationTestHelper.expectInvalid(
+        CreateVehicleServiceDto,
+        { ...validBaseData, mileage: 'not-a-number' as any },
+        'mileage'
+      );
     });
   });
 });
