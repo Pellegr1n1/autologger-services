@@ -1,44 +1,26 @@
-import { Test, TestingModule } from '@nestjs/testing';
-import { getRepositoryToken } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { EmailVerificationRepository } from './email-verification.repository';
 import { EmailVerificationToken } from './entities/email-verification-token.entity';
+import { TokenRepositoryTestHelper } from '../../common/test-helpers/token-repository.test-helper';
 
 describe('EmailVerificationRepository', () => {
   let repository: EmailVerificationRepository;
   let tokenRepository: jest.Mocked<Repository<EmailVerificationToken>>;
 
-  const mockToken: EmailVerificationToken = {
-    id: 'token-123',
-    token: 'verification-token',
-    userId: 'user-123',
-    expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
-    used: false,
-    user: null,
-    createdAt: new Date(),
-  };
+  const mockToken = TokenRepositoryTestHelper.createMockToken<EmailVerificationToken>(
+    'verification-token',
+    'user-123',
+    24 * 60 * 60 * 1000
+  );
 
   beforeEach(async () => {
-    const mockRepository = {
-      create: jest.fn(),
-      save: jest.fn(),
-      findOne: jest.fn(),
-      update: jest.fn(),
-      createQueryBuilder: jest.fn(),
-    };
-
-    const module: TestingModule = await Test.createTestingModule({
-      providers: [
-        EmailVerificationRepository,
-        {
-          provide: getRepositoryToken(EmailVerificationToken),
-          useValue: mockRepository,
-        },
-      ],
-    }).compile();
+    const { module, mockRepository } = await TokenRepositoryTestHelper.createTestingModule(
+      EmailVerificationRepository,
+      EmailVerificationToken
+    );
 
     repository = module.get<EmailVerificationRepository>(EmailVerificationRepository);
-    tokenRepository = module.get(getRepositoryToken(EmailVerificationToken));
+    tokenRepository = mockRepository;
   });
 
   it('should be defined', () => {
@@ -125,11 +107,7 @@ describe('EmailVerificationRepository', () => {
 
   describe('deleteExpiredTokens', () => {
     it('should delete expired tokens', async () => {
-      const mockQueryBuilder = {
-        delete: jest.fn().mockReturnThis(),
-        where: jest.fn().mockReturnThis(),
-        execute: jest.fn().mockResolvedValue({ affected: 5 }),
-      };
+      const mockQueryBuilder = TokenRepositoryTestHelper.createMockQueryBuilder(5);
 
       tokenRepository.createQueryBuilder.mockReturnValue(mockQueryBuilder as any);
 

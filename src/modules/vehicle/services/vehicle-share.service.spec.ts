@@ -49,7 +49,7 @@ describe('VehicleShareService', () => {
     description: 'Troca de oleo',
     serviceDate: new Date(),
     mileage: 50000,
-    cost: 150.0,
+    cost: 150,
     location: 'Oficina',
     status: ServiceStatus.CONFIRMED,
     attachments: ['url1', 'url2'],
@@ -72,6 +72,12 @@ describe('VehicleShareService', () => {
       findByVehicleId: jest.fn(),
     };
 
+    const mockStorage = {
+      upload: jest.fn(),
+      delete: jest.fn(),
+      getAccessibleUrl: jest.fn((url) => Promise.resolve(url)),
+    };
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         VehicleShareService,
@@ -86,6 +92,10 @@ describe('VehicleShareService', () => {
         {
           provide: VehicleServiceService,
           useValue: mockVehicleServiceService,
+        },
+        {
+          provide: 'STORAGE',
+          useValue: mockStorage,
         },
       ],
     }).compile();

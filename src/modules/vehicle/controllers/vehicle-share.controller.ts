@@ -55,7 +55,7 @@ export class VehicleShareController {
     @Query('expiresInDays') expiresInDays?: string,
     @Query('includeAttachments') includeAttachments?: string,
   ): Promise<VehicleShareResponseDto> {
-    const days = expiresInDays ? parseInt(expiresInDays) : 30;
+    const days = expiresInDays ? Number.parseInt(expiresInDays) : 30;
     const includeAttachmentsBool = includeAttachments === 'true';
     return this.vehicleShareService.generateShareToken(vehicleId, user.id, days, includeAttachmentsBool);
   }

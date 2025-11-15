@@ -1,8 +1,5 @@
 import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
 import { EmailVerificationRepository } from './email-verification.repository';
-import { EmailVerificationToken } from './entities/email-verification-token.entity';
 import { EmailService } from '../email/email.service';
 import { UserService } from '../user/services/user.service';
 import { generateSecureToken } from '../../common/utils/token.util';

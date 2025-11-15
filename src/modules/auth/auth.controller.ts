@@ -5,7 +5,6 @@ import { AuthService } from './auth.service';
 import { AuthRegisterDto } from './dto/auth-register.dto';
 import { AuthLoginDto } from './dto/auth-login.dto';
 import { ChangePasswordDto } from './dto/change-password.dto';
-import { AuthResponseDto } from './dto/auth-response.dto';
 import { Public } from '../../common/decorators/public.decorator';
 import { EmailVerificationService } from '../email-verification/email-verification.service';
 import { PasswordResetService } from '../password-reset/password-reset.service';
@@ -24,15 +23,21 @@ export class AuthController {
 
   private setTokenCookie(res: Response, token: string): void {
     const isProduction = process.env.NODE_ENV === 'production';
-    const maxAge = 24 * 60 * 60 * 1000; // 24 horas em milissegundos
+    const maxAge = 24 * 60 * 60 * 1000;
     
-    res.cookie('autologger_token', token, {
+    const cookieOptions: any = {
       httpOnly: true,
-      secure: isProduction, // HTTPS apenas em produção
+      secure: isProduction,
       sameSite: 'lax',
       maxAge,
       path: '/',
-    });
+    };
+    
+    if (!isProduction) {
+      cookieOptions.domain = 'localhost';
+    }
+    
+    res.cookie('autologger_token', token, cookieOptions);
   }
 
   @Public()
@@ -42,7 +47,6 @@ export class AuthController {
     this.setTokenCookie(res, result.access_token);
     res.json({
       user: result.user,
-      // Não retornar access_token no body por segurança
     });
   }
 
@@ -54,7 +58,6 @@ export class AuthController {
     this.setTokenCookie(res, result.access_token);
     res.json({
       user: result.user,
-      // Não retornar access_token no body por segurança
     });
   }
 
@@ -95,12 +98,8 @@ export class AuthController {
       throw new UnauthorizedException('Usuário não autenticado');
     }
     
-    try {
-      await this.emailVerificationService.resendVerificationEmail(userId);
-      return { message: 'Email de verificação reenviado com sucesso' };
-    } catch (error) {
-      throw error;
-    }
+    await this.emailVerificationService.resendVerificationEmail(userId);
+    return { message: 'Email de verificação reenviado com sucesso' };
   }
 
   /**
@@ -156,12 +155,19 @@ export class AuthController {
   @UseGuards(JwtAuthGuard)
   @Post('logout')
   async logout(@Res() res: Response): Promise<void> {
-    res.clearCookie('autologger_token', {
+    const isProduction = process.env.NODE_ENV === 'production';
+    const cookieOptions: any = {
       httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
+      secure: isProduction,
       sameSite: 'lax',
       path: '/',
-    });
+    };
+    
+    if (!isProduction) {
+      cookieOptions.domain = 'localhost';
+    }
+    
+    res.clearCookie('autologger_token', cookieOptions);
     res.json({ message: 'Logout realizado com sucesso' });
   }
 

@@ -56,9 +56,12 @@ export class VehicleServiceController {
   @Post('upload-attachments')
   @UseInterceptors(FilesInterceptor('files', 10))
   @ApiConsumes('multipart/form-data')
-  @ApiOperation({ summary: 'Fazer upload de anexos para serviços' })
+  @ApiOperation({ 
+    summary: 'Fazer upload de anexos para serviços',
+    description: 'Aceita apenas: Imagens (JPG, PNG, GIF, WEBP), PDFs e documentos Office (Word, Excel, PowerPoint). Limite: 10MB por arquivo.'
+  })
   @ApiResponse({ status: 201, description: 'Anexos enviados com sucesso' })
-  @ApiResponse({ status: 400, description: 'Erro no upload' })
+  @ApiResponse({ status: 400, description: 'Erro no upload, tipo de arquivo não permitido ou arquivo muito grande' })
   @ApiBody({
     schema: {
       type: 'object',
@@ -78,6 +81,9 @@ export class VehicleServiceController {
       throw new BadRequestException('Nenhum arquivo foi enviado');
     }
 
+    this.validateFileSizes(files);
+    this.validateFileTypes(files);
+
     try {
       const uploadedUrls = await this.fileUploadService.uploadMultipleAttachments(files);
       
@@ -87,7 +93,39 @@ export class VehicleServiceController {
         count: uploadedUrls.length,
       };
     } catch (error) {
-      throw new BadRequestException('Erro ao fazer upload dos arquivos');
+      throw new BadRequestException(`Erro ao fazer upload dos arquivos: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+
+  private validateFileSizes(files: any[]): void {
+    const maxSize = 10 * 1024 * 1024; // 10MB
+    const oversizedFile = files.find(file => file.size > maxSize);
+    
+    if (oversizedFile) {
+      throw new BadRequestException(
+        `Arquivo "${oversizedFile.originalname}" excede o tamanho máximo de 10MB`
+      );
+    }
+  }
+
+  private validateFileTypes(files: any[]): void {
+    const allowedExtensions = new Set([
+      '.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp', // Imagens
+      '.pdf', // PDFs
+      '.doc', '.docx', '.xls', '.xlsx', '.ppt', '.pptx', // Office
+      '.txt' // Texto
+    ]);
+    
+    const invalidFile = files.find(file => {
+      const fileName = file.originalname?.toLowerCase() || '';
+      return !Array.from(allowedExtensions).some(ext => fileName.endsWith(ext));
+    });
+    
+    if (invalidFile) {
+      throw new BadRequestException(
+        `Tipo de arquivo não permitido: "${invalidFile.originalname}". ` +
+        `Aceitos: Imagens (JPG, PNG, GIF, WEBP), PDFs e documentos Office (Word, Excel, PowerPoint).`
+      );
     }
   }
 

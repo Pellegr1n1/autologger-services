@@ -69,7 +69,7 @@ export function validateEmailEnvVars(): {
   const isDevelopment = process.env.NODE_ENV !== 'production';
   
   const smtpHost = getEnvVar('SMTP_HOST', isDevelopment ? 'smtp.ethereal.email' : undefined);
-  const smtpPort = parseInt(getEnvVar('SMTP_PORT', '587'), 10);
+  const smtpPort = Number.parseInt(getEnvVar('SMTP_PORT', '587'), 10);
   const smtpUser = getEnvVar('SMTP_USER', isDevelopment ? 'default_user' : undefined);
   const smtpPass = getEnvVar('SMTP_PASS', isDevelopment ? 'default_pass' : undefined);
   const smtpFrom = getEnvVar('SMTP_FROM', 'noreply@autologger.com');

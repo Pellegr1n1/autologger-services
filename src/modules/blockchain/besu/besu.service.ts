@@ -156,7 +156,7 @@ export class BesuService {
         };
       } catch (timeoutError) {
         // Se der timeout, a transação NÃO foi confirmada - retornar FALHA
-        this.logger.error(`❌ Timeout ao aguardar confirmação da transação ${tx.hash}`);
+        this.logger.error(`❌ Timeout ao aguardar confirmação da transação ${tx.hash}`, timeoutError instanceof Error ? timeoutError.stack : String(timeoutError));
         this.logger.warn(`⚠️ Possível problema: Rede Besu está muito lenta ou não está minerando`);
         this.logger.warn(`⚠️ Transação pode estar pendente na mempool: ${tx.hash}`);
         
@@ -222,7 +222,7 @@ export class BesuService {
         };
       } catch (timeoutError) {
         // Se der timeout, a transação NÃO foi confirmada - retornar FALHA
-        this.logger.error(`❌ Timeout ao aguardar confirmação da transação ${tx.hash}`);
+        this.logger.error(`❌ Timeout ao aguardar confirmação da transação ${tx.hash}`, timeoutError instanceof Error ? timeoutError.stack : String(timeoutError));
         this.logger.warn(`⚠️ Possível problema: Rede Besu está muito lenta ou não está minerando`);
         this.logger.warn(`⚠️ Transação pode estar pendente na mempool: ${tx.hash}`);
         
@@ -531,83 +531,110 @@ export class BesuService {
       }
 
       // 2. Informações da rede
-      try {
-        const blockNumber = await this.provider.getBlockNumber();
-        result.blockNumber = blockNumber;
-        this.logger.log(`📊 Bloco atual: ${blockNumber}`);
-        
-        if (blockNumber === 0) {
-          issues.push('⚠️ Blockchain está no bloco 0 - pode não estar minerando');
-        }
-      } catch (error) {
-        issues.push(`❌ Erro ao obter número do bloco: ${error.message}`);
-      }
+      await this.checkBlockNumber(result, issues);
 
       // 3. Verificar Chain ID
-      try {
-        const network = await this.provider.getNetwork();
-        result.chainId = network.chainId.toString();
-        this.logger.log(`🔗 Chain ID: ${result.chainId}`);
-      } catch (error) {
-        issues.push(`❌ Erro ao obter Chain ID: ${error.message}`);
-      }
+      await this.checkChainId(result, issues);
 
       // 4. Verificar Gas Price
-      try {
-        const feeData = await this.provider.getFeeData();
-        result.gasPrice = ethers.formatUnits(feeData.gasPrice || 0, 'gwei');
-        this.logger.log(`⛽ Gas Price: ${result.gasPrice} Gwei`);
-      } catch (error) {
-        issues.push(`❌ Erro ao obter Gas Price: ${error.message}`);
-      }
+      await this.checkGasPrice(result, issues);
 
       // 5. Verificar contrato
-      if (this.contract) {
-        try {
-          result.contractAddress = await this.contract.getAddress();
-          const code = await this.provider.getCode(result.contractAddress);
-          result.contractDeployed = code !== '0x';
-          
-          if (!result.contractDeployed) {
-            issues.push(`❌ Contrato NÃO está implantado no endereço ${result.contractAddress}`);
-          } else {
-            this.logger.log(`✅ Contrato implantado em: ${result.contractAddress}`);
-          }
-        } catch (error) {
-          issues.push(`❌ Erro ao verificar contrato: ${error.message}`);
-        }
-      } else {
-        issues.push('⚠️ Contrato não inicializado');
-      }
+      await this.checkContract(result, issues);
 
       // 6. Verificar velocidade da rede (tempo entre blocos)
-      try {
-        const latestBlock = await this.provider.getBlock('latest');
-        const previousBlock = await this.provider.getBlock(latestBlock.number - 1);
-        
-        if (latestBlock && previousBlock) {
-          result.lastBlockTime = latestBlock.timestamp - previousBlock.timestamp;
-          this.logger.log(`⏱️ Tempo entre blocos: ${result.lastBlockTime}s`);
-          
-          if (result.lastBlockTime > 30) {
-            issues.push(`⚠️ Rede está lenta: ${result.lastBlockTime}s entre blocos (esperado < 15s)`);
-          }
-        }
-      } catch (error) {
-        this.logger.warn(`⚠️ Não foi possível calcular tempo entre blocos: ${error.message}`);
-      }
+      await this.checkBlockTime(result, issues);
 
-      if (issues.length === 0) {
-        this.logger.log('✅ Rede Besu está saudável');
-      } else {
-        this.logger.warn(`⚠️ Encontrados ${issues.length} problemas na rede`);
-        issues.forEach(issue => this.logger.warn(issue));
-      }
+      this.logDiagnosisResults(issues);
 
       return result;
     } catch (error) {
       issues.push(`❌ Erro geral no diagnóstico: ${error.message}`);
       return result;
+    }
+  }
+
+  private async checkBlockNumber(result: any, issues: string[]): Promise<void> {
+    try {
+      const blockNumber = await this.provider.getBlockNumber();
+      result.blockNumber = blockNumber;
+      this.logger.log(`📊 Bloco atual: ${blockNumber}`);
+      
+      if (blockNumber === 0) {
+        issues.push('⚠️ Blockchain está no bloco 0 - pode não estar minerando');
+      }
+    } catch (error) {
+      issues.push(`❌ Erro ao obter número do bloco: ${error.message}`);
+    }
+  }
+
+  private async checkChainId(result: any, issues: string[]): Promise<void> {
+    try {
+      const network = await this.provider.getNetwork();
+      result.chainId = network.chainId.toString();
+      this.logger.log(`🔗 Chain ID: ${result.chainId}`);
+    } catch (error) {
+      issues.push(`❌ Erro ao obter Chain ID: ${error.message}`);
+    }
+  }
+
+  private async checkGasPrice(result: any, issues: string[]): Promise<void> {
+    try {
+      const feeData = await this.provider.getFeeData();
+      result.gasPrice = ethers.formatUnits(feeData.gasPrice || 0, 'gwei');
+      this.logger.log(`⛽ Gas Price: ${result.gasPrice} Gwei`);
+    } catch (error) {
+      issues.push(`❌ Erro ao obter Gas Price: ${error.message}`);
+    }
+  }
+
+  private async checkContract(result: any, issues: string[]): Promise<void> {
+    if (!this.contract) {
+      issues.push('⚠️ Contrato não inicializado');
+      return;
+    }
+
+    try {
+      result.contractAddress = await this.contract.getAddress();
+      const code = await this.provider.getCode(result.contractAddress);
+      result.contractDeployed = code !== '0x';
+      
+      if (result.contractDeployed) {
+        this.logger.log(`✅ Contrato implantado em: ${result.contractAddress}`);
+      } else {
+        issues.push(`❌ Contrato NÃO está implantado no endereço ${result.contractAddress}`);
+      }
+    } catch (error) {
+      issues.push(`❌ Erro ao verificar contrato: ${error.message}`);
+    }
+  }
+
+  private async checkBlockTime(result: any, issues: string[]): Promise<void> {
+    try {
+      const latestBlock = await this.provider.getBlock('latest');
+      const previousBlock = await this.provider.getBlock(latestBlock.number - 1);
+      
+      if (latestBlock && previousBlock) {
+        result.lastBlockTime = latestBlock.timestamp - previousBlock.timestamp;
+        this.logger.log(`⏱️ Tempo entre blocos: ${result.lastBlockTime}s`);
+        
+        if (result.lastBlockTime > 30) {
+          issues.push(`⚠️ Rede está lenta: ${result.lastBlockTime}s entre blocos (esperado < 15s)`);
+        }
+      }
+    } catch (error) {
+      this.logger.warn(`⚠️ Não foi possível calcular tempo entre blocos: ${error.message}`);
+    }
+  }
+
+  private logDiagnosisResults(issues: string[]): void {
+    if (issues.length === 0) {
+      this.logger.log('✅ Rede Besu está saudável');
+    } else {
+      this.logger.warn(`⚠️ Encontrados ${issues.length} problemas na rede`);
+      for (const issue of issues) {
+        this.logger.warn(issue);
+      }
     }
   }
 

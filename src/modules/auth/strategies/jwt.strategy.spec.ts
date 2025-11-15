@@ -48,7 +48,6 @@ describe('JwtStrategy', () => {
 
     strategy = module.get<JwtStrategy>(JwtStrategy);
     userService = module.get(UserService);
-    configService = module.get(ConfigService);
   });
 
   it('should be defined', () => {

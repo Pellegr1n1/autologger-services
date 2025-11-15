@@ -10,7 +10,7 @@ services:
     entrypoint:
       - /bin/bash
       - -c
-      - besu --data-path=data --genesis-file=genesis/genesis.json --bootnodes=enode://4730e5a4781ed662dba259fb9806e106f792c91b2ec36ee12c81e0f1f7c21c71dfeee374c4160db68f2aee2ae49116d88fc3d8ba71d76a1395d0a4440c0b3bd1@172.29.0.2:30303 --p2p-port=30304 --rpc-http-enabled --rpc-http-api=ETH,NET,QBFT --host-allowlist="*" --rpc-http-cors-origins="all" --rpc-http-port=8546 --min-gas-price=0
+      - besu --data-path=data --genesis-file=genesis/genesis.json --bootnodes=enode://b7c51af6e0aa77ec5fc117571afb549c220f7ffeb11e4c9a86fbb7732891429cf4ae5962afb1e19cf0b8f27a152235629e152cd45124d8b82b6f96fa3794e69f@172.29.0.2:30303 --p2p-port=30304 --rpc-http-enabled --rpc-http-api=ETH,NET,QBFT --host-allowlist="*" --rpc-http-cors-origins="all" --rpc-http-port=8546 --min-gas-price=0
     ports:
       - "8546:8546"
       - "30304:30304"
@@ -27,7 +27,7 @@ services:
     entrypoint:
       - /bin/bash
       - -c
-      - besu --data-path=data --genesis-file=genesis/genesis.json --bootnodes=enode://4730e5a4781ed662dba259fb9806e106f792c91b2ec36ee12c81e0f1f7c21c71dfeee374c4160db68f2aee2ae49116d88fc3d8ba71d76a1395d0a4440c0b3bd1@172.29.0.2:30303 --p2p-port=30305 --rpc-http-enabled --rpc-http-api=ETH,NET,QBFT --host-allowlist="*" --rpc-http-cors-origins="all" --rpc-http-port=8547 --min-gas-price=0
+      - besu --data-path=data --genesis-file=genesis/genesis.json --bootnodes=enode://b7c51af6e0aa77ec5fc117571afb549c220f7ffeb11e4c9a86fbb7732891429cf4ae5962afb1e19cf0b8f27a152235629e152cd45124d8b82b6f96fa3794e69f@172.29.0.2:30303 --p2p-port=30305 --rpc-http-enabled --rpc-http-api=ETH,NET,QBFT --host-allowlist="*" --rpc-http-cors-origins="all" --rpc-http-port=8547 --min-gas-price=0
     ports:
       - "8547:8547"
       - "30305:30305"

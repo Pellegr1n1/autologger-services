@@ -26,7 +26,10 @@ async function bootstrap() {
     forbidNonWhitelisted: true,
   }));
 
-  app.use('/uploads', express.static(path.join(process.cwd(), 'storage', 'uploads')));
+  const storageType = process.env.STORAGE_TYPE || 'local';
+  if (storageType.toLowerCase() === 'local') {
+    app.use('/uploads', express.static(path.join(process.cwd(), 'storage', 'uploads')));
+  }
 
   const config = new DocumentBuilder()
     .setTitle('AutoLogger API')

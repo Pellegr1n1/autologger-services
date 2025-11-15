@@ -55,7 +55,6 @@ describe('BesuService', () => {
     }).compile();
 
     service = module.get<BesuService>(BesuService);
-    configService = module.get(ConfigService);
   });
 
   it('should be defined', () => {

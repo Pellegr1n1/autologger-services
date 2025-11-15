@@ -2,18 +2,27 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { ConfigService } from '@nestjs/config';
 import { Logger } from '@nestjs/common';
 import { FileUploadService } from './file-upload.service';
-import * as fs from 'fs';
-import * as path from 'path';
-
-jest.mock('fs');
-jest.mock('path');
+import { IStorage } from '../../storage/interfaces/storage.interface';
 
 describe('FileUploadService', () => {
   let service: FileUploadService;
-  let configService: jest.Mocked<ConfigService>;
+  let mockStorage: jest.Mocked<IStorage>;
   let loggerErrorSpy: jest.SpyInstance;
 
+  const createMockFile = (originalname: string, buffer: string = 'test'): any => ({
+    originalname,
+    buffer: Buffer.from(buffer),
+  });
+
+  const mockUploadResult = 'https://storage.example.com/uploaded-file.jpg';
+
   beforeEach(async () => {
+    mockStorage = {
+      upload: jest.fn().mockResolvedValue(mockUploadResult),
+      delete: jest.fn().mockResolvedValue(undefined),
+      getUrl: jest.fn(),
+    } as any;
+
     const mockConfigService = {
       get: jest.fn(),
     };
@@ -25,13 +34,15 @@ describe('FileUploadService', () => {
           provide: ConfigService,
           useValue: mockConfigService,
         },
+        {
+          provide: 'STORAGE',
+          useValue: mockStorage,
+        },
       ],
     }).compile();
 
     service = module.get<FileUploadService>(FileUploadService);
-    configService = module.get(ConfigService);
     
-    // Spy on Logger.error method
     loggerErrorSpy = jest.spyOn(Logger.prototype, 'error').mockImplementation();
   });
 
@@ -46,240 +57,139 @@ describe('FileUploadService', () => {
   describe('uploadPhoto', () => {
     it('should return null when file is not provided', async () => {
       const result = await service.uploadPhoto(null);
-
       expect(result).toBeNull();
     });
 
     it('should upload photo successfully', async () => {
-      const mockFile = {
-        originalname: 'test.jpg',
-        buffer: Buffer.from('test'),
-      };
+      const mockFile = createMockFile('test.jpg');
 
-      (path.join as jest.Mock).mockReturnValue('/uploads/vehicles');
-      (fs.existsSync as jest.Mock).mockReturnValue(true);
-      (path.extname as jest.Mock).mockReturnValue('.jpg');
-      (fs.writeFileSync as jest.Mock).mockReturnValue(undefined);
-      configService.get.mockReturnValue(3001);
+      const result = await service.uploadPhoto(mockFile);
 
-      const result = await service.uploadPhoto(mockFile as any);
-
-      expect(result).toContain('uploads/vehicles');
-      expect(fs.writeFileSync).toHaveBeenCalled();
+      expect(mockStorage.upload).toHaveBeenCalledWith(
+        mockFile.buffer,
+        expect.stringMatching(/\.jpg$/),
+        'vehicles'
+      );
+      expect(result).toBe(mockUploadResult);
     });
 
-    it('should create directory if it does not exist', async () => {
-      const mockFile = {
-        originalname: 'test.jpg',
-        buffer: Buffer.from('test'),
-      };
+    it('should handle file without extension', async () => {
+      const mockFile = createMockFile('test');
 
-      (path.join as jest.Mock).mockReturnValue('/uploads/vehicles');
-      (fs.existsSync as jest.Mock).mockReturnValue(false);
-      (fs.mkdirSync as jest.Mock).mockReturnValue(undefined);
-      (path.extname as jest.Mock).mockReturnValue('.jpg');
-      (fs.writeFileSync as jest.Mock).mockReturnValue(undefined);
-      configService.get.mockReturnValue(3001);
+      await service.uploadPhoto(mockFile);
 
-      await service.uploadPhoto(mockFile as any);
-
-      expect(fs.mkdirSync).toHaveBeenCalled();
+      expect(mockStorage.upload).toHaveBeenCalledWith(
+        mockFile.buffer,
+        expect.not.stringContaining('.'),
+        'vehicles'
+      );
     });
   });
 
   describe('deletePhoto', () => {
     it('should return when photoUrl is not provided', async () => {
       await service.deletePhoto(null);
-
-      expect(fs.unlinkSync).not.toHaveBeenCalled();
+      expect(mockStorage.delete).not.toHaveBeenCalled();
     });
 
     it('should delete photo successfully', async () => {
-      const photoUrl = 'http://localhost:3001/uploads/vehicles/test.jpg';
-
-      (path.join as jest.Mock).mockReturnValue('/uploads/vehicles/test.jpg');
-      (fs.existsSync as jest.Mock).mockReturnValue(true);
-      (fs.unlinkSync as jest.Mock).mockReturnValue(undefined);
+      const photoUrl = 'https://storage.example.com/photo.jpg';
 
       await service.deletePhoto(photoUrl);
 
-      expect(fs.unlinkSync).toHaveBeenCalled();
-    });
-
-    it('should not throw error when file does not exist', async () => {
-      const photoUrl = 'http://localhost:3001/uploads/vehicles/test.jpg';
-
-      (path.join as jest.Mock).mockReturnValue('/uploads/vehicles/test.jpg');
-      (fs.existsSync as jest.Mock).mockReturnValue(false);
-
-      await expect(service.deletePhoto(photoUrl)).resolves.not.toThrow();
+      expect(mockStorage.delete).toHaveBeenCalledWith(photoUrl);
     });
 
     it('should handle error when deleting photo', async () => {
-      const photoUrl = 'http://localhost:3001/uploads/vehicles/test.jpg';
+      const photoUrl = 'https://storage.example.com/photo.jpg';
       const error = new Error('Delete error');
 
-      (path.join as jest.Mock).mockReturnValue('/uploads/vehicles/test.jpg');
-      (fs.existsSync as jest.Mock).mockReturnValue(true);
-      (fs.unlinkSync as jest.Mock).mockImplementation(() => {
-        throw error;
-      });
+      mockStorage.delete.mockRejectedValueOnce(error);
 
       await service.deletePhoto(photoUrl);
 
-      expect(loggerErrorSpy).toHaveBeenCalledWith(
-        'Erro ao deletar foto:',
-        error,
-      );
+      expect(loggerErrorSpy).toHaveBeenCalledWith('Erro ao deletar foto:', error);
     });
   });
 
   describe('getPhotoPath', () => {
-    it('should return null when photoUrl is not provided', () => {
-      const result = service.getPhotoPath(null);
-
-      expect(result).toBeNull();
-    });
-
-    it('should return photo path when photoUrl is provided', () => {
-      const photoUrl = 'uploads/vehicles/test.jpg';
-      (path.join as jest.Mock).mockReturnValue('/uploads/vehicles/test.jpg');
-
+    it('should return photo path', () => {
+      const photoUrl = 'https://storage.example.com/photo.jpg';
+      
       const result = service.getPhotoPath(photoUrl);
 
-      expect(path.join).toHaveBeenCalled();
-      expect(result).toBe('/uploads/vehicles/test.jpg');
+      expect(result).toBe(photoUrl);
     });
   });
 
   describe('uploadAttachment', () => {
     it('should return null when file is not provided', async () => {
       const result = await service.uploadAttachment(null);
-
       expect(result).toBeNull();
     });
 
     it('should upload attachment successfully', async () => {
-      const mockFile = {
-        originalname: 'test.pdf',
-        buffer: Buffer.from('test'),
-      };
+      const mockFile = createMockFile('test.pdf');
 
-      (path.join as jest.Mock).mockReturnValue('/uploads/attachments');
-      (fs.existsSync as jest.Mock).mockReturnValue(true);
-      (path.extname as jest.Mock).mockReturnValue('.pdf');
-      (fs.writeFileSync as jest.Mock).mockReturnValue(undefined);
-      configService.get.mockReturnValue(3001);
+      const result = await service.uploadAttachment(mockFile);
 
-      const result = await service.uploadAttachment(mockFile as any);
-
-      expect(result).toContain('uploads/attachments');
-    });
-
-    it('should create directory if it does not exist', async () => {
-      const mockFile = {
-        originalname: 'test.pdf',
-        buffer: Buffer.from('test'),
-      };
-
-      (path.join as jest.Mock).mockReturnValue('/uploads/attachments');
-      (fs.existsSync as jest.Mock).mockReturnValue(false);
-      (fs.mkdirSync as jest.Mock).mockReturnValue(undefined);
-      (path.extname as jest.Mock).mockReturnValue('.pdf');
-      (fs.writeFileSync as jest.Mock).mockReturnValue(undefined);
-      configService.get.mockReturnValue(3001);
-
-      await service.uploadAttachment(mockFile as any);
-
-      expect(fs.mkdirSync).toHaveBeenCalled();
+      expect(mockStorage.upload).toHaveBeenCalledWith(
+        mockFile.buffer,
+        expect.stringMatching(/\.pdf$/),
+        'attachments'
+      );
+      expect(result).toBe(mockUploadResult);
     });
   });
 
   describe('uploadMultipleAttachments', () => {
     it('should return empty array when files are not provided', async () => {
       const result = await service.uploadMultipleAttachments(null);
+      expect(result).toEqual([]);
+    });
 
+    it('should return empty array when files array is empty', async () => {
+      const result = await service.uploadMultipleAttachments([]);
       expect(result).toEqual([]);
     });
 
     it('should upload multiple attachments', async () => {
       const mockFiles = [
-        { originalname: 'test1.pdf', buffer: Buffer.from('test1') },
-        { originalname: 'test2.pdf', buffer: Buffer.from('test2') },
+        createMockFile('test1.pdf'),
+        createMockFile('test2.pdf'),
       ];
 
-      (path.join as jest.Mock).mockReturnValue('/uploads/attachments');
-      (fs.existsSync as jest.Mock).mockReturnValue(true);
-      (path.extname as jest.Mock).mockReturnValue('.pdf');
-      (fs.writeFileSync as jest.Mock).mockReturnValue(undefined);
-      configService.get.mockReturnValue(3001);
+      const result = await service.uploadMultipleAttachments(mockFiles);
 
-      const result = await service.uploadMultipleAttachments(
-        mockFiles as any,
-      );
-
+      expect(mockStorage.upload).toHaveBeenCalledTimes(2);
       expect(result).toHaveLength(2);
+      expect(result).toEqual([mockUploadResult, mockUploadResult]);
     });
   });
 
   describe('deleteAttachment', () => {
-    beforeEach(() => {
-      jest.clearAllMocks();
-    });
-
     it('should return when attachmentUrl is not provided', async () => {
       await service.deleteAttachment(null);
-
-      expect(fs.unlinkSync).not.toHaveBeenCalled();
+      expect(mockStorage.delete).not.toHaveBeenCalled();
     });
 
     it('should delete attachment successfully', async () => {
-      const attachmentUrl =
-        'http://localhost:3001/uploads/attachments/test.pdf';
-
-      (path.join as jest.Mock).mockReturnValue(
-        '/uploads/attachments/test.pdf',
-      );
-      (fs.existsSync as jest.Mock).mockReturnValue(true);
-      (fs.unlinkSync as jest.Mock).mockReturnValue(undefined);
+      const attachmentUrl = 'https://storage.example.com/attachment.pdf';
 
       await service.deleteAttachment(attachmentUrl);
 
-      expect(fs.unlinkSync).toHaveBeenCalled();
-    });
-
-    it('should not throw error when file does not exist', async () => {
-      const attachmentUrl =
-        'http://localhost:3001/uploads/attachments/test.pdf';
-
-      (path.join as jest.Mock).mockReturnValue(
-        '/uploads/attachments/test.pdf',
-      );
-      (fs.existsSync as jest.Mock).mockReturnValue(false);
-
-      await expect(service.deleteAttachment(attachmentUrl)).resolves.not.toThrow();
+      expect(mockStorage.delete).toHaveBeenCalledWith(attachmentUrl);
     });
 
     it('should handle error when deleting attachment', async () => {
-      const attachmentUrl =
-        'http://localhost:3001/uploads/attachments/test.pdf';
+      const attachmentUrl = 'https://storage.example.com/attachment.pdf';
       const error = new Error('Delete error');
 
-      (path.join as jest.Mock).mockReturnValue(
-        '/uploads/attachments/test.pdf',
-      );
-      (fs.existsSync as jest.Mock).mockReturnValue(true);
-      (fs.unlinkSync as jest.Mock).mockImplementation(() => {
-        throw error;
-      });
+      mockStorage.delete.mockRejectedValueOnce(error);
 
       await service.deleteAttachment(attachmentUrl);
 
-      expect(loggerErrorSpy).toHaveBeenCalledWith(
-        'Erro ao deletar anexo:',
-        error,
-      );
+      expect(loggerErrorSpy).toHaveBeenCalledWith('Erro ao deletar anexo:', error);
     });
   });
 });
-

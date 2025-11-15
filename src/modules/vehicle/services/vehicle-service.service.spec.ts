@@ -6,15 +6,16 @@ import { VehicleServiceService } from './vehicle-service.service';
 import { VehicleService, ServiceStatus, ServiceType } from '../entities/vehicle-service.entity';
 import { Vehicle } from '../entities/vehicle.entity';
 import { BlockchainService } from '../../blockchain/blockchain.service';
+import { VehicleServiceFactory } from '../factories/vehicle-service.factory';
 import { CreateVehicleServiceDto } from '../dto/create-vehicle-service.dto';
 import { UpdateVehicleServiceDto } from '../dto/update-vehicle-service.dto';
-import { ethers } from 'ethers';
 
 describe('VehicleServiceService', () => {
   let service: VehicleServiceService;
   let vehicleServiceRepository: jest.Mocked<Repository<VehicleService>>;
   let vehicleRepository: jest.Mocked<Repository<Vehicle>>;
   let blockchainService: jest.Mocked<BlockchainService>;
+  let vehicleServiceFactory: jest.Mocked<VehicleServiceFactory>;
 
   const mockVehicle = {
     id: 'vehicle-123',
@@ -34,7 +35,7 @@ describe('VehicleServiceService', () => {
     description: 'Troca de oleo',
     serviceDate: new Date(),
     mileage: 50000,
-    cost: 150.0,
+    cost: 150,
     location: 'Oficina',
     status: ServiceStatus.PENDING,
     isImmutable: false,
@@ -65,6 +66,11 @@ describe('VehicleServiceService', () => {
       registerHashInContract: jest.fn(),
     };
 
+    const mockVehicleServiceFactory = {
+      toResponseDto: jest.fn((service) => Promise.resolve(service)),
+      toResponseDtoArray: jest.fn((services) => Promise.resolve(services)),
+    };
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         VehicleServiceService,
@@ -80,6 +86,10 @@ describe('VehicleServiceService', () => {
           provide: BlockchainService,
           useValue: mockBlockchainService,
         },
+        {
+          provide: VehicleServiceFactory,
+          useValue: mockVehicleServiceFactory,
+        },
       ],
     }).compile();
 
@@ -87,6 +97,7 @@ describe('VehicleServiceService', () => {
     vehicleServiceRepository = module.get(getRepositoryToken(VehicleService));
     vehicleRepository = module.get(getRepositoryToken(Vehicle));
     blockchainService = module.get(BlockchainService);
+    vehicleServiceFactory = module.get(VehicleServiceFactory);
   });
 
   it('should be defined', () => {
@@ -102,7 +113,7 @@ describe('VehicleServiceService', () => {
         description: 'Troca de oleo',
         serviceDate: new Date(),
         mileage: 50000,
-        cost: 150.0,
+        cost: 150,
         location: 'Oficina',
       };
 
@@ -131,7 +142,7 @@ describe('VehicleServiceService', () => {
         description: 'Troca de oleo',
         serviceDate: new Date(),
         mileage: 50000,
-        cost: 150.0,
+        cost: 150,
         location: 'Oficina',
       };
 
@@ -148,7 +159,7 @@ describe('VehicleServiceService', () => {
         description: 'Troca de oleo',
         serviceDate: new Date(),
         mileage: 50000,
-        cost: 150.0,
+        cost: 150,
         location: 'Oficina',
       };
 
@@ -441,7 +452,7 @@ describe('VehicleServiceService', () => {
       const queryBuilder = {
         select: jest.fn().mockReturnThis(),
         where: jest.fn().mockReturnThis(),
-        getRawOne: jest.fn().mockResolvedValue({ total: '500.00' }),
+        getRawOne: jest.fn().mockResolvedValue({ total: '500' }),
       };
 
       vehicleServiceRepository.createQueryBuilder.mockReturnValue(queryBuilder as any);
@@ -450,7 +461,7 @@ describe('VehicleServiceService', () => {
 
       expect(queryBuilder.select).toHaveBeenCalledWith('SUM(service.cost)', 'total');
       expect(queryBuilder.where).toHaveBeenCalledWith('service.vehicleId = :vehicleId', { vehicleId: 'vehicle-123' });
-      expect(result).toBe(500.0);
+      expect(result).toBe(500);
     });
 
     it('should return 0 when total is null', async () => {

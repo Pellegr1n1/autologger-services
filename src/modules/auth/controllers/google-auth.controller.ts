@@ -29,28 +29,34 @@ export class GoogleAuthController {
       const isProduction = process.env.NODE_ENV === 'production';
       const maxAge = 24 * 60 * 60 * 1000; // 24 horas
       
-      res.cookie('autologger_token', result.access_token, {
+      const cookieOptions: any = {
         httpOnly: true,
         secure: isProduction,
         sameSite: 'lax',
         maxAge,
         path: '/',
-      });
+      };
+      
+      // Em desenvolvimento, usar domain 'localhost' para compartilhar cookie entre portas
+      if (!isProduction) {
+        cookieOptions.domain = 'localhost';
+      }
+      
+      res.cookie('autologger_token', result.access_token, cookieOptions);
       
       const { frontendUrl } = validateGoogleOAuthEnvVars();
-      // Usar apenas campos seguros do usuário na URL
       const safeUserData = {
         id: result.user.id,
         name: result.user.name,
         email: result.user.email,
         isEmailVerified: result.user.isEmailVerified,
+        authProvider: 'google',
       };
       const redirectUrl = `${frontendUrl}/auth/callback?user=${encodeURIComponent(JSON.stringify(safeUserData))}`;
       
       res.redirect(redirectUrl);
     } catch (error) {
       const { frontendUrl } = validateGoogleOAuthEnvVars();
-      // Sanitizar mensagem de erro para prevenir XSS
       const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido';
       const redirectUrl = `${frontendUrl}/auth/callback?error=${encodeURIComponent(errorMessage)}`;
       res.redirect(redirectUrl);
@@ -74,13 +80,8 @@ export class GoogleAuthController {
         }
 
         // Validar e decodificar payload do JWT de forma segura
-        let payload: any;
-        try {
-          const decoded = Buffer.from(parts[1], 'base64').toString('utf-8');
-          payload = JSON.parse(decoded);
-        } catch (parseError) {
-          throw new BadRequestException('Invalid Google credential: malformed JWT payload');
-        }
+        const decoded = Buffer.from(parts[1], 'base64').toString('utf-8');
+        const payload = JSON.parse(decoded);
         
         if (!payload.sub || !payload.email) {
           throw new BadRequestException('Invalid Google credential: missing required fields');
@@ -109,13 +110,20 @@ export class GoogleAuthController {
     const isProduction = process.env.NODE_ENV === 'production';
     const maxAge = 24 * 60 * 60 * 1000; // 24 horas
     
-    res.cookie('autologger_token', result.access_token, {
+    const cookieOptions: any = {
       httpOnly: true,
       secure: isProduction,
       sameSite: 'lax',
       maxAge,
       path: '/',
-    });
+    };
+    
+    // Em desenvolvimento, usar domain 'localhost' para compartilhar cookie entre portas
+    if (!isProduction) {
+      cookieOptions.domain = 'localhost';
+    }
+    
+    res.cookie('autologger_token', result.access_token, cookieOptions);
     
     res.json({
       user: result.user,

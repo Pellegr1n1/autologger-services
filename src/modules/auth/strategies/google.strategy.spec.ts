@@ -63,7 +63,6 @@ describe('GoogleStrategy', () => {
 
     strategy = module.get<GoogleStrategy>(GoogleStrategy);
     authService = module.get(AuthService);
-    configService = module.get(ConfigService);
   });
 
   it('should be defined', () => {

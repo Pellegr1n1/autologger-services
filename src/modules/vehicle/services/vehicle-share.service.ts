@@ -1,22 +1,25 @@
-import { Injectable, NotFoundException, UnauthorizedException, BadRequestException } from '@nestjs/common';
+import { Injectable, NotFoundException, UnauthorizedException, BadRequestException, Inject, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { VehicleShare } from '../entities/vehicle-share.entity';
 import { VehicleService } from './vehicle.service';
 import { VehicleServiceService } from './vehicle-service.service';
-import { VehicleShareResponseDto, PublicVehicleInfoDto, PublicMaintenanceInfoDto } from '../dto/vehicle-share-response.dto';
-import { VehicleResponseDto } from '../dto/vehicle-response.dto';
+import { VehicleShareResponseDto, PublicVehicleInfoDto, PublicMaintenanceInfoDto, PublicAttachmentDto } from '../dto/vehicle-share-response.dto';
 import { ServiceType, ServiceStatus } from '../entities/vehicle-service.entity';
 import { VehicleStatus } from '../enums/vehicle-status.enum';
+import { IStorage } from '../../storage/interfaces/storage.interface';
 import { generateSecureToken } from '../../../common/utils/token.util';
 
 @Injectable()
 export class VehicleShareService {
+  private readonly logger = new Logger(VehicleShareService.name);
+
   constructor(
     @InjectRepository(VehicleShare)
     private readonly vehicleShareRepository: Repository<VehicleShare>,
     private readonly vehicleService: VehicleService,
     private readonly vehicleServiceService: VehicleServiceService,
+    @Inject('STORAGE') private readonly storage: IStorage,
   ) {}
 
   /**
@@ -87,6 +90,16 @@ export class VehicleShareService {
     vehicleShare.lastViewedAt = new Date();
     await this.vehicleShareRepository.save(vehicleShare);
 
+    // Converter URL da foto do veículo
+    let photoUrl = vehicle.photoUrl;
+    if (photoUrl && this.storage.getAccessibleUrl) {
+      try {
+        photoUrl = await this.storage.getAccessibleUrl(photoUrl);
+      } catch (error) {
+        this.logger.error(`Erro ao gerar URL acessível para foto do veículo: ${error}`);
+      }
+    }
+
     const maintenanceHistory = await this.getPublicMaintenanceHistory(vehicle.id, vehicleShare.includeAttachments);
 
     return {
@@ -98,7 +111,7 @@ export class VehicleShareService {
       mileage: vehicle.mileage,
       status: vehicle.status,
       createdAt: vehicle.createdAt,
-      photoUrl: vehicle.photoUrl,
+      photoUrl,
       maintenanceHistory,
     };
   }
@@ -109,36 +122,60 @@ export class VehicleShareService {
   private async getPublicMaintenanceHistory(vehicleId: string, includeAttachments: boolean = false): Promise<PublicMaintenanceInfoDto[]> {
     const services = await this.vehicleServiceService.findByVehicleId(vehicleId);
 
-    return services.map(service => {
-      // Converter anexos de string[] para PublicAttachmentDto[] apenas se includeAttachments for true
-      const attachments = includeAttachments
-        ? (service.attachments || []).map((url, index) => ({
-            id: `attachment-${service.id}-${index}`,
-            fileName: this.getFileNameFromUrl(url),
-            fileUrl: url,
-            fileType: this.getFileTypeFromUrl(url),
-            fileSize: 0 // Não temos o tamanho salvo no banco
-          }))
-        : undefined;
+    // Processar serviços de forma assíncrona para converter URLs
+    const processedServices = await Promise.all(
+      services.map(async (service) => {
+        // Converter anexos de string[] para PublicAttachmentDto[] apenas se includeAttachments for true
+        let attachments: PublicAttachmentDto[] | undefined;
+        
+        if (includeAttachments && service.attachments && service.attachments.length > 0) {
+          // Converter URLs s3:// para URLs acessíveis (assinadas)
+          attachments = await Promise.all(
+            service.attachments.map(async (url, index) => {
+              let accessibleUrl = url;
+              
+              // Converter URL do storage para URL acessível
+              if (url && this.storage.getAccessibleUrl) {
+                try {
+                  accessibleUrl = await this.storage.getAccessibleUrl(url);
+                } catch (error) {
+                  // Em caso de erro, manter URL original
+                  this.logger.error(`Erro ao gerar URL acessível para anexo: ${error}`);
+                }
+              }
 
-      return {
-        type: this.mapServiceType(service.type),
-        category: service.category,
-        description: service.description,
-        serviceDate: service.serviceDate,
-        mileage: service.mileage,
-        cost: service.cost,
-        location: service.location,
-        technician: service.technician,
-        warranty: service.warranty,
-        nextServiceDate: service.nextServiceDate,
-        notes: service.notes,
-        blockchainStatus: this.mapBlockchainStatus(service.status),
-        blockchainHash: service.blockchainHash,
-        createdAt: service.createdAt,
-        attachments: attachments,
-      };
-    });
+              return {
+                id: `attachment-${service.id}-${index}`,
+                fileName: this.getFileNameFromUrl(url),
+                fileUrl: accessibleUrl, // URL acessível (assinada)
+                fileType: this.getFileTypeFromUrl(url),
+                fileSize: 0 // Não temos o tamanho salvo no banco
+              };
+            })
+          );
+        }
+
+        return {
+          type: this.mapServiceType(service.type),
+          category: service.category,
+          description: service.description,
+          serviceDate: service.serviceDate,
+          mileage: service.mileage,
+          cost: service.cost,
+          location: service.location,
+          technician: service.technician,
+          warranty: service.warranty,
+          nextServiceDate: service.nextServiceDate,
+          notes: service.notes,
+          blockchainStatus: this.mapBlockchainStatus(service.status),
+          blockchainHash: service.blockchainHash,
+          createdAt: service.createdAt,
+          attachments: attachments,
+        };
+      })
+    );
+
+    return processedServices;
   }
 
   /**
@@ -170,12 +207,25 @@ export class VehicleShareService {
   }
 
   /**
-   * Extrair nome do arquivo da URL
+   * Extrair nome do arquivo da URL (sem parâmetros de query string)
    */
   private getFileNameFromUrl(url: string): string {
     if (!url) return 'Arquivo';
-    const fileName = url.split('/').pop() || 'Arquivo';
-    return fileName;
+    
+    try {
+      // Extrair o caminho da URL (removendo protocolo s3:// ou http/https)
+      const urlPath = url.replace(/^s3:\/\/[^\/]+\//, '').replace(/^https?:\/\/[^\/]+\//, '');
+      
+      // Pegar a última parte do caminho (nome do arquivo)
+      const fileName = urlPath.split('/').pop() || 'Arquivo';
+      
+      // Remover parâmetros de query string (ex: ?X-Amz-Algorithm=...)
+      const cleanFileName = fileName.split('?')[0];
+      
+      return cleanFileName || 'Arquivo';
+    } catch (error) {
+      return 'Arquivo';
+    }
   }
 
   /**
@@ -183,13 +233,39 @@ export class VehicleShareService {
    */
   private getFileTypeFromUrl(url: string): string {
     if (!url) return 'unknown';
-    const extension = url.split('.').pop()?.toLowerCase() || '';
     
-    if (extension === 'pdf') return 'application/pdf';
-    if (['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(extension)) return 'image';
-    if (['doc', 'docx'].includes(extension)) return 'application/msword';
+    // Remover query string para pegar a extensão corretamente
+    const cleanUrl = url.split('?')[0];
+    const extension = cleanUrl.split('.').pop()?.toLowerCase() || '';
     
-    return 'unknown';
+    // Mapa de extensões para tipos MIME
+    const extensionTypeMap: Record<string, string> = {
+      // PDFs
+      'pdf': 'application/pdf',
+      // Imagens
+      'jpg': 'image',
+      'jpeg': 'image',
+      'png': 'image',
+      'gif': 'image',
+      'webp': 'image',
+      'bmp': 'image',
+      'svg': 'image',
+      // Documentos Word
+      'doc': 'application/msword',
+      'docx': 'application/msword',
+      // Planilhas Excel
+      'xls': 'application/vnd.ms-excel',
+      'xlsx': 'application/vnd.ms-excel',
+      'csv': 'application/vnd.ms-excel',
+      // Apresentações PowerPoint
+      'ppt': 'application/vnd.ms-powerpoint',
+      'pptx': 'application/vnd.ms-powerpoint',
+      // Arquivos de texto
+      'txt': 'text/plain',
+      'text': 'text/plain',
+    };
+    
+    return extensionTypeMap[extension] || 'unknown';
   }
 
   /**

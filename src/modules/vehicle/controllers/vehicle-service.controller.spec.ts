@@ -37,7 +37,7 @@ describe('VehicleServiceController', () => {
     description: 'Troca de oleo',
     serviceDate: new Date(),
     mileage: 50000,
-    cost: 150.0,
+    cost: 150,
     location: 'Oficina',
     status: 'PENDING' as any,
     createdAt: new Date(),
@@ -106,7 +106,7 @@ describe('VehicleServiceController', () => {
         description: 'Troca de oleo',
         serviceDate: new Date(),
         mileage: 50000,
-        cost: 150.0,
+        cost: 150,
         location: 'Oficina',
       };
 
@@ -131,7 +131,7 @@ describe('VehicleServiceController', () => {
         description: 'Troca de oleo',
         serviceDate: new Date(),
         mileage: 50000,
-        cost: 150.0,
+        cost: 150,
         location: 'Oficina',
       };
 
@@ -153,7 +153,7 @@ describe('VehicleServiceController', () => {
         description: 'Troca de oleo',
         serviceDate: new Date(),
         mileage: 50000,
-        cost: 150.0,
+        cost: 150,
         location: 'Oficina',
       };
 
@@ -292,7 +292,7 @@ describe('VehicleServiceController', () => {
 
   describe('getTotalCostByVehicle', () => {
     it('should return total cost by vehicle', async () => {
-      const totalCost = 500.0;
+      const totalCost = 500;
       vehicleServiceService.getTotalCostByVehicle.mockResolvedValue(totalCost);
 
       const result = await controller.getTotalCostByVehicle('vehicle-123');

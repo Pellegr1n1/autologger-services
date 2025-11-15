@@ -7,6 +7,7 @@ import { VehicleStatus } from '../enums/vehicle-status.enum';
 
 describe('VehicleFactory', () => {
   let factory: VehicleFactory;
+  let mockStorage: any;
 
   const mockVehicle: Vehicle = {
     id: 'vehicle-123',
@@ -26,8 +27,21 @@ describe('VehicleFactory', () => {
   };
 
   beforeEach(async () => {
+    mockStorage = {
+      upload: jest.fn(),
+      delete: jest.fn(),
+      isConfigured: jest.fn().mockReturnValue(true),
+      getAccessibleUrl: jest.fn().mockImplementation((url: string) => Promise.resolve(url)),
+    };
+
     const module: TestingModule = await Test.createTestingModule({
-      providers: [VehicleFactory],
+      providers: [
+        VehicleFactory,
+        {
+          provide: 'STORAGE',
+          useValue: mockStorage,
+        },
+      ],
     }).compile();
 
     factory = module.get<VehicleFactory>(VehicleFactory);
@@ -38,8 +52,8 @@ describe('VehicleFactory', () => {
   });
 
   describe('toResponseDto', () => {
-    it('should convert vehicle to response dto', () => {
-      const result = factory.toResponseDto(mockVehicle);
+    it('should convert vehicle to response dto', async () => {
+      const result = await factory.toResponseDto(mockVehicle);
 
       expect(result).toBeInstanceOf(VehicleResponseDto);
       expect(result.id).toBe(mockVehicle.id);
@@ -92,9 +106,9 @@ describe('VehicleFactory', () => {
   });
 
   describe('toResponseDtoArray', () => {
-    it('should convert array of vehicles to response dto array', () => {
+    it('should convert array of vehicles to response dto array', async () => {
       const vehicles = [mockVehicle, { ...mockVehicle, id: 'vehicle-456' }];
-      const result = factory.toResponseDtoArray(vehicles);
+      const result = await factory.toResponseDtoArray(vehicles);
 
       expect(result).toHaveLength(2);
       expect(result[0]).toBeInstanceOf(VehicleResponseDto);

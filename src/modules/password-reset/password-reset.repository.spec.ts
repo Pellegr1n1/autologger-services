@@ -1,43 +1,23 @@
-import { Test, TestingModule } from '@nestjs/testing';
-import { getRepositoryToken } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
+import { getRepositoryToken } from '@nestjs/typeorm';
 import { PasswordResetRepository } from './password-reset.repository';
 import { PasswordResetToken } from './entities/password-reset-token.entity';
+import { TokenRepositoryTestHelper } from '../../common/test-helpers/token-repository.test-helper';
 
 describe('PasswordResetRepository', () => {
   let repository: PasswordResetRepository;
   let tokenRepository: jest.Mocked<Repository<PasswordResetToken>>;
 
-  const mockToken: PasswordResetToken = {
-    id: 'token-123',
-    token: 'reset-token',
-    userId: 'user-123',
-    expiresAt: new Date(Date.now() + 60 * 60 * 1000),
-    used: false,
-    user: null,
-    createdAt: new Date(),
-  };
+  const mockToken = TokenRepositoryTestHelper.createMockToken<PasswordResetToken>('reset-token');
 
   beforeEach(async () => {
-    const mockRepository = {
-      create: jest.fn(),
-      save: jest.fn(),
-      findOne: jest.fn(),
-      update: jest.fn(),
-    };
-
-    const module: TestingModule = await Test.createTestingModule({
-      providers: [
-        PasswordResetRepository,
-        {
-          provide: getRepositoryToken(PasswordResetToken),
-          useValue: mockRepository,
-        },
-      ],
-    }).compile();
+    const { module, mockRepository } = await TokenRepositoryTestHelper.createTestingModule(
+      PasswordResetRepository,
+      PasswordResetToken
+    );
 
     repository = module.get<PasswordResetRepository>(PasswordResetRepository);
-    tokenRepository = module.get(getRepositoryToken(PasswordResetToken));
+    tokenRepository = mockRepository;
   });
 
   it('should be defined', () => {

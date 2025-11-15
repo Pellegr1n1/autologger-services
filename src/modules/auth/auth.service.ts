@@ -62,7 +62,7 @@ export class AuthService {
   async login(authLoginDto: AuthLoginDto): Promise<AuthResponseDto> {
     const user = await this.userService.findByEmail(authLoginDto.email);
     
-    if (!user || !user.isActive) {
+    if (!user?.isActive) {
       throw new UnauthorizedException('Credenciais inválidas');
     }
 
@@ -189,7 +189,7 @@ export class AuthService {
     }
 
     const user = await this.userRepository.findById(userId);
-    if (!user || !user.isActive) {
+    if (!user?.isActive) {
       throw new UnauthorizedException('Usuário não encontrado');
     }
 

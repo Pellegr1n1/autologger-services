@@ -796,7 +796,7 @@ describe('BlockchainService', () => {
       });
       besuService.verifyHashInContract.mockResolvedValue(false);
 
-      const result = await service.getAllServices('user-123');
+      await service.getAllServices('user-123');
 
       expect(mockQueryBuilder.andWhere).toHaveBeenCalledWith(
         'vehicle.userId = :userId',

@@ -122,7 +122,7 @@ describe('VehicleService', () => {
       businessRules.validateUniquePlate.mockResolvedValue(undefined);
       fileUploadService.uploadPhoto.mockResolvedValue(null);
       repository.create.mockResolvedValue(mockVehicle as any);
-      vehicleFactory.toResponseDto.mockReturnValue(mockResponseDto);
+      vehicleFactory.toResponseDto.mockResolvedValue(mockResponseDto);
 
       const result = await service.createVehicle(
         createVehicleDto,
@@ -154,7 +154,7 @@ describe('VehicleService', () => {
       businessRules.validateUniquePlate.mockResolvedValue(undefined);
       fileUploadService.uploadPhoto.mockResolvedValue('photo-url');
       repository.create.mockResolvedValue(mockVehicle as any);
-      vehicleFactory.toResponseDto.mockReturnValue(mockResponseDto);
+      vehicleFactory.toResponseDto.mockResolvedValue(mockResponseDto);
 
       await service.createVehicle(createVehicleDto, 'user-123');
 
@@ -171,7 +171,7 @@ describe('VehicleService', () => {
 
       repository.findActiveByUserId.mockResolvedValue(activeVehicles as any);
       repository.findSoldByUserId.mockResolvedValue(soldVehicles as any);
-      vehicleFactory.toResponseDto.mockReturnValue(mockResponseDto);
+      vehicleFactory.toResponseDto.mockResolvedValue(mockResponseDto);
 
       const result = await service.findUserVehicles('user-123');
 
@@ -185,7 +185,7 @@ describe('VehicleService', () => {
   describe('findVehicleById', () => {
     it('should return vehicle when found', async () => {
       repository.findByIdAndUserId.mockResolvedValue(mockVehicle as any);
-      vehicleFactory.toResponseDto.mockReturnValue(mockResponseDto);
+      vehicleFactory.toResponseDto.mockResolvedValue(mockResponseDto);
 
       const result = await service.findVehicleById('vehicle-123', 'user-123');
 
@@ -253,7 +253,7 @@ describe('VehicleService', () => {
       fileUploadService.deletePhoto.mockResolvedValue(undefined);
       fileUploadService.uploadPhoto.mockResolvedValue('new-photo-url');
       repository.update.mockResolvedValue(mockVehicle as any);
-      vehicleFactory.toResponseDto.mockReturnValue(mockResponseDto);
+      vehicleFactory.toResponseDto.mockResolvedValue(mockResponseDto);
 
       await service.updateVehicle('vehicle-123', updateVehicleDto, 'user-123');
 
