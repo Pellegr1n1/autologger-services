@@ -2,9 +2,11 @@ FROM node:20-alpine AS builder
 
 WORKDIR /app
 
-COPY package*.json ./
+COPY package*.json .npmrc ./
 
-RUN npm ci --omit=optional --ignore-scripts && npm cache clean --force
+# Install dependencies (including dev dependencies for build)
+# .npmrc ensures optional dependencies like fsevents are not installed
+RUN npm ci --ignore-scripts && npm cache clean --force
 
 COPY . .
 
@@ -16,9 +18,11 @@ WORKDIR /app
 
 RUN apk add --no-cache dumb-init
 
-COPY package*.json ./
+COPY package*.json .npmrc ./
 
-RUN npm ci --omit=dev --omit=optional --ignore-scripts && npm cache clean --force
+# Install only production dependencies
+# .npmrc ensures optional dependencies like fsevents are not installed
+RUN npm ci --omit=dev --ignore-scripts && npm cache clean --force
 
 COPY --from=builder /app/dist ./dist
 
