@@ -65,6 +65,37 @@ jobs:
         id: login-ecr
         uses: aws-actions/amazon-ecr-login@v2
 
+      - name: Create ECR repositories if they don't exist
+        run: |
+          BACKEND_REPO="autologger-${{ steps.set-env.outputs.environment }}-backend"
+          FRONTEND_REPO="autologger-${{ steps.set-env.outputs.environment }}-frontend"
+          
+          # Check if backend repository exists
+          if ! aws ecr describe-repositories --repository-names $BACKEND_REPO --region ${{ env.AWS_REGION }} 2>/dev/null; then
+            echo "Creating ECR repository: $BACKEND_REPO"
+            aws ecr create-repository \
+              --repository-name $BACKEND_REPO \
+              --region ${{ env.AWS_REGION }} \
+              --image-scanning-configuration scanOnPush=true \
+              --encryption-configuration encryptionType=AES256 \
+              --image-tag-mutability MUTABLE
+          else
+            echo "ECR repository $BACKEND_REPO already exists"
+          fi
+          
+          # Check if frontend repository exists
+          if ! aws ecr describe-repositories --repository-names $FRONTEND_REPO --region ${{ env.AWS_REGION }} 2>/dev/null; then
+            echo "Creating ECR repository: $FRONTEND_REPO"
+            aws ecr create-repository \
+              --repository-name $FRONTEND_REPO \
+              --region ${{ env.AWS_REGION }} \
+              --image-scanning-configuration scanOnPush=true \
+              --encryption-configuration encryptionType=AES256 \
+              --image-tag-mutability MUTABLE
+          else
+            echo "ECR repository $FRONTEND_REPO already exists"
+          fi
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
