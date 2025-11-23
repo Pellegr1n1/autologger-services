@@ -4,22 +4,34 @@ const LokiTransport = require('winston-loki');
 
 const { combine, timestamp, printf, colorize, errors } = winston.format;
 
-// Formato customizado para logs legíveis
 const customFormat = printf(
   ({ level, message, timestamp, context, trace, ...metadata }) => {
     const contextStr = typeof context === 'string' ? context : 'Application';
-    const timestampStr = typeof timestamp === 'string' ? timestamp : String(timestamp);
-    const messageStr = typeof message === 'string' ? message : String(message);
+    const timestampStr =
+      typeof timestamp === 'string'
+        ? timestamp
+        : typeof timestamp === 'object' && timestamp !== null
+          ? JSON.stringify(timestamp)
+          : String(timestamp);
+    const messageStr =
+      typeof message === 'string'
+        ? message
+        : typeof message === 'object' && message !== null
+          ? JSON.stringify(message)
+          : String(message);
     let log = `${timestampStr} [${contextStr}] ${level}: ${messageStr}`;
 
-    // Adiciona metadata se existir
     if (Object.keys(metadata).length > 0) {
       log += ` ${JSON.stringify(metadata)}`;
     }
 
-    // Adiciona stack trace se for erro
     if (trace) {
-      const traceStr = typeof trace === 'string' ? trace : String(trace);
+      const traceStr =
+        typeof trace === 'string'
+          ? trace
+          : typeof trace === 'object' && trace !== null
+            ? JSON.stringify(trace)
+            : String(trace);
       log += `\n${traceStr}`;
     }
 
@@ -27,13 +39,11 @@ const customFormat = printf(
   },
 );
 
-// Formato JSON para Loki
 const jsonFormat = winston.format.json();
 
 export const createWinstonLogger = () => {
   const transports: winston.transport[] = [];
 
-  // Transport para console (sempre ativo)
   transports.push(
     new winston.transports.Console({
       format: combine(
@@ -45,7 +55,6 @@ export const createWinstonLogger = () => {
     }),
   );
 
-  // Transport para arquivo local
   if (process.env.LOG_TO_FILE === 'true') {
     transports.push(
       new winston.transports.File({
@@ -60,7 +69,6 @@ export const createWinstonLogger = () => {
     );
   }
 
-  // Transport para Loki (apenas se configurado)
   if (process.env.LOKI_HOST && process.env.LOKI_ENABLED === 'true') {
     transports.push(
       new LokiTransport({
@@ -86,7 +94,6 @@ export const createWinstonLogger = () => {
   return winston.createLogger({
     level: logLevel,
     transports,
-    // Evita exit on error
     exitOnError: false,
   });
 };
