@@ -4,21 +4,31 @@ const LokiTransport = require('winston-loki');
 
 const { combine, timestamp, printf, colorize, errors } = winston.format;
 
+/**
+ * Converte um valor para string de forma segura, evitando '[object Object]'
+ */
+function safeStringify(value: unknown): string {
+  if (typeof value === 'string') {
+    return value;
+  }
+  if (typeof value === 'object' && value !== null) {
+    return JSON.stringify(value);
+  }
+  return String(value);
+}
+
+/**
+ * Obtém o contexto do log ou retorna o padrão
+ */
+function getContext(context: unknown): string {
+  return typeof context === 'string' ? context : 'Application';
+}
+
 const customFormat = printf(
   ({ level, message, timestamp, context, trace, ...metadata }) => {
-    const contextStr = typeof context === 'string' ? context : 'Application';
-    const timestampStr =
-      typeof timestamp === 'string'
-        ? timestamp
-        : typeof timestamp === 'object' && timestamp !== null
-          ? JSON.stringify(timestamp)
-          : String(timestamp);
-    const messageStr =
-      typeof message === 'string'
-        ? message
-        : typeof message === 'object' && message !== null
-          ? JSON.stringify(message)
-          : String(message);
+    const contextStr = getContext(context);
+    const timestampStr = safeStringify(timestamp);
+    const messageStr = safeStringify(message);
     let log = `${timestampStr} [${contextStr}] ${level}: ${messageStr}`;
 
     if (Object.keys(metadata).length > 0) {
@@ -26,12 +36,7 @@ const customFormat = printf(
     }
 
     if (trace) {
-      const traceStr =
-        typeof trace === 'string'
-          ? trace
-          : typeof trace === 'object' && trace !== null
-            ? JSON.stringify(trace)
-            : String(trace);
+      const traceStr = safeStringify(trace);
       log += `\n${traceStr}`;
     }
 
