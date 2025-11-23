@@ -1,3 +1,8 @@
+# Local value for number of NAT gateways (limited to 3 to avoid EIP limit)
+locals {
+  nat_gateway_count = min(3, length(var.availability_zones))
+}
+
 # VPC
 resource "aws_vpc" "main" {
   cidr_block           = var.vpc_cidr
@@ -46,8 +51,10 @@ resource "aws_subnet" "private" {
 }
 
 # Elastic IPs for NAT Gateways
+# Limit to 3 NAT gateways to avoid EIP limit (free tier has 5 EIP limit)
+# Using first 3 availability zones
 resource "aws_eip" "nat" {
-  count  = length(var.availability_zones)
+  count  = local.nat_gateway_count
   domain = "vpc"
 
   tags = {
@@ -58,8 +65,9 @@ resource "aws_eip" "nat" {
 }
 
 # NAT Gateways
+# Limit to 3 NAT gateways to avoid EIP limit
 resource "aws_nat_gateway" "main" {
-  count         = length(var.availability_zones)
+  count         = local.nat_gateway_count
   allocation_id = aws_eip.nat[count.index].id
   subnet_id     = aws_subnet.public[count.index].id
 
@@ -92,13 +100,15 @@ resource "aws_route_table_association" "public" {
 }
 
 # Route Tables for Private Subnets
+# Use modulo to distribute subnets across available NAT gateways (max 3)
 resource "aws_route_table" "private" {
   count  = length(var.availability_zones)
   vpc_id = aws_vpc.main.id
 
   route {
     cidr_block     = "0.0.0.0/0"
-    nat_gateway_id = aws_nat_gateway.main[count.index].id
+    # Use modulo to cycle through available NAT gateways (max 3)
+    nat_gateway_id = aws_nat_gateway.main[count.index % local.nat_gateway_count].id
   }
 
   tags = {

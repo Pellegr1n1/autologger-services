@@ -210,6 +210,25 @@ jobs:
         working-directory: ./backend/infrastructure/aws/terraform
         run: terraform init
 
+      - name: Import existing ECR repositories if they exist
+        working-directory: ./backend/infrastructure/aws/terraform
+        run: |
+          ENVIRONMENT="${{ needs.build-and-push.outputs.environment }}"
+          BACKEND_REPO="autologger-${ENVIRONMENT}-backend"
+          FRONTEND_REPO="autologger-${ENVIRONMENT}-frontend"
+          
+          # Try to import backend repository if it exists
+          if aws ecr describe-repositories --repository-names $BACKEND_REPO --region ${{ env.AWS_REGION }} >/dev/null 2>&1; then
+            echo "Importing existing ECR repository: $BACKEND_REPO"
+            terraform import module.ecr.aws_ecr_repository.backend $BACKEND_REPO || echo "Repository already in state or import failed"
+          fi
+          
+          # Try to import frontend repository if it exists
+          if aws ecr describe-repositories --repository-names $FRONTEND_REPO --region ${{ env.AWS_REGION }} >/dev/null 2>&1; then
+            echo "Importing existing ECR repository: $FRONTEND_REPO"
+            terraform import module.ecr.aws_ecr_repository.frontend $FRONTEND_REPO || echo "Repository already in state or import failed"
+          fi
+
       - name: Terraform Plan
         working-directory: ./backend/infrastructure/aws/terraform
         run: |

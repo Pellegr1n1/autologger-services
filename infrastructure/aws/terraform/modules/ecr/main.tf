@@ -32,6 +32,10 @@ resource "aws_ecr_repository" "frontend" {
   tags = {
     Name = "${var.project_name}-${var.environment}-frontend"
   }
+
+  lifecycle {
+    ignore_changes = [name]
+  }
 }
 
 # ECR Lifecycle Policy for Backend
