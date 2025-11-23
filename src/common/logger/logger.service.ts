@@ -4,7 +4,7 @@ import { createWinstonLogger } from './logger.config';
 
 @Injectable()
 export class LoggerService implements NestLoggerService {
-  private logger: Logger;
+  private readonly logger: Logger;
   private context?: string;
 
   constructor() {

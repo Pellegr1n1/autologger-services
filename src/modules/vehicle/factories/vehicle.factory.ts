@@ -95,9 +95,9 @@ export class VehicleFactory {
     const cleanPlate = plate.toUpperCase().replace(/[^A-Z0-9]/g, '');
 
     if (cleanPlate.length === 7) {
-      if (/^[A-Z]{3}[0-9]{4}$/.test(cleanPlate)) {
-        return cleanPlate.replace(/^([A-Z]{3})([0-9]{4})$/, '$1-$2');
-      } else if (/^[A-Z]{3}[0-9][A-Z][0-9]{2}$/.test(cleanPlate)) {
+      if (/^[A-Z]{3}\d{4}$/.test(cleanPlate)) {
+        return cleanPlate.replace(/^([A-Z]{3})(\d{4})$/, '$1-$2');
+      } else if (/^[A-Z]{3}\d[A-Z]\d{2}$/.test(cleanPlate)) {
         return cleanPlate;
       }
     }
@@ -111,8 +111,8 @@ export class VehicleFactory {
   isValidPlate(plate: string): boolean {
     const cleanPlate = plate.toUpperCase().replace(/[^A-Z0-9]/g, '');
 
-    const oldFormat = /^[A-Z]{3}[0-9]{4}$/;
-    const mercosulFormat = /^[A-Z]{3}[0-9][A-Z][0-9]{2}$/;
+    const oldFormat = /^[A-Z]{3}\d{4}$/;
+    const mercosulFormat = /^[A-Z]{3}\d[A-Z]\d{2}$/;
 
     return oldFormat.test(cleanPlate) || mercosulFormat.test(cleanPlate);
   }

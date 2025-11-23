@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { ethers } from 'ethers';
 import { LoggerService } from '@/common/logger/logger.service';
@@ -8,7 +8,7 @@ import { LoggerService } from '@/common/logger/logger.service';
  * AutoLogger - Rede Privada Besu com IBFT 2.0
  */
 @Injectable()
-export class BesuService {
+export class BesuService implements OnModuleInit {
   private provider: ethers.JsonRpcProvider;
   private wallet: ethers.Wallet;
   private contract: ethers.Contract;
@@ -39,11 +39,19 @@ export class BesuService {
   ];
 
   constructor(
-    private configService: ConfigService,
+    private readonly configService: ConfigService,
     private readonly logger: LoggerService,
   ) {
     this.logger.setContext('BesuService');
-    this.initializeBesu().catch((error) => {
+  }
+
+  /**
+   * Inicializa o serviço Besu (deve ser chamado após a construção)
+   */
+  async onModuleInit(): Promise<void> {
+    try {
+      await this.initializeBesu();
+    } catch (error) {
       this.logger.error(
         'Erro na inicialização do Besu',
         error.stack,
@@ -52,7 +60,7 @@ export class BesuService {
           errorMessage: error.message,
         },
       );
-    });
+    }
   }
 
   /**

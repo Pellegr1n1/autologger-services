@@ -4,7 +4,6 @@ on:
   push:
     branches:
       - main
-      - develop
   workflow_dispatch:
     inputs:
       environment:
@@ -18,11 +17,10 @@ on:
 env:
   AWS_REGION: us-east-1
   ECR_REGISTRY: ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.us-east-1.amazonaws.com
-  BACKEND_REPO: ${{ github.repository }}  # autologger-service
-  FRONTEND_REPO: ${{ secrets.FRONTEND_REPO || 'seu-usuario/autologger-ui' }}  # Ajuste com seu repositório
+  BACKEND_REPO: ${{ github.repository }}
+  FRONTEND_REPO: ${{ secrets.FRONTEND_REPO || 'seu-usuario/autologger-ui' }}
 
 jobs:
-  # Build and push Docker images
   build-and-push:
     name: Build and Push Docker Images
     runs-on: ubuntu-latest
@@ -43,13 +41,11 @@ jobs:
             echo "environment=dev" >> $GITHUB_OUTPUT
           fi
 
-      # Checkout Backend (este repositório)
       - name: Checkout Backend
         uses: actions/checkout@v4
         with:
           path: backend
 
-      # Checkout Frontend (repositório separado)
       - name: Checkout Frontend
         uses: actions/checkout@v4
         with:
@@ -71,7 +67,6 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      # Build and push Backend
       - name: Build and push Backend image
         id: backend-image
         uses: docker/build-push-action@v5
@@ -84,7 +79,6 @@ jobs:
           cache-from: type=registry,ref=${{ env.ECR_REGISTRY }}/autologger-${{ steps.set-env.outputs.environment }}-backend:buildcache
           cache-to: type=registry,ref=${{ env.ECR_REGISTRY }}/autologger-${{ steps.set-env.outputs.environment }}-backend:buildcache,mode=max
 
-      # Build and push Frontend
       - name: Build and push Frontend image
         id: frontend-image
         uses: docker/build-push-action@v5
@@ -99,7 +93,6 @@ jobs:
           build-args: |
             VITE_API_URL=${{ secrets.API_URL }}
 
-  # Run tests
   test:
     name: Run Tests
     runs-on: ubuntu-latest
@@ -124,7 +117,6 @@ jobs:
           node-version: '20'
           cache: 'npm'
 
-      # Test Backend
       - name: Install Backend dependencies
         working-directory: ./backend
         run: npm ci
@@ -133,7 +125,6 @@ jobs:
         working-directory: ./backend
         run: npm run test -- --coverage --watchAll=false
 
-      # Test Frontend
       - name: Install Frontend dependencies
         working-directory: ./frontend
         run: npm ci
@@ -142,7 +133,6 @@ jobs:
         working-directory: ./frontend
         run: npm run test -- --coverage --watchAll=false
 
-  # Deploy infrastructure with Terraform
   deploy-infrastructure:
     name: Deploy Infrastructure
     runs-on: ubuntu-latest
@@ -189,7 +179,6 @@ jobs:
         working-directory: ./backend/infrastructure/aws/terraform
         run: terraform apply -auto-approve tfplan
 
-  # Update ECS services
   deploy-services:
     name: Deploy ECS Services
     runs-on: ubuntu-latest
@@ -244,7 +233,6 @@ jobs:
             --services $SERVICE_NAME_FRONTEND \
             --region ${{ env.AWS_REGION }}
 
-  # Run database migrations
   run-migrations:
     name: Run Database Migrations
     runs-on: ubuntu-latest

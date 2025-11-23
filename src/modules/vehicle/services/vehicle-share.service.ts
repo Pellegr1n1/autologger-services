@@ -254,8 +254,8 @@ export class VehicleShareService {
     try {
       // Extrair o caminho da URL (removendo protocolo s3:// ou http/https)
       const urlPath = url
-        .replace(/^s3:\/\/[^\/]+\//, '')
-        .replace(/^https?:\/\/[^\/]+\//, '');
+        .replace(/^s3:\/\/[^/]+\//, '')
+        .replace(/^https?:\/\/[^/]+\//, '');
 
       // Pegar a última parte do caminho (nome do arquivo)
       const fileName = urlPath.split('/').pop() || 'Arquivo';

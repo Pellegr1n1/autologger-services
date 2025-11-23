@@ -7,7 +7,10 @@ const { combine, timestamp, printf, colorize, errors } = winston.format;
 // Formato customizado para logs legíveis
 const customFormat = printf(
   ({ level, message, timestamp, context, trace, ...metadata }) => {
-    let log = `${timestamp} [${context || 'Application'}] ${level}: ${message}`;
+    const contextStr = typeof context === 'string' ? context : 'Application';
+    const timestampStr = typeof timestamp === 'string' ? timestamp : String(timestamp);
+    const messageStr = typeof message === 'string' ? message : String(message);
+    let log = `${timestampStr} [${contextStr}] ${level}: ${messageStr}`;
 
     // Adiciona metadata se existir
     if (Object.keys(metadata).length > 0) {
@@ -16,7 +19,8 @@ const customFormat = printf(
 
     // Adiciona stack trace se for erro
     if (trace) {
-      log += `\n${trace}`;
+      const traceStr = typeof trace === 'string' ? trace : String(trace);
+      log += `\n${traceStr}`;
     }
 
     return log;

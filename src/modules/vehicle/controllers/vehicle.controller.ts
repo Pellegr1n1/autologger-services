@@ -75,8 +75,8 @@ export class VehicleController {
   ): Promise<VehicleResponseDto> {
     const vehicleData = {
       ...createVehicleDto,
-      year: parseInt(createVehicleDto.year as any),
-      mileage: parseInt(createVehicleDto.mileage as any) || 0,
+      year: Number.parseInt(createVehicleDto.year as any, 10),
+      mileage: Number.parseInt(createVehicleDto.mileage as any, 10) || 0,
       photo,
     };
 
@@ -161,10 +161,10 @@ export class VehicleController {
     const vehicleData = {
       ...updateVehicleDto,
       year: updateVehicleDto.year
-        ? parseInt(updateVehicleDto.year as any)
+        ? Number.parseInt(updateVehicleDto.year as any, 10)
         : undefined,
       mileage: updateVehicleDto.mileage
-        ? parseInt(updateVehicleDto.mileage as any)
+        ? Number.parseInt(updateVehicleDto.mileage as any, 10)
         : undefined,
       photo,
     };
