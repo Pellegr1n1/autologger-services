@@ -147,7 +147,14 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '20'
-          cache: 'npm'
+
+      - name: Cache Backend node modules
+        uses: actions/cache@v4
+        with:
+          path: ./backend/node_modules
+          key: ${{ runner.os }}-node-backend-${{ hashFiles('**/backend/package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-node-backend-
 
       - name: Install Backend dependencies
         working-directory: ./backend
@@ -156,6 +163,14 @@ jobs:
       - name: Run Backend tests
         working-directory: ./backend
         run: npm run test -- --coverage --watchAll=false
+
+      - name: Cache Frontend node modules
+        uses: actions/cache@v4
+        with:
+          path: ./frontend/node_modules
+          key: ${{ runner.os }}-node-frontend-${{ hashFiles('**/frontend/package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-node-frontend-
 
       - name: Install Frontend dependencies
         working-directory: ./frontend
