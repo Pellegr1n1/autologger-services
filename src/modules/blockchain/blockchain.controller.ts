@@ -1,7 +1,20 @@
-import { Controller, Post, Get, Body, Param, UseGuards, Request } from '@nestjs/common';
-import { BlockchainService, ServiceSubmissionResult, BlockchainTransaction } from './blockchain.service';
+import {
+  Controller,
+  Post,
+  Get,
+  Body,
+  Param,
+  UseGuards,
+  Request,
+} from '@nestjs/common';
+import {
+  BlockchainService,
+  ServiceSubmissionResult,
+  BlockchainTransaction,
+} from './blockchain.service';
 import { BesuService } from './besu/besu.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { LoggerService } from '../../common/logger/logger.service';
 
 @Controller('blockchain')
 @UseGuards(JwtAuthGuard)
@@ -9,28 +22,38 @@ export class BlockchainController {
   constructor(
     private readonly blockchainService: BlockchainService,
     private readonly besuService: BesuService,
-  ) {}
+    private readonly logger: LoggerService,
+  ) {
+    this.logger.setContext('BlockchainController');
+  }
 
   @Post('services/submit')
-  async submitService(@Body() serviceData: {
-    serviceId: string;
-    vehicleId: string;
-    mileage: number;
-    cost: number;
-    description: string;
-    location?: string;
-    type?: string;
-  }): Promise<ServiceSubmissionResult> {
+  async submitService(
+    @Body()
+    serviceData: {
+      serviceId: string;
+      vehicleId: string;
+      mileage: number;
+      cost: number;
+      description: string;
+      location?: string;
+      type?: string;
+    },
+  ): Promise<ServiceSubmissionResult> {
     return this.blockchainService.submitServiceToBlockchain(serviceData);
   }
 
   @Post('services/:serviceId/confirm')
-  async confirmService(@Param('serviceId') serviceId: string): Promise<ServiceSubmissionResult> {
+  async confirmService(
+    @Param('serviceId') serviceId: string,
+  ): Promise<ServiceSubmissionResult> {
     return this.blockchainService.confirmService(serviceId);
   }
 
   @Post('services/:serviceId/resend')
-  async resendFailedService(@Param('serviceId') serviceId: string): Promise<ServiceSubmissionResult> {
+  async resendFailedService(
+    @Param('serviceId') serviceId: string,
+  ): Promise<ServiceSubmissionResult> {
     return this.blockchainService.resendFailedService(serviceId);
   }
 
@@ -45,7 +68,9 @@ export class BlockchainController {
   }
 
   @Get('services/:serviceId/status')
-  async getServiceStatus(@Param('serviceId') serviceId: string): Promise<BlockchainTransaction> {
+  async getServiceStatus(
+    @Param('serviceId') serviceId: string,
+  ): Promise<BlockchainTransaction> {
     return this.blockchainService.getServiceStatus(serviceId);
   }
 
@@ -92,12 +117,14 @@ export class BlockchainController {
 
   // Endpoints específicos para rede Besu
   @Post('besu/hash/register')
-  async registerHash(@Body() data: {
-    hash: string;
-    vehicleId: string;
-    eventType: string;
-  }) {
-    return this.besuService.registerHash(data.hash, data.vehicleId, data.eventType);
+  async registerHash(
+    @Body() data: { hash: string; vehicleId: string; eventType: string },
+  ) {
+    return this.besuService.registerHash(
+      data.hash,
+      data.vehicleId,
+      data.eventType,
+    );
   }
 
   @Get('besu/hash/verify/:hash')

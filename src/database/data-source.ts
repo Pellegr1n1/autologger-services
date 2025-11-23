@@ -13,15 +13,9 @@ export const AppDataSource = new DataSource({
   database: process.env.DB_NAME || 'autologger',
   synchronize: false, // Sempre false para usar migrations
   logging: process.env.NODE_ENV === 'development',
-  entities: [
-    'src/**/*.entity.ts'
-  ],
-  migrations: [
-    'src/database/migrations/*.ts'
-  ],
-  subscribers: [
-    'src/**/*.subscriber.ts'
-  ],
+  entities: ['src/**/*.entity.ts'],
+  migrations: ['src/database/migrations/*.ts'],
+  subscribers: ['src/**/*.subscriber.ts'],
   extra: {
     max: 20,
     idleTimeoutMillis: 30000,

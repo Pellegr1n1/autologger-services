@@ -11,8 +11,12 @@ services:
     environment:
       - DB_HOST=postgres
       - BLOCKCHAIN_RPC_URL=http://besu:8545
+      - LOKI_HOST=http://loki:3100
+      - LOKI_ENABLED=true
+      - LOG_TO_FILE=true
     depends_on:
       - postgres
+      - loki
     volumes:
       - ./src:/app/src
       - ./logs:/app/logs
@@ -71,9 +75,55 @@ services:
     profiles:
       - blockchain
 
+  # Serviços de Monitoramento e Observabilidade
+  loki:
+    image: grafana/loki:2.9.3
+    container_name: autologger-loki
+    ports:
+      - "3100:3100"
+    command: -config.file=/etc/loki/loki-config.yaml
+    volumes:
+      - ../monitoring/loki-config.yaml:/etc/loki/loki-config.yaml
+      - loki_data:/loki
+    networks:
+      - autologger-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:3100/ready || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  grafana:
+    image: grafana/grafana:10.2.3
+    container_name: autologger-grafana
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_USER=${GRAFANA_ADMIN_USER:-admin}
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD:-admin}
+      - GF_USERS_ALLOW_SIGN_UP=false
+      - GF_SERVER_ROOT_URL=http://localhost:3000
+      - GF_INSTALL_PLUGINS=
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ../../grafana/provisioning:/etc/grafana/provisioning
+    depends_on:
+      - loki
+    networks:
+      - autologger-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:3000/api/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
 volumes:
   postgres_data:
   besu_node1_data:
+  loki_data:
+  grafana_data:
 
 networks:
   autologger-network:

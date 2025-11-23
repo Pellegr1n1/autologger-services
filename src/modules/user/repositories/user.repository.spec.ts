@@ -72,7 +72,9 @@ describe('UserRepository', () => {
 
       const result = await repository.findByEmail('test@example.com');
 
-      expect(userRepository.findOne).toHaveBeenCalledWith({ where: { email: 'test@example.com' } });
+      expect(userRepository.findOne).toHaveBeenCalledWith({
+        where: { email: 'test@example.com' },
+      });
       expect(result).toEqual(mockUser);
     });
 
@@ -91,7 +93,9 @@ describe('UserRepository', () => {
 
       const result = await repository.findById('user-123');
 
-      expect(userRepository.findOne).toHaveBeenCalledWith({ where: { id: 'user-123' } });
+      expect(userRepository.findOne).toHaveBeenCalledWith({
+        where: { id: 'user-123' },
+      });
       expect(result).toEqual(mockUser);
     });
 
@@ -117,8 +121,13 @@ describe('UserRepository', () => {
 
       const result = await repository.update('user-123', updateData);
 
-      expect(userRepository.update).toHaveBeenCalledWith('user-123', updateData);
-      expect(userRepository.findOne).toHaveBeenCalledWith({ where: { id: 'user-123' } });
+      expect(userRepository.update).toHaveBeenCalledWith(
+        'user-123',
+        updateData,
+      );
+      expect(userRepository.findOne).toHaveBeenCalledWith({
+        where: { id: 'user-123' },
+      });
       expect(result).toEqual(updatedUser);
     });
 
@@ -140,7 +149,10 @@ describe('UserRepository', () => {
 
       await repository.update('user-123', updateData);
 
-      expect(userRepository.update).toHaveBeenCalledWith('user-123', filteredData);
+      expect(userRepository.update).toHaveBeenCalledWith(
+        'user-123',
+        filteredData,
+      );
     });
   });
 
@@ -150,7 +162,9 @@ describe('UserRepository', () => {
 
       await repository.softDelete('user-123');
 
-      expect(userRepository.update).toHaveBeenCalledWith('user-123', { isActive: false });
+      expect(userRepository.update).toHaveBeenCalledWith('user-123', {
+        isActive: false,
+      });
     });
   });
 
@@ -176,7 +190,9 @@ describe('UserRepository', () => {
 
       const result = await repository.findByGoogleId('google-123');
 
-      expect(userRepository.findOne).toHaveBeenCalledWith({ where: { googleId: 'google-123' } });
+      expect(userRepository.findOne).toHaveBeenCalledWith({
+        where: { googleId: 'google-123' },
+      });
       expect(result).toEqual(googleUser);
     });
 
@@ -238,4 +254,3 @@ describe('UserRepository', () => {
     });
   });
 });
-

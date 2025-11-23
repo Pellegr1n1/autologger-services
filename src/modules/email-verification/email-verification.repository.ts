@@ -13,4 +13,3 @@ export class EmailVerificationRepository extends BaseTokenRepository<EmailVerifi
     super(tokenRepository);
   }
 }
-

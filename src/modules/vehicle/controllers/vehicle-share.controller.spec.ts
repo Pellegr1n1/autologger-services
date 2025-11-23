@@ -66,7 +66,9 @@ describe('VehicleShareController', () => {
 
   describe('generateShareLink', () => {
     it('should generate share link successfully', async () => {
-      vehicleShareService.generateShareToken.mockResolvedValue(mockShareResponse as any);
+      vehicleShareService.generateShareToken.mockResolvedValue(
+        mockShareResponse as any,
+      );
 
       const result = await controller.generateShareLink(
         'vehicle-123',
@@ -85,9 +87,14 @@ describe('VehicleShareController', () => {
     });
 
     it('should generate share link with default expiration', async () => {
-      vehicleShareService.generateShareToken.mockResolvedValue(mockShareResponse as any);
+      vehicleShareService.generateShareToken.mockResolvedValue(
+        mockShareResponse as any,
+      );
 
-      const result = await controller.generateShareLink('vehicle-123', mockUser);
+      const result = await controller.generateShareLink(
+        'vehicle-123',
+        mockUser,
+      );
 
       expect(vehicleShareService.generateShareToken).toHaveBeenCalledWith(
         'vehicle-123',
@@ -99,7 +106,9 @@ describe('VehicleShareController', () => {
     });
 
     it('should generate share link with includeAttachments true', async () => {
-      vehicleShareService.generateShareToken.mockResolvedValue(mockShareResponse as any);
+      vehicleShareService.generateShareToken.mockResolvedValue(
+        mockShareResponse as any,
+      );
 
       const result = await controller.generateShareLink(
         'vehicle-123',
@@ -120,11 +129,15 @@ describe('VehicleShareController', () => {
 
   describe('getPublicVehicleInfo', () => {
     it('should return public vehicle info successfully', async () => {
-      vehicleShareService.getPublicVehicleInfo.mockResolvedValue(mockPublicVehicleInfo as any);
+      vehicleShareService.getPublicVehicleInfo.mockResolvedValue(
+        mockPublicVehicleInfo as any,
+      );
 
       const result = await controller.getPublicVehicleInfo('token-123');
 
-      expect(vehicleShareService.getPublicVehicleInfo).toHaveBeenCalledWith('token-123');
+      expect(vehicleShareService.getPublicVehicleInfo).toHaveBeenCalledWith(
+        'token-123',
+      );
       expect(result).toEqual(mockPublicVehicleInfo);
     });
   });
@@ -154,13 +167,16 @@ describe('VehicleShareController', () => {
         },
       ];
 
-      vehicleShareService.getUserShareTokens.mockResolvedValue(shareLinks as any);
+      vehicleShareService.getUserShareTokens.mockResolvedValue(
+        shareLinks as any,
+      );
 
       const result = await controller.getMyShareLinks(mockUser);
 
-      expect(vehicleShareService.getUserShareTokens).toHaveBeenCalledWith(mockUser.id);
+      expect(vehicleShareService.getUserShareTokens).toHaveBeenCalledWith(
+        mockUser.id,
+      );
       expect(result).toEqual(shareLinks);
     });
   });
 });
-

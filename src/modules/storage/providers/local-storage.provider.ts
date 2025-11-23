@@ -17,16 +17,20 @@ export class LocalStorageProvider implements IStorage {
     this.baseUrl = `http://${host}:${port}/uploads`;
   }
 
-  async upload(fileBuffer: Buffer, fileName: string, folder: string): Promise<string> {
+  async upload(
+    fileBuffer: Buffer,
+    fileName: string,
+    folder: string,
+  ): Promise<string> {
     const uploadDir = path.join(this.basePath, folder);
-    
+
     // Criar diretório se não existir
     if (!fs.existsSync(uploadDir)) {
       fs.mkdirSync(uploadDir, { recursive: true });
     }
 
     const filePath = path.join(uploadDir, fileName);
-    
+
     // Salvar arquivo
     fs.writeFileSync(filePath, fileBuffer);
 
@@ -69,4 +73,3 @@ export class LocalStorageProvider implements IStorage {
     return fileUrl; // Local storage já retorna URLs prontas
   }
 }
-

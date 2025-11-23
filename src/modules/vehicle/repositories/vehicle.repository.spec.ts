@@ -129,7 +129,10 @@ describe('VehicleRepository', () => {
     it('should find vehicle by id and user id', async () => {
       vehicleRepository.findOne.mockResolvedValue(mockVehicle as any);
 
-      const result = await repository.findByIdAndUserId('vehicle-123', 'user-123');
+      const result = await repository.findByIdAndUserId(
+        'vehicle-123',
+        'user-123',
+      );
 
       expect(vehicleRepository.findOne).toHaveBeenCalledWith({
         where: { id: 'vehicle-123', userId: 'user-123' },
@@ -141,7 +144,10 @@ describe('VehicleRepository', () => {
     it('should return null when vehicle not found', async () => {
       vehicleRepository.findOne.mockResolvedValue(null);
 
-      const result = await repository.findByIdAndUserId('vehicle-123', 'user-999');
+      const result = await repository.findByIdAndUserId(
+        'vehicle-123',
+        'user-999',
+      );
 
       expect(result).toBeNull();
     });
@@ -179,7 +185,11 @@ describe('VehicleRepository', () => {
 
   describe('findSoldByUserId', () => {
     it('should find sold vehicles by user id', async () => {
-      const soldVehicle = { ...mockVehicle, status: VehicleStatus.SOLD, soldAt: new Date() };
+      const soldVehicle = {
+        ...mockVehicle,
+        status: VehicleStatus.SOLD,
+        soldAt: new Date(),
+      };
       const vehicles = [soldVehicle];
       vehicleRepository.find.mockResolvedValue(vehicles as any);
 
@@ -247,7 +257,10 @@ describe('VehicleRepository', () => {
 
       const result = await repository.update('vehicle-123', updateVehicleDto);
 
-      expect(vehicleRepository.update).toHaveBeenCalledWith('vehicle-123', updateVehicleDto);
+      expect(vehicleRepository.update).toHaveBeenCalledWith(
+        'vehicle-123',
+        updateVehicleDto,
+      );
       expect(vehicleRepository.findOne).toHaveBeenCalledWith({
         where: { id: 'vehicle-123' },
         relations: ['user'],
@@ -259,7 +272,11 @@ describe('VehicleRepository', () => {
   describe('markAsSold', () => {
     it('should mark vehicle as sold with provided date', async () => {
       const soldAt = new Date('2024-01-01');
-      const soldVehicle = { ...mockVehicle, status: VehicleStatus.SOLD, soldAt };
+      const soldVehicle = {
+        ...mockVehicle,
+        status: VehicleStatus.SOLD,
+        soldAt,
+      };
 
       vehicleRepository.update.mockResolvedValue(undefined as any);
       vehicleRepository.findOne.mockResolvedValue(soldVehicle as any);
@@ -274,7 +291,11 @@ describe('VehicleRepository', () => {
     });
 
     it('should mark vehicle as sold with current date when soldAt not provided', async () => {
-      const soldVehicle = { ...mockVehicle, status: VehicleStatus.SOLD, soldAt: new Date() };
+      const soldVehicle = {
+        ...mockVehicle,
+        status: VehicleStatus.SOLD,
+        soldAt: new Date(),
+      };
 
       vehicleRepository.update.mockResolvedValue(undefined as any);
       vehicleRepository.findOne.mockResolvedValue(soldVehicle as any);
@@ -313,4 +334,3 @@ describe('VehicleRepository', () => {
     });
   });
 });
-

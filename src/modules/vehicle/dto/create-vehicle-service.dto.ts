@@ -1,4 +1,12 @@
-import { IsString, IsNumber, IsDate, IsOptional, IsBoolean, IsArray, IsEnum } from 'class-validator';
+import {
+  IsString,
+  IsNumber,
+  IsDate,
+  IsOptional,
+  IsBoolean,
+  IsArray,
+  IsEnum,
+} from 'class-validator';
 import { Type } from 'class-transformer';
 import { ServiceType } from '../entities/vehicle-service.entity';
 

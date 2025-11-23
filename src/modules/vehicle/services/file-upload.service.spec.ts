@@ -3,13 +3,18 @@ import { ConfigService } from '@nestjs/config';
 import { Logger } from '@nestjs/common';
 import { FileUploadService } from './file-upload.service';
 import { IStorage } from '../../storage/interfaces/storage.interface';
+import { LoggerService } from '../../../common/logger/logger.service';
+import { LoggerServiceTestHelper } from '../../../common/test-helpers/logger-service.test-helper';
 
 describe('FileUploadService', () => {
   let service: FileUploadService;
   let mockStorage: jest.Mocked<IStorage>;
   let loggerErrorSpy: jest.SpyInstance;
 
-  const createMockFile = (originalname: string, buffer: string = 'test'): any => ({
+  const createMockFile = (
+    originalname: string,
+    buffer: string = 'test',
+  ): any => ({
     originalname,
     buffer: Buffer.from(buffer),
   });
@@ -27,6 +32,8 @@ describe('FileUploadService', () => {
       get: jest.fn(),
     };
 
+    const mockLoggerService = LoggerServiceTestHelper.createMockLoggerService();
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         FileUploadService,
@@ -38,11 +45,15 @@ describe('FileUploadService', () => {
           provide: 'STORAGE',
           useValue: mockStorage,
         },
+        {
+          provide: LoggerService,
+          useValue: mockLoggerService,
+        },
       ],
     }).compile();
 
     service = module.get<FileUploadService>(FileUploadService);
-    
+
     loggerErrorSpy = jest.spyOn(Logger.prototype, 'error').mockImplementation();
   });
 
@@ -68,7 +79,7 @@ describe('FileUploadService', () => {
       expect(mockStorage.upload).toHaveBeenCalledWith(
         mockFile.buffer,
         expect.stringMatching(/\.jpg$/),
-        'vehicles'
+        'vehicles',
       );
       expect(result).toBe(mockUploadResult);
     });
@@ -81,7 +92,7 @@ describe('FileUploadService', () => {
       expect(mockStorage.upload).toHaveBeenCalledWith(
         mockFile.buffer,
         expect.not.stringContaining('.'),
-        'vehicles'
+        'vehicles',
       );
     });
   });
@@ -106,16 +117,18 @@ describe('FileUploadService', () => {
 
       mockStorage.delete.mockRejectedValueOnce(error);
 
-      await service.deletePhoto(photoUrl);
+      await expect(service.deletePhoto(photoUrl)).rejects.toThrow(
+        'Delete error',
+      );
 
-      expect(loggerErrorSpy).toHaveBeenCalledWith('Erro ao deletar foto:', error);
+      expect(mockStorage.delete).toHaveBeenCalledWith(photoUrl);
     });
   });
 
   describe('getPhotoPath', () => {
     it('should return photo path', () => {
       const photoUrl = 'https://storage.example.com/photo.jpg';
-      
+
       const result = service.getPhotoPath(photoUrl);
 
       expect(result).toBe(photoUrl);
@@ -136,7 +149,7 @@ describe('FileUploadService', () => {
       expect(mockStorage.upload).toHaveBeenCalledWith(
         mockFile.buffer,
         expect.stringMatching(/\.pdf$/),
-        'attachments'
+        'attachments',
       );
       expect(result).toBe(mockUploadResult);
     });
@@ -187,9 +200,11 @@ describe('FileUploadService', () => {
 
       mockStorage.delete.mockRejectedValueOnce(error);
 
-      await service.deleteAttachment(attachmentUrl);
+      await expect(service.deleteAttachment(attachmentUrl)).rejects.toThrow(
+        'Delete error',
+      );
 
-      expect(loggerErrorSpy).toHaveBeenCalledWith('Erro ao deletar anexo:', error);
+      expect(mockStorage.delete).toHaveBeenCalledWith(attachmentUrl);
     });
   });
 });

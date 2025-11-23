@@ -16,4 +16,3 @@ import { UserModule } from '../user/user.module';
   exports: [EmailVerificationService, EmailVerificationRepository],
 })
 export class EmailVerificationModule {}
-

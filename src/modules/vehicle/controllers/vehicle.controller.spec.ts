@@ -91,9 +91,7 @@ describe('VehicleController', () => {
 
       const result = await controller.getUserVehicles(mockUser as any);
 
-      expect(vehicleService.findUserVehicles).toHaveBeenCalledWith(
-        mockUser.id,
-      );
+      expect(vehicleService.findUserVehicles).toHaveBeenCalledWith(mockUser.id);
       expect(result).toEqual(vehicles);
     });
   });
@@ -185,4 +183,3 @@ describe('VehicleController', () => {
     });
   });
 });
-

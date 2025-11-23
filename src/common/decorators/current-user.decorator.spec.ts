@@ -24,12 +24,15 @@ describe('CurrentUser', () => {
       updatedAt: new Date(),
     };
 
-    const testDecoratorLogic = (ctx: ExecutionContext) => {
+    const testDecoratorFactory = (
+      data: unknown,
+      ctx: ExecutionContext,
+    ): UserResponseDto => {
       const request = ctx.switchToHttp().getRequest();
       return request.user;
     };
 
-    it('should extract user from request', () => {
+    it('should extract user from request using decorator', () => {
       const mockExecutionContext: ExecutionContext = {
         switchToHttp: jest.fn().mockReturnValue({
           getRequest: jest.fn().mockReturnValue({
@@ -38,7 +41,7 @@ describe('CurrentUser', () => {
         }),
       } as any;
 
-      const result = testDecoratorLogic(mockExecutionContext);
+      const result = testDecoratorFactory(null, mockExecutionContext);
 
       expect(result).toEqual(mockUser);
     });
@@ -52,7 +55,7 @@ describe('CurrentUser', () => {
         }),
       } as any;
 
-      const result = testDecoratorLogic(mockExecutionContext);
+      const result = testDecoratorFactory(null, mockExecutionContext);
 
       expect(result).toBeUndefined();
     });
@@ -66,7 +69,7 @@ describe('CurrentUser', () => {
         }),
       } as any;
 
-      const result = testDecoratorLogic(mockExecutionContext);
+      const result = testDecoratorFactory(null, mockExecutionContext);
 
       expect(result).toBeNull();
     });
@@ -85,10 +88,31 @@ describe('CurrentUser', () => {
         }),
       } as any;
 
-      const result = testDecoratorLogic(mockExecutionContext);
+      const result = testDecoratorFactory(null, mockExecutionContext);
 
       expect(result).toEqual(mockUserWithGoogle);
-      expect((result as UserResponseDto).authProvider).toBe('google');
+      expect(result?.authProvider).toBe('google');
+    });
+
+    it('should ignore data parameter', () => {
+      const mockExecutionContext: ExecutionContext = {
+        switchToHttp: jest.fn().mockReturnValue({
+          getRequest: jest.fn().mockReturnValue({
+            user: mockUser,
+          }),
+        }),
+      } as any;
+
+      const result1 = testDecoratorFactory('someData', mockExecutionContext);
+      const result2 = testDecoratorFactory(
+        { key: 'value' },
+        mockExecutionContext,
+      );
+      const result3 = testDecoratorFactory(null, mockExecutionContext);
+
+      expect(result1).toEqual(mockUser);
+      expect(result2).toEqual(mockUser);
+      expect(result3).toEqual(mockUser);
     });
   });
 });

@@ -23,13 +23,15 @@ export class EncryptedTransformer implements ValueTransformer {
     if (value === null || value === undefined) {
       return null;
     }
-    
+
     try {
       return EncryptionUtil.decrypt(value);
     } catch (error) {
-      console.warn('Erro ao descriptografar campo. Retornando valor original:', error.message);
+      console.warn(
+        'Erro ao descriptografar campo. Retornando valor original:',
+        error.message,
+      );
       return value;
     }
   }
 }
-

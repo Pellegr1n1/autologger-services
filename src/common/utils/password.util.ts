@@ -12,27 +12,26 @@ export function isPasswordStrong(password: string): boolean {
   if (!password || password.length < 8) {
     return false;
   }
-  
+
   // Deve conter pelo menos uma letra minúscula
   if (!/[a-z]/.test(password)) {
     return false;
   }
-  
+
   // Deve conter pelo menos uma letra maiúscula
   if (!/[A-Z]/.test(password)) {
     return false;
   }
-  
+
   // Deve conter pelo menos um número
   if (!/\d/.test(password)) {
     return false;
   }
-  
+
   // Deve conter pelo menos um caractere especial
   if (!/[!@#$%^&*(),.?":{}|<>]/.test(password)) {
     return false;
   }
-  
+
   return true;
 }
-

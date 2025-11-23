@@ -1,7 +1,10 @@
 import { ApiResponse } from '../interfaces/api-response.interface';
 
 export class ResponseUtil {
-  static success<T>(data: T, message = 'Operação realizada com sucesso'): ApiResponse<T> {
+  static success<T>(
+    data: T,
+    message = 'Operação realizada com sucesso',
+  ): ApiResponse<T> {
     return {
       success: true,
       message,

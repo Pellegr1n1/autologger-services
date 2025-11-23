@@ -45,7 +45,7 @@ export abstract class BaseTokenRepository<T extends BaseTokenEntity> {
   async invalidateUserTokens(userId: string): Promise<void> {
     await this.tokenRepository.update(
       { userId, used: false } as any,
-      { used: true } as any
+      { used: true } as any,
     );
   }
 
@@ -62,4 +62,3 @@ export abstract class BaseTokenRepository<T extends BaseTokenEntity> {
       .execute();
   }
 }
-

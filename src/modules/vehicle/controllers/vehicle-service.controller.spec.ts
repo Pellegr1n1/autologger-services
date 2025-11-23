@@ -116,7 +116,9 @@ describe('VehicleServiceController', () => {
       });
       vehicleServiceService.create.mockResolvedValue(mockVehicleService as any);
 
-      const result = await controller.create(createDto, { user: mockUser } as any);
+      const result = await controller.create(createDto, {
+        user: mockUser,
+      } as any);
 
       expect(vehicleService.findUserVehicles).toHaveBeenCalledWith(mockUser.id);
       expect(vehicleServiceService.create).toHaveBeenCalledWith(createDto);
@@ -176,11 +178,15 @@ describe('VehicleServiceController', () => {
       ] as any[];
 
       const uploadedUrls = ['url1', 'url2'];
-      fileUploadService.uploadMultipleAttachments.mockResolvedValue(uploadedUrls);
+      fileUploadService.uploadMultipleAttachments.mockResolvedValue(
+        uploadedUrls,
+      );
 
       const result = await controller.uploadAttachments(files);
 
-      expect(fileUploadService.uploadMultipleAttachments).toHaveBeenCalledWith(files);
+      expect(fileUploadService.uploadMultipleAttachments).toHaveBeenCalledWith(
+        files,
+      );
       expect(result).toEqual({
         success: true,
         urls: uploadedUrls,
@@ -220,7 +226,9 @@ describe('VehicleServiceController', () => {
 
       const result = await controller.findByVehicleId('vehicle-123');
 
-      expect(vehicleServiceService.findByVehicleId).toHaveBeenCalledWith('vehicle-123');
+      expect(vehicleServiceService.findByVehicleId).toHaveBeenCalledWith(
+        'vehicle-123',
+      );
       expect(result).toEqual(services);
     });
   });
@@ -228,9 +236,13 @@ describe('VehicleServiceController', () => {
   describe('findByType', () => {
     it('should return services by type', async () => {
       const services = [mockVehicleService];
-      vehicleServiceService.getServicesByType.mockResolvedValue(services as any);
+      vehicleServiceService.getServicesByType.mockResolvedValue(
+        services as any,
+      );
 
-      const result = await controller.findByType('MANUTENCAO', { user: mockUser } as any);
+      const result = await controller.findByType('MANUTENCAO', {
+        user: mockUser,
+      } as any);
 
       expect(vehicleServiceService.getServicesByType).toHaveBeenCalledWith(
         'MANUTENCAO',
@@ -243,9 +255,13 @@ describe('VehicleServiceController', () => {
   describe('findByStatus', () => {
     it('should return services by status', async () => {
       const services = [mockVehicleService];
-      vehicleServiceService.getServicesByStatus.mockResolvedValue(services as any);
+      vehicleServiceService.getServicesByStatus.mockResolvedValue(
+        services as any,
+      );
 
-      const result = await controller.findByStatus('PENDING', { user: mockUser } as any);
+      const result = await controller.findByStatus('PENDING', {
+        user: mockUser,
+      } as any);
 
       expect(vehicleServiceService.getServicesByStatus).toHaveBeenCalledWith(
         'PENDING',
@@ -261,13 +277,13 @@ describe('VehicleServiceController', () => {
       const startDate = '2024-01-01';
       const endDate = '2024-12-31';
 
-      vehicleServiceService.getServicesByDateRange.mockResolvedValue(services as any);
-
-      const result = await controller.findByDateRange(
-        startDate,
-        endDate,
-        { user: mockUser } as any,
+      vehicleServiceService.getServicesByDateRange.mockResolvedValue(
+        services as any,
       );
+
+      const result = await controller.findByDateRange(startDate, endDate, {
+        user: mockUser,
+      } as any);
 
       expect(vehicleServiceService.getServicesByDateRange).toHaveBeenCalledWith(
         new Date(startDate),
@@ -281,11 +297,15 @@ describe('VehicleServiceController', () => {
   describe('findByMileageRange', () => {
     it('should return services by mileage range', async () => {
       const services = [mockVehicleService];
-      vehicleServiceService.getServicesByMileageRange.mockResolvedValue(services as any);
+      vehicleServiceService.getServicesByMileageRange.mockResolvedValue(
+        services as any,
+      );
 
       const result = await controller.findByMileageRange(0, 100000);
 
-      expect(vehicleServiceService.getServicesByMileageRange).toHaveBeenCalledWith(0, 100000);
+      expect(
+        vehicleServiceService.getServicesByMileageRange,
+      ).toHaveBeenCalledWith(0, 100000);
       expect(result).toEqual(services);
     });
   });
@@ -297,7 +317,9 @@ describe('VehicleServiceController', () => {
 
       const result = await controller.getTotalCostByVehicle('vehicle-123');
 
-      expect(vehicleServiceService.getTotalCostByVehicle).toHaveBeenCalledWith('vehicle-123');
+      expect(vehicleServiceService.getTotalCostByVehicle).toHaveBeenCalledWith(
+        'vehicle-123',
+      );
       expect(result).toBe(totalCost);
     });
   });
@@ -309,14 +331,18 @@ describe('VehicleServiceController', () => {
 
       const result = await controller.getServicesCountByVehicle('vehicle-123');
 
-      expect(vehicleServiceService.getServicesCountByVehicle).toHaveBeenCalledWith('vehicle-123');
+      expect(
+        vehicleServiceService.getServicesCountByVehicle,
+      ).toHaveBeenCalledWith('vehicle-123');
       expect(result).toEqual({ count });
     });
   });
 
   describe('findOne', () => {
     it('should return service by id', async () => {
-      vehicleServiceService.findOne.mockResolvedValue(mockVehicleService as any);
+      vehicleServiceService.findOne.mockResolvedValue(
+        mockVehicleService as any,
+      );
 
       const result = await controller.findOne('service-123');
 
@@ -331,12 +357,18 @@ describe('VehicleServiceController', () => {
         description: 'Nova descricao',
       };
 
-      const updatedService = { ...mockVehicleService, description: 'Nova descricao' };
+      const updatedService = {
+        ...mockVehicleService,
+        description: 'Nova descricao',
+      };
       vehicleServiceService.update.mockResolvedValue(updatedService as any);
 
       const result = await controller.update('service-123', updateDto);
 
-      expect(vehicleServiceService.update).toHaveBeenCalledWith('service-123', updateDto);
+      expect(vehicleServiceService.update).toHaveBeenCalledWith(
+        'service-123',
+        updateDto,
+      );
       expect(result).toEqual(updatedService);
     });
   });
@@ -358,10 +390,18 @@ describe('VehicleServiceController', () => {
         confirmedBy: 'blockchain',
       };
 
-      const updatedService = { ...mockVehicleService, blockchainHash: 'hash123' };
-      vehicleServiceService.updateBlockchainStatus.mockResolvedValue(updatedService as any);
+      const updatedService = {
+        ...mockVehicleService,
+        blockchainHash: 'hash123',
+      };
+      vehicleServiceService.updateBlockchainStatus.mockResolvedValue(
+        updatedService as any,
+      );
 
-      const result = await controller.updateBlockchainStatus('service-123', body);
+      const result = await controller.updateBlockchainStatus(
+        'service-123',
+        body,
+      );
 
       expect(vehicleServiceService.updateBlockchainStatus).toHaveBeenCalledWith(
         'service-123',
@@ -377,9 +417,14 @@ describe('VehicleServiceController', () => {
       };
 
       const updatedService = { ...mockVehicleService };
-      vehicleServiceService.updateBlockchainStatus.mockResolvedValue(updatedService as any);
+      vehicleServiceService.updateBlockchainStatus.mockResolvedValue(
+        updatedService as any,
+      );
 
-      const result = await controller.updateBlockchainStatus('service-123', body);
+      const result = await controller.updateBlockchainStatus(
+        'service-123',
+        body,
+      );
 
       expect(vehicleServiceService.updateBlockchainStatus).toHaveBeenCalledWith(
         'service-123',
@@ -390,4 +435,3 @@ describe('VehicleServiceController', () => {
     });
   });
 });
-

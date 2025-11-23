@@ -1,10 +1,22 @@
-import { Injectable, NotFoundException, UnauthorizedException, BadRequestException, Inject, Logger } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  UnauthorizedException,
+  BadRequestException,
+  Inject,
+  Logger,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { VehicleShare } from '../entities/vehicle-share.entity';
 import { VehicleService } from './vehicle.service';
 import { VehicleServiceService } from './vehicle-service.service';
-import { VehicleShareResponseDto, PublicVehicleInfoDto, PublicMaintenanceInfoDto, PublicAttachmentDto } from '../dto/vehicle-share-response.dto';
+import {
+  VehicleShareResponseDto,
+  PublicVehicleInfoDto,
+  PublicMaintenanceInfoDto,
+  PublicAttachmentDto,
+} from '../dto/vehicle-share-response.dto';
 import { ServiceType, ServiceStatus } from '../entities/vehicle-service.entity';
 import { VehicleStatus } from '../enums/vehicle-status.enum';
 import { IStorage } from '../../storage/interfaces/storage.interface';
@@ -25,13 +37,23 @@ export class VehicleShareService {
   /**
    * Gerar token de compartilhamento para um veículo
    */
-  async generateShareToken(vehicleId: string, userId: string, expiresInDays: number = 30, includeAttachments: boolean = false): Promise<VehicleShareResponseDto> {
+  async generateShareToken(
+    vehicleId: string,
+    userId: string,
+    expiresInDays: number = 30,
+    includeAttachments: boolean = false,
+  ): Promise<VehicleShareResponseDto> {
     // Verificar se o veículo pertence ao usuário
-    const vehicle = await this.vehicleService.findVehicleById(vehicleId, userId);
+    const vehicle = await this.vehicleService.findVehicleById(
+      vehicleId,
+      userId,
+    );
 
     // Verificar se o veículo foi vendido e bloquear geração de link
     if (vehicle.status === VehicleStatus.SOLD) {
-      throw new BadRequestException('Não é possível gerar link de compartilhamento para veículos vendidos');
+      throw new BadRequestException(
+        'Não é possível gerar link de compartilhamento para veículos vendidos',
+      );
     }
 
     // Gerar token único
@@ -66,14 +88,18 @@ export class VehicleShareService {
   /**
    * Buscar informações públicas do veículo pelo token
    */
-  async getPublicVehicleInfo(shareToken: string): Promise<PublicVehicleInfoDto> {
+  async getPublicVehicleInfo(
+    shareToken: string,
+  ): Promise<PublicVehicleInfoDto> {
     const vehicleShare = await this.vehicleShareRepository.findOne({
       where: { shareToken, isActive: true },
       relations: ['vehicle'],
     });
 
     if (!vehicleShare) {
-      throw new NotFoundException('Link de compartilhamento não encontrado ou expirado');
+      throw new NotFoundException(
+        'Link de compartilhamento não encontrado ou expirado',
+      );
     }
 
     if (vehicleShare.expiresAt && vehicleShare.expiresAt < new Date()) {
@@ -83,7 +109,9 @@ export class VehicleShareService {
     const vehicle = vehicleShare.vehicle;
 
     if (vehicle.status !== 'active') {
-      throw new UnauthorizedException('Este veículo foi vendido e não está mais disponível para visualização pública');
+      throw new UnauthorizedException(
+        'Este veículo foi vendido e não está mais disponível para visualização pública',
+      );
     }
 
     vehicleShare.viewCount += 1;
@@ -95,12 +123,15 @@ export class VehicleShareService {
     if (photoUrl && this.storage.getAccessibleUrl) {
       try {
         photoUrl = await this.storage.getAccessibleUrl(photoUrl);
-      } catch (_error) {
+      } catch {
         this.logger.error(`Erro ao gerar URL acessível para foto do veículo`);
       }
     }
 
-    const maintenanceHistory = await this.getPublicMaintenanceHistory(vehicle.id, vehicleShare.includeAttachments);
+    const maintenanceHistory = await this.getPublicMaintenanceHistory(
+      vehicle.id,
+      vehicleShare.includeAttachments,
+    );
 
     return {
       id: vehicle.id,
@@ -119,26 +150,34 @@ export class VehicleShareService {
   /**
    * Buscar histórico de serviços público (sem dados sensíveis)
    */
-  private async getPublicMaintenanceHistory(vehicleId: string, includeAttachments: boolean = false): Promise<PublicMaintenanceInfoDto[]> {
-    const services = await this.vehicleServiceService.findByVehicleId(vehicleId);
+  private async getPublicMaintenanceHistory(
+    vehicleId: string,
+    includeAttachments: boolean = false,
+  ): Promise<PublicMaintenanceInfoDto[]> {
+    const services =
+      await this.vehicleServiceService.findByVehicleId(vehicleId);
 
     // Processar serviços de forma assíncrona para converter URLs
     const processedServices = await Promise.all(
       services.map(async (service) => {
         // Converter anexos de string[] para PublicAttachmentDto[] apenas se includeAttachments for true
         let attachments: PublicAttachmentDto[] | undefined;
-        
-        if (includeAttachments && service.attachments && service.attachments.length > 0) {
+
+        if (
+          includeAttachments &&
+          service.attachments &&
+          service.attachments.length > 0
+        ) {
           // Converter URLs s3:// para URLs acessíveis (assinadas)
           attachments = await Promise.all(
             service.attachments.map(async (url, index) => {
               let accessibleUrl = url;
-              
+
               // Converter URL do storage para URL acessível
               if (url && this.storage.getAccessibleUrl) {
                 try {
                   accessibleUrl = await this.storage.getAccessibleUrl(url);
-                } catch (_error) {
+                } catch {
                   // Em caso de erro, manter URL original
                   this.logger.error(`Erro ao gerar URL acessível para anexo`);
                 }
@@ -149,9 +188,9 @@ export class VehicleShareService {
                 fileName: this.getFileNameFromUrl(url),
                 fileUrl: accessibleUrl, // URL acessível (assinada)
                 fileType: this.getFileTypeFromUrl(url),
-                fileSize: 0 // Não temos o tamanho salvo no banco
+                fileSize: 0, // Não temos o tamanho salvo no banco
               };
-            })
+            }),
           );
         }
 
@@ -172,7 +211,7 @@ export class VehicleShareService {
           createdAt: service.createdAt,
           attachments: attachments,
         };
-      })
+      }),
     );
 
     return processedServices;
@@ -211,19 +250,21 @@ export class VehicleShareService {
    */
   private getFileNameFromUrl(url: string): string {
     if (!url) return 'Arquivo';
-    
+
     try {
       // Extrair o caminho da URL (removendo protocolo s3:// ou http/https)
-      const urlPath = url.replace(/^s3:\/\/[^\/]+\//, '').replace(/^https?:\/\/[^\/]+\//, '');
-      
+      const urlPath = url
+        .replace(/^s3:\/\/[^\/]+\//, '')
+        .replace(/^https?:\/\/[^\/]+\//, '');
+
       // Pegar a última parte do caminho (nome do arquivo)
       const fileName = urlPath.split('/').pop() || 'Arquivo';
-      
+
       // Remover parâmetros de query string (ex: ?X-Amz-Algorithm=...)
       const cleanFileName = fileName.split('?')[0];
-      
+
       return cleanFileName || 'Arquivo';
-    } catch (_error) {
+    } catch {
       return 'Arquivo';
     }
   }
@@ -233,45 +274,48 @@ export class VehicleShareService {
    */
   private getFileTypeFromUrl(url: string): string {
     if (!url) return 'unknown';
-    
+
     // Remover query string para pegar a extensão corretamente
     const cleanUrl = url.split('?')[0];
     const extension = cleanUrl.split('.').pop()?.toLowerCase() || '';
-    
+
     // Mapa de extensões para tipos MIME
     const extensionTypeMap: Record<string, string> = {
       // PDFs
-      'pdf': 'application/pdf',
+      pdf: 'application/pdf',
       // Imagens
-      'jpg': 'image',
-      'jpeg': 'image',
-      'png': 'image',
-      'gif': 'image',
-      'webp': 'image',
-      'bmp': 'image',
-      'svg': 'image',
+      jpg: 'image',
+      jpeg: 'image',
+      png: 'image',
+      gif: 'image',
+      webp: 'image',
+      bmp: 'image',
+      svg: 'image',
       // Documentos Word
-      'doc': 'application/msword',
-      'docx': 'application/msword',
+      doc: 'application/msword',
+      docx: 'application/msword',
       // Planilhas Excel
-      'xls': 'application/vnd.ms-excel',
-      'xlsx': 'application/vnd.ms-excel',
-      'csv': 'application/vnd.ms-excel',
+      xls: 'application/vnd.ms-excel',
+      xlsx: 'application/vnd.ms-excel',
+      csv: 'application/vnd.ms-excel',
       // Apresentações PowerPoint
-      'ppt': 'application/vnd.ms-powerpoint',
-      'pptx': 'application/vnd.ms-powerpoint',
+      ppt: 'application/vnd.ms-powerpoint',
+      pptx: 'application/vnd.ms-powerpoint',
       // Arquivos de texto
-      'txt': 'text/plain',
-      'text': 'text/plain',
+      txt: 'text/plain',
+      text: 'text/plain',
     };
-    
+
     return extensionTypeMap[extension] || 'unknown';
   }
 
   /**
    * Desativar token de compartilhamento
    */
-  async deactivateShareToken(shareToken: string, userId: string): Promise<void> {
+  async deactivateShareToken(
+    shareToken: string,
+    userId: string,
+  ): Promise<void> {
     const vehicleShare = await this.vehicleShareRepository.findOne({
       where: { shareToken },
       relations: ['vehicle'],

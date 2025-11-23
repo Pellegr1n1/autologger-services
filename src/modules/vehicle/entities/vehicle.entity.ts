@@ -5,7 +5,7 @@ import {
   CreateDateColumn,
   UpdateDateColumn,
   ManyToOne,
-  JoinColumn
+  JoinColumn,
 } from 'typeorm';
 import { User } from '../../user/entities/user.entity';
 import { VehicleStatus } from '../enums/vehicle-status.enum';
@@ -20,11 +20,11 @@ export class Vehicle {
    * Placa do veículo (criptografada no banco de dados)
    * Usa criptografia determinística para permitir constraints UNIQUE e buscas
    */
-  @Column({ 
-    type: 'varchar', 
+  @Column({
+    type: 'varchar',
     length: 255, // Aumentado para acomodar texto criptografado em base64
     unique: true,
-    transformer: new EncryptedTransformer()
+    transformer: new EncryptedTransformer(),
   })
   plate: string;
 
@@ -49,7 +49,7 @@ export class Vehicle {
   @Column({
     type: 'enum',
     enum: VehicleStatus,
-    default: VehicleStatus.ACTIVE
+    default: VehicleStatus.ACTIVE,
   })
   status: VehicleStatus;
 
@@ -66,7 +66,7 @@ export class Vehicle {
   @Column({ type: 'uuid' })
   userId: string;
 
-  @ManyToOne(() => User, (user) => user.vehicles, { 
+  @ManyToOne(() => User, (user) => user.vehicles, {
     onDelete: 'CASCADE',
     eager: false,
   })

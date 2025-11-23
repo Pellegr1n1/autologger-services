@@ -33,14 +33,14 @@ export class EmailServiceTestHelper {
     mockTransporter: jest.Mocked<nodemailer.Transporter>,
     expectedTo: string,
     expectedSubject: string,
-    shouldContain: string[]
+    shouldContain: string[],
   ): void {
     expect(mockTransporter.sendMail).toHaveBeenCalled();
     const callArgs = mockTransporter.sendMail.mock.calls[0][0];
     expect(callArgs.to).toBe(expectedTo);
     expect(callArgs.subject).toBe(expectedSubject);
-    
-    shouldContain.forEach(content => {
+
+    shouldContain.forEach((content) => {
       expect(callArgs.html).toContain(content);
     });
   }
@@ -51,7 +51,7 @@ export class EmailServiceTestHelper {
   static async expectEmailError(
     mockTransporter: jest.Mocked<nodemailer.Transporter>,
     sendFunction: () => Promise<any>,
-    errorMessage: string = 'SMTP Error'
+    errorMessage: string = 'SMTP Error',
   ): Promise<void> {
     const error = new Error(errorMessage);
     mockTransporter.sendMail.mockRejectedValue(error);
@@ -59,4 +59,3 @@ export class EmailServiceTestHelper {
     await expect(sendFunction()).rejects.toThrow(errorMessage);
   }
 }
-

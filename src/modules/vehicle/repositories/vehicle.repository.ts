@@ -49,9 +49,9 @@ export class VehicleRepository {
 
   async findActiveByUserId(userId: string): Promise<Vehicle[]> {
     return this.vehicleRepository.find({
-      where: { 
-        userId, 
-        status: VehicleStatus.ACTIVE 
+      where: {
+        userId,
+        status: VehicleStatus.ACTIVE,
       },
       order: { createdAt: 'DESC' },
     });
@@ -59,9 +59,9 @@ export class VehicleRepository {
 
   async findSoldByUserId(userId: string): Promise<Vehicle[]> {
     return this.vehicleRepository.find({
-      where: { 
-        userId, 
-        status: VehicleStatus.SOLD 
+      where: {
+        userId,
+        status: VehicleStatus.SOLD,
       },
       order: { soldAt: 'DESC' },
     });
@@ -69,16 +69,16 @@ export class VehicleRepository {
 
   async countActiveByUserId(userId: string): Promise<number> {
     return this.vehicleRepository.count({
-      where: { 
-        userId, 
-        status: VehicleStatus.ACTIVE 
+      where: {
+        userId,
+        status: VehicleStatus.ACTIVE,
       },
     });
   }
 
   async existsByPlate(plate: string, excludeId?: string): Promise<boolean> {
     const whereCondition: FindOptionsWhere<Vehicle> = { plate };
-    
+
     if (excludeId) {
       whereCondition.id = { $ne: excludeId } as any;
     }
@@ -100,7 +100,7 @@ export class VehicleRepository {
 
   async markAsSold(id: string, soldAt?: Date): Promise<Vehicle> {
     const soldDate = soldAt || new Date();
-    
+
     await this.vehicleRepository.update(id, {
       status: VehicleStatus.SOLD,
       soldAt: soldDate,

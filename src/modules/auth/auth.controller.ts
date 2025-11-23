@@ -1,4 +1,17 @@
-import { Controller, Post, Body, HttpCode, HttpStatus, Get, Param, Req, UseGuards, Res, Put, UnauthorizedException } from '@nestjs/common';
+import {
+  Controller,
+  Post,
+  Body,
+  HttpCode,
+  HttpStatus,
+  Get,
+  Param,
+  Req,
+  UseGuards,
+  Res,
+  Put,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Response } from 'express';
 import { AuthService } from './auth.service';
@@ -11,6 +24,7 @@ import { PasswordResetService } from '../password-reset/password-reset.service';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { UserResponseDto } from '../user/dto/user-response.dto';
+import { LoggerService } from '../../common/logger/logger.service';
 
 @Controller('auth')
 export class AuthController {
@@ -19,12 +33,15 @@ export class AuthController {
     private readonly emailVerificationService: EmailVerificationService,
     private readonly passwordResetService: PasswordResetService,
     private readonly configService: ConfigService,
-  ) {}
+    private readonly logger: LoggerService,
+  ) {
+    this.logger.setContext('AuthController');
+  }
 
   private setTokenCookie(res: Response, token: string): void {
     const isProduction = process.env.NODE_ENV === 'production';
     const maxAge = 24 * 60 * 60 * 1000;
-    
+
     const cookieOptions: any = {
       httpOnly: true,
       secure: isProduction,
@@ -32,17 +49,20 @@ export class AuthController {
       maxAge,
       path: '/',
     };
-    
+
     if (!isProduction) {
       cookieOptions.domain = 'localhost';
     }
-    
+
     res.cookie('autologger_token', token, cookieOptions);
   }
 
   @Public()
   @Post('register')
-  async register(@Body() authRegisterDto: AuthRegisterDto, @Res() res: Response): Promise<void> {
+  async register(
+    @Body() authRegisterDto: AuthRegisterDto,
+    @Res() res: Response,
+  ): Promise<void> {
     const result = await this.authService.register(authRegisterDto);
     this.setTokenCookie(res, result.access_token);
     res.json({
@@ -53,7 +73,10 @@ export class AuthController {
   @Public()
   @HttpCode(HttpStatus.OK)
   @Post('login')
-  async login(@Body() authLoginDto: AuthLoginDto, @Res() res: Response): Promise<void> {
+  async login(
+    @Body() authLoginDto: AuthLoginDto,
+    @Res() res: Response,
+  ): Promise<void> {
     const result = await this.authService.login(authLoginDto);
     this.setTokenCookie(res, result.access_token);
     res.json({
@@ -71,7 +94,7 @@ export class AuthController {
     if (!userId) {
       throw new UnauthorizedException('Usuário não autenticado');
     }
-    
+
     await this.emailVerificationService.sendVerificationEmail(userId);
     return { message: 'Email de verificação enviado com sucesso' };
   }
@@ -81,7 +104,9 @@ export class AuthController {
    */
   @Public()
   @Post('verify-email/:token')
-  async verifyEmail(@Param('token') token: string): Promise<{ message: string }> {
+  async verifyEmail(
+    @Param('token') token: string,
+  ): Promise<{ message: string }> {
     await this.emailVerificationService.verifyEmail(token);
     return { message: 'Email verificado com sucesso' };
   }
@@ -93,11 +118,11 @@ export class AuthController {
   @Post('resend-verification')
   async resendVerificationEmail(@Req() request): Promise<{ message: string }> {
     const userId = request.user?.id;
-    
+
     if (!userId) {
       throw new UnauthorizedException('Usuário não autenticado');
     }
-    
+
     await this.emailVerificationService.resendVerificationEmail(userId);
     return { message: 'Email de verificação reenviado com sucesso' };
   }
@@ -107,13 +132,16 @@ export class AuthController {
    */
   @UseGuards(JwtAuthGuard)
   @Get('verification-status')
-  async checkVerificationStatus(@Req() request): Promise<{ isEmailVerified: boolean }> {
+  async checkVerificationStatus(
+    @Req() request,
+  ): Promise<{ isEmailVerified: boolean }> {
     const userId = request.user?.id;
     if (!userId) {
       return { isEmailVerified: false };
     }
-    
-    const isVerified = await this.emailVerificationService.checkVerificationStatus(userId);
+
+    const isVerified =
+      await this.emailVerificationService.checkVerificationStatus(userId);
     return { isEmailVerified: isVerified };
   }
 
@@ -122,9 +150,25 @@ export class AuthController {
    */
   @Public()
   @Post('forgot-password')
-  async forgotPassword(@Body('email') email: string): Promise<{ message: string }> {
+  async forgotPassword(
+    @Body('email') email: string,
+  ): Promise<{ message: string }> {
     await this.passwordResetService.requestPasswordReset(email);
-    return { message: 'Se o email estiver cadastrado, você receberá instruções' };
+    return {
+      message: 'Se o email estiver cadastrado, você receberá instruções',
+    };
+  }
+
+  /**
+   * Validar token de reset de senha
+   */
+  @Public()
+  @Get('validate-reset-token/:token')
+  async validateResetToken(
+    @Param('token') token: string,
+  ): Promise<{ valid: boolean }> {
+    const isValid = await this.passwordResetService.validateResetToken(token);
+    return { valid: isValid };
   }
 
   /**
@@ -132,8 +176,19 @@ export class AuthController {
    */
   @Public()
   @Post('reset-password')
-  async resetPassword(@Body() data: { token: string; newPassword: string; confirmPassword: string }): Promise<{ message: string }> {
-    await this.passwordResetService.resetPassword(data.token, data.newPassword, data.confirmPassword);
+  async resetPassword(
+    @Body()
+    data: {
+      token: string;
+      newPassword: string;
+      confirmPassword: string;
+    },
+  ): Promise<{ message: string }> {
+    await this.passwordResetService.resetPassword(
+      data.token,
+      data.newPassword,
+      data.confirmPassword,
+    );
     return { message: 'Senha alterada com sucesso' };
   }
 
@@ -162,13 +217,12 @@ export class AuthController {
       sameSite: 'lax',
       path: '/',
     };
-    
+
     if (!isProduction) {
       cookieOptions.domain = 'localhost';
     }
-    
+
     res.clearCookie('autologger_token', cookieOptions);
     res.json({ message: 'Logout realizado com sucesso' });
   }
-
 }

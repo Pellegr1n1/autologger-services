@@ -6,13 +6,15 @@ import { S3StorageProvider } from './providers/s3-storage.provider';
 const StorageProvider: Provider = {
   provide: 'STORAGE',
   useFactory: (configService: ConfigService) => {
-    const storageType = configService.get<string>('STORAGE_TYPE', 'local').toLowerCase();
+    const storageType = configService
+      .get<string>('STORAGE_TYPE', 'local')
+      .toLowerCase();
 
     if (storageType === 's3') {
       try {
         const provider = new S3StorageProvider(configService);
         return provider;
-      } catch (_error) {
+      } catch {
         return new LocalStorageProvider(configService);
       }
     }
@@ -28,4 +30,3 @@ const StorageProvider: Provider = {
   exports: ['STORAGE'],
 })
 export class StorageModule {}
-

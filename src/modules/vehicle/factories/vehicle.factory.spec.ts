@@ -31,7 +31,9 @@ describe('VehicleFactory', () => {
       upload: jest.fn(),
       delete: jest.fn(),
       isConfigured: jest.fn().mockReturnValue(true),
-      getAccessibleUrl: jest.fn().mockImplementation((url: string) => Promise.resolve(url)),
+      getAccessibleUrl: jest
+        .fn()
+        .mockImplementation((url: string) => Promise.resolve(url)),
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -269,4 +271,3 @@ describe('VehicleFactory', () => {
     });
   });
 });
-

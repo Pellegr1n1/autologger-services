@@ -1,6 +1,8 @@
 import { MigrationInterface, QueryRunner, Table } from 'typeorm';
 
-export class CreateVehicleShareTable1753020000000 implements MigrationInterface {
+export class CreateVehicleShareTable1753020000000
+  implements MigrationInterface
+{
   name = 'CreateVehicleShareTable1753020000000';
 
   public async up(queryRunner: QueryRunner): Promise<void> {
@@ -70,9 +72,15 @@ export class CreateVehicleShareTable1753020000000 implements MigrationInterface 
     );
 
     // Criar índices para performance
-    await queryRunner.query(`CREATE INDEX "IDX_vehicle_shares_share_token" ON "vehicle_shares" ("shareToken")`);
-    await queryRunner.query(`CREATE INDEX "IDX_vehicle_shares_vehicle_id" ON "vehicle_shares" ("vehicleId")`);
-    await queryRunner.query(`CREATE INDEX "IDX_vehicle_shares_is_active" ON "vehicle_shares" ("isActive")`);
+    await queryRunner.query(
+      `CREATE INDEX "IDX_vehicle_shares_share_token" ON "vehicle_shares" ("shareToken")`,
+    );
+    await queryRunner.query(
+      `CREATE INDEX "IDX_vehicle_shares_vehicle_id" ON "vehicle_shares" ("vehicleId")`,
+    );
+    await queryRunner.query(
+      `CREATE INDEX "IDX_vehicle_shares_is_active" ON "vehicle_shares" ("isActive")`,
+    );
   }
 
   public async down(queryRunner: QueryRunner): Promise<void> {

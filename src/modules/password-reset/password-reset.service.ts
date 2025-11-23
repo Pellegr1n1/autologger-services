@@ -1,4 +1,8 @@
-import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
+import {
+  Injectable,
+  BadRequestException,
+  NotFoundException,
+} from '@nestjs/common';
 import { PasswordResetRepository } from './password-reset.repository';
 import { EmailService } from '../email/email.service';
 import { UserService } from '../user/services/user.service';
@@ -16,13 +20,12 @@ export class PasswordResetService {
     private readonly userRepository: UserRepository,
   ) {}
 
-
   /**
    * Solicitar reset de senha
    */
   async requestPasswordReset(email: string): Promise<void> {
     const user = await this.userService.findByEmail(email);
-    
+
     if (!user) {
       return;
     }
@@ -44,13 +47,19 @@ export class PasswordResetService {
   /**
    * Resetar senha com token
    */
-  async resetPassword(token: string, newPassword: string, confirmPassword: string): Promise<void> {
+  async resetPassword(
+    token: string,
+    newPassword: string,
+    confirmPassword: string,
+  ): Promise<void> {
     if (newPassword !== confirmPassword) {
       throw new BadRequestException('As senhas não coincidem');
     }
 
     if (!isPasswordStrong(newPassword)) {
-      throw new BadRequestException('A senha não atende aos requisitos mínimos de segurança');
+      throw new BadRequestException(
+        'A senha não atende aos requisitos mínimos de segurança',
+      );
     }
 
     const resetToken = await this.tokenRepository.findByToken(token);
@@ -77,18 +86,16 @@ export class PasswordResetService {
     });
   }
 
-
   /**
    * Validar token de reset
    */
   async validateResetToken(token: string): Promise<boolean> {
     const resetToken = await this.tokenRepository.findByToken(token);
-    
+
     if (!resetToken) return false;
     if (resetToken.used) return false;
     if (resetToken.expiresAt < new Date()) return false;
-    
+
     return true;
   }
 }
-

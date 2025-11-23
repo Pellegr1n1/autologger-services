@@ -1,10 +1,14 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { APP_INTERCEPTOR } from '@nestjs/core';
 import { AuthModule } from './modules/auth/auth.module';
 import { UserModule } from './modules/user/user.module';
 import { VehicleModule } from './modules/vehicle/vehicle.module';
 import { BlockchainModule } from './modules/blockchain/blockchain.module';
+import { HealthModule } from './modules/health/health.module';
+import { LoggerModule } from './common/logger/logger.module';
+import { LoggingInterceptor } from './common/interceptors/logging.interceptor';
 
 @Module({
   imports: [
@@ -27,10 +31,18 @@ import { BlockchainModule } from './modules/blockchain/blockchain.module';
       }),
       inject: [ConfigService],
     }),
+    LoggerModule,
+    HealthModule,
     AuthModule,
     UserModule,
     VehicleModule,
-    BlockchainModule
+    BlockchainModule,
+  ],
+  providers: [
+    {
+      provide: APP_INTERCEPTOR,
+      useClass: LoggingInterceptor,
+    },
   ],
 })
 export class AppModule {}

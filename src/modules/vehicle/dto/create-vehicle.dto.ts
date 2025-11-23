@@ -1,4 +1,12 @@
-import { IsString, IsInt, IsOptional, Length, Min, Max, Matches } from 'class-validator';
+import {
+  IsString,
+  IsInt,
+  IsOptional,
+  Length,
+  Min,
+  Max,
+  Matches,
+} from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 
@@ -7,7 +15,7 @@ export class CreateVehicleDto {
   @IsString()
   @Length(7, 8)
   @Matches(/^[A-Z]{3}[0-9]{4}$|^[A-Z]{3}[0-9][A-Z][0-9]{2}$/, {
-    message: 'Placa deve estar no formato brasileiro (ABC1234 ou ABC1D23)'
+    message: 'Placa deve estar no formato brasileiro (ABC1234 ou ABC1D23)',
   })
   plate: string;
 
@@ -33,14 +41,23 @@ export class CreateVehicleDto {
   @Length(1, 30)
   color: string;
 
-  @ApiProperty({ description: 'Quilometragem atual', example: 50000, required: false })
+  @ApiProperty({
+    description: 'Quilometragem atual',
+    example: 50000,
+    required: false,
+  })
   @IsOptional()
   @IsInt()
   @Min(0)
   @Type(() => Number)
   mileage?: number;
 
-  @ApiProperty({ description: 'Foto do veículo', type: 'string', format: 'binary', required: false })
+  @ApiProperty({
+    description: 'Foto do veículo',
+    type: 'string',
+    format: 'binary',
+    required: false,
+  })
   @IsOptional()
   photo?: any;
 }

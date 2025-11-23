@@ -1,6 +1,7 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { ethers } from 'ethers';
+import { LoggerService } from '@/common/logger/logger.service';
 
 /**
  * Serviço para interação com a rede privada Besu
@@ -8,7 +9,6 @@ import { ethers } from 'ethers';
  */
 @Injectable()
 export class BesuService {
-  private readonly logger = new Logger(BesuService.name);
   private provider: ethers.JsonRpcProvider;
   private wallet: ethers.Wallet;
   private contract: ethers.Contract;
@@ -31,16 +31,27 @@ export class BesuService {
     'function admin() external view returns (address)',
     'function transferAdmin(address _newAdmin) external',
     'function withdraw(uint256 _amount) external',
-    
+
     // Eventos
     'event ServiceRegistered(uint256 indexed serviceId, string indexed vehicleId, address indexed serviceProvider, uint256 timestamp, uint256 cost)',
     'event ServiceVerified(uint256 indexed serviceId, address indexed verifier, uint256 timestamp)',
-    'event ServiceUpdated(uint256 indexed serviceId, string description, uint256 newCost)'
+    'event ServiceUpdated(uint256 indexed serviceId, string description, uint256 newCost)',
   ];
 
-  constructor(private configService: ConfigService) {
-    this.initializeBesu().catch(error => {
-      this.logger.error('Erro na inicialização do Besu:', error);
+  constructor(
+    private configService: ConfigService,
+    private readonly logger: LoggerService,
+  ) {
+    this.logger.setContext('BesuService');
+    this.initializeBesu().catch((error) => {
+      this.logger.error(
+        'Erro na inicialização do Besu',
+        error.stack,
+        'BesuService',
+        {
+          errorMessage: error.message,
+        },
+      );
     });
   }
 
@@ -48,41 +59,92 @@ export class BesuService {
    * Inicializa a conexão com a rede Besu
    */
   private async initializeBesu(): Promise<void> {
-    try {
-      const rpcUrl = this.configService.get<string>('BESU_RPC_URL', 'http://localhost:8545');
-      const privateKey = this.configService.get<string>('BESU_PRIVATE_KEY');
-      const contractAddress = this.configService.get<string>('BESU_CONTRACT_ADDRESS');
+    const startTime = Date.now();
 
-      this.logger.log(`Conectando à rede Besu: ${rpcUrl}`);
+    try {
+      const rpcUrl = this.configService.get<string>(
+        'BESU_RPC_URL',
+        'http://localhost:8545',
+      );
+      const privateKey = this.configService.get<string>('BESU_PRIVATE_KEY');
+      const contractAddress = this.configService.get<string>(
+        'BESU_CONTRACT_ADDRESS',
+      );
+
+      this.logger.log('Iniciando conexão com rede Besu', 'BesuService', {
+        rpcUrl,
+        hasPrivateKey: !!privateKey,
+        hasContractAddress: !!contractAddress,
+      });
 
       this.provider = new ethers.JsonRpcProvider(rpcUrl);
-      
+
       const network = await this.provider.getNetwork();
-      this.logger.log(`Rede conectada: Chain ID ${network.chainId}`);
+      this.logger.log('Conectado à rede Besu', 'BesuService', {
+        chainId: network.chainId.toString(),
+        rpcUrl,
+      });
 
       if (privateKey) {
         this.wallet = new ethers.Wallet(privateKey, this.provider);
-        this.logger.log(`Wallet inicializada: ${this.wallet.address}`);
+        this.logger.log('Wallet inicializada', 'BesuService', {
+          address: this.wallet.address,
+        });
       }
 
       if (contractAddress && this.wallet) {
-        this.contract = new ethers.Contract(contractAddress, this.contractABI, this.wallet);
-        this.logger.log(`Contrato inicializado: ${contractAddress}`);
-        
+        this.contract = new ethers.Contract(
+          contractAddress,
+          this.contractABI,
+          this.wallet,
+        );
+
         try {
           const totalServices = await this.contract.totalServices();
-          this.logger.log(`Contrato VehicleServiceTracker ativo - Total de serviços: ${totalServices}`);
+          const duration = Date.now() - startTime;
+
+          this.logger.log(
+            'Contrato VehicleServiceTracker ativo',
+            'BesuService',
+            {
+              contractAddress,
+              totalServices: totalServices.toString(),
+              duration: `${duration}ms`,
+            },
+          );
         } catch (error) {
-          this.logger.warn(`Contrato não encontrado ou não implantado: ${contractAddress}`);
-          this.logger.warn(`Erro: ${error.message}`);
+          this.logger.warn(
+            'Contrato não encontrado ou não implantado',
+            'BesuService',
+            {
+              contractAddress,
+              errorMessage: error.message,
+            },
+          );
         }
       } else {
-        this.logger.warn('Contrato não inicializado - endereço ou wallet não fornecidos');
+        this.logger.warn('Contrato não inicializado', 'BesuService', {
+          hasContractAddress: !!contractAddress,
+          hasWallet: !!this.wallet,
+        });
       }
 
-      this.logger.log('Serviço Besu inicializado com sucesso');
+      const totalDuration = Date.now() - startTime;
+      this.logger.log('Serviço Besu inicializado com sucesso', 'BesuService', {
+        duration: `${totalDuration}ms`,
+      });
     } catch (error) {
-      this.logger.error('Erro ao inicializar serviço Besu:', error.message);
+      const duration = Date.now() - startTime;
+
+      this.logger.error(
+        'Erro ao inicializar serviço Besu',
+        error.stack,
+        'BesuService',
+        {
+          errorMessage: error.message,
+          duration: `${duration}ms`,
+        },
+      );
       throw error;
     }
   }
@@ -98,34 +160,56 @@ export class BesuService {
     cost: number;
     description: string;
     serviceType: string;
-  }): Promise<{ success: boolean; transactionHash?: string; serviceId?: number; error?: string }> {
+  }): Promise<{
+    success: boolean;
+    transactionHash?: string;
+    serviceId?: number;
+    error?: string;
+  }> {
+    const startTime = Date.now();
+
     try {
       if (!this.contract) {
         throw new Error('Contrato não inicializado');
       }
 
-      this.logger.log(`Registrando serviço para veículo: ${serviceData.vehicleId}`);
+      this.logger.log(
+        'Iniciando registro de serviço na blockchain',
+        'BesuService',
+        {
+          vehicleId: serviceData.vehicleId,
+          serviceType: serviceData.serviceType,
+          mileage: serviceData.mileage,
+          cost: serviceData.cost,
+        },
+      );
 
       const tx = await this.contract.registerService(
         serviceData.vehicleId,
         serviceData.mileage,
         serviceData.cost,
         serviceData.description,
-        serviceData.serviceType
+        serviceData.serviceType,
       );
-      
-      this.logger.log(`Transação enviada: ${tx.hash} - aguardando confirmação...`);
-      
+
+      this.logger.debug('Transação enviada para a rede', 'BesuService', {
+        txHash: tx.hash,
+        vehicleId: serviceData.vehicleId,
+      });
+
       const waitPromise = tx.wait();
-      const timeoutPromise = new Promise<any>((_, reject) => 
-        setTimeout(() => reject(new Error('Timeout aguardando mineração (20s)')), 20000)
+      const timeoutPromise = new Promise<any>((_, reject) =>
+        setTimeout(
+          () => reject(new Error('Timeout aguardando mineração (20s)')),
+          20000,
+        ),
       );
-      
+
       try {
         const receipt = await Promise.race([waitPromise, timeoutPromise]);
-        this.logger.log(`Serviço confirmado no bloco ${receipt.blockNumber}`);
-        
-        const event = receipt.logs.find(log => {
+        const duration = Date.now() - startTime;
+
+        const event = receipt.logs.find((log) => {
           try {
             const parsed = this.contract.interface.parseLog(log);
             return parsed?.name === 'ServiceRegistered';
@@ -138,36 +222,111 @@ export class BesuService {
         if (event) {
           const parsed = this.contract.interface.parseLog(event);
           serviceId = Number(parsed?.args.serviceId);
-          this.logger.log(`Service ID extraído: ${serviceId}`);
         }
+
+        this.logger.logBlockchainTransaction(
+          'registerService',
+          tx.hash,
+          'success',
+          {
+            vehicleId: serviceData.vehicleId,
+            serviceId,
+            blockNumber: receipt.blockNumber,
+            gasUsed: receipt.gasUsed.toString(),
+            duration: `${duration}ms`,
+            serviceType: serviceData.serviceType,
+          },
+        );
 
         return {
           success: true,
           transactionHash: tx.hash,
-          serviceId
+          serviceId,
         };
       } catch (timeoutError) {
-        this.logger.error(`Timeout ao aguardar confirmação da transação ${tx.hash}`, timeoutError instanceof Error ? timeoutError.stack : String(timeoutError));
-        this.logger.warn(`Possível problema: Rede Besu está muito lenta ou não está minerando`);
-        this.logger.warn(`Transação pode estar pendente na mempool: ${tx.hash}`);
-        
-        tx.wait().then(receipt => {
-          this.logger.log(`Serviço confirmado TARDIAMENTE no bloco ${receipt.blockNumber} (após timeout)`);
-        }).catch(() => {
-          this.logger.error(`Transação ${tx.hash} NUNCA foi confirmada`);
-        });
-        
+        const duration = Date.now() - startTime;
+
+        this.logger.error(
+          'Timeout ao aguardar confirmação da transação',
+          timeoutError instanceof Error
+            ? timeoutError.stack
+            : String(timeoutError),
+          'BesuService',
+          {
+            txHash: tx.hash,
+            vehicleId: serviceData.vehicleId,
+            duration: `${duration}ms`,
+            timeout: '20s',
+          },
+        );
+
+        this.logger.logBlockchainTransaction(
+          'registerService',
+          tx.hash,
+          'timeout',
+          {
+            vehicleId: serviceData.vehicleId,
+            duration: `${duration}ms`,
+            error: 'Timeout aguardando mineração',
+          },
+        );
+
+        // Monitor assíncrono para confirmação tardia
+        tx.wait()
+          .then((receipt) => {
+            this.logger.logBlockchainTransaction(
+              'registerService',
+              tx.hash,
+              'late_success',
+              {
+                vehicleId: serviceData.vehicleId,
+                blockNumber: receipt.blockNumber,
+                note: 'Confirmada após timeout',
+              },
+            );
+          })
+          .catch(() => {
+            this.logger.logBlockchainTransaction(
+              'registerService',
+              tx.hash,
+              'failed',
+              {
+                vehicleId: serviceData.vehicleId,
+                error: 'Transação nunca foi confirmada',
+              },
+            );
+          });
+
         return {
           success: false,
-          error: 'Timeout aguardando confirmação da transação (20s). A rede pode estar lenta ou não está minerando.',
-          serviceId: undefined
+          error:
+            'Timeout aguardando confirmação da transação (20s). A rede pode estar lenta ou não está minerando.',
+          serviceId: undefined,
         };
       }
     } catch (error) {
-      this.logger.error('Erro ao registrar serviço:', error.message);
+      const duration = Date.now() - startTime;
+
+      this.logger.error(
+        'Erro ao registrar serviço na blockchain',
+        error.stack,
+        'BesuService',
+        {
+          vehicleId: serviceData.vehicleId,
+          errorMessage: error.message,
+          duration: `${duration}ms`,
+        },
+      );
+
+      this.logger.logBlockchainTransaction('registerService', null, 'failed', {
+        vehicleId: serviceData.vehicleId,
+        error: error.message,
+        duration: `${duration}ms`,
+      });
+
       return {
         success: false,
-        error: error.message
+        error: error.message,
       };
     }
   }
@@ -182,54 +341,127 @@ export class BesuService {
   async registerHash(
     hash: string,
     vehicleId: string,
-    _eventType: string
+    eventType: string,
   ): Promise<{ success: boolean; transactionHash?: string; error?: string }> {
+    const startTime = Date.now();
+
     try {
       if (!this.contract) {
         throw new Error('Contrato não inicializado');
       }
 
-      this.logger.log(`Registrando hash: ${hash} para veículo: ${vehicleId}`);
+      this.logger.log('Registrando hash na blockchain', 'BesuService', {
+        hash: hash.substring(0, 16) + '...',
+        vehicleId,
+        eventType,
+      });
 
-      // Registrar o hash no contrato
       const tx = await this.contract.registerHash(hash);
-      
-      this.logger.log(`Transação enviada: ${tx.hash} - aguardando confirmação...`);
-      
+
+      this.logger.debug('Transação de hash enviada', 'BesuService', {
+        txHash: tx.hash,
+        vehicleId,
+      });
+
       const waitPromise = tx.wait();
-      const timeoutPromise = new Promise<any>((_, reject) => 
-        setTimeout(() => reject(new Error('Timeout aguardando mineração (20s)')), 20000)
+      const timeoutPromise = new Promise<any>((_, reject) =>
+        setTimeout(
+          () => reject(new Error('Timeout aguardando mineração (20s)')),
+          20000,
+        ),
       );
-      
+
       try {
         const receipt = await Promise.race([waitPromise, timeoutPromise]);
-        this.logger.log(`Hash ${hash} confirmado no bloco ${receipt.blockNumber}`);
-        
+        const duration = Date.now() - startTime;
+
+        this.logger.logBlockchainTransaction(
+          'registerHash',
+          tx.hash,
+          'success',
+          {
+            vehicleId,
+            eventType,
+            blockNumber: receipt.blockNumber,
+            gasUsed: receipt.gasUsed.toString(),
+            duration: `${duration}ms`,
+          },
+        );
+
         return {
           success: true,
-          transactionHash: tx.hash
+          transactionHash: tx.hash,
         };
-      } catch (timeoutError) {
-        this.logger.error(`Timeout ao aguardar confirmação da transação ${tx.hash}`, timeoutError instanceof Error ? timeoutError.stack : String(timeoutError));
-        this.logger.warn(`Possível problema: Rede Besu está muito lenta ou não está minerando`);
-        this.logger.warn(`Transação pode estar pendente na mempool: ${tx.hash}`);
-        
-        tx.wait().then(receipt => {
-          this.logger.log(`Hash ${hash} confirmado TARDIAMENTE no bloco ${receipt.blockNumber} (após timeout)`);
-        }).catch(() => {
-          this.logger.error(`Transação ${tx.hash} NUNCA foi confirmada`);
+      } catch {
+        const duration = Date.now() - startTime;
+
+        this.logger.warn('Timeout ao aguardar confirmação', 'BesuService', {
+          txHash: tx.hash,
+          vehicleId,
+          duration: `${duration}ms`,
         });
-        
+
+        this.logger.logBlockchainTransaction(
+          'registerHash',
+          tx.hash,
+          'timeout',
+          {
+            vehicleId,
+            eventType,
+            duration: `${duration}ms`,
+          },
+        );
+
+        // Monitor assíncrono
+        tx.wait()
+          .then((receipt) => {
+            this.logger.logBlockchainTransaction(
+              'registerHash',
+              tx.hash,
+              'late_success',
+              {
+                vehicleId,
+                blockNumber: receipt.blockNumber,
+              },
+            );
+          })
+          .catch(() => {
+            this.logger.logBlockchainTransaction(
+              'registerHash',
+              tx.hash,
+              'failed',
+              {
+                vehicleId,
+                error: 'Nunca confirmada',
+              },
+            );
+          });
+
         return {
           success: false,
-          error: 'Timeout aguardando confirmação da transação (20s). A rede pode estar lenta ou não está minerando.'
+          error:
+            'Timeout aguardando confirmação da transação (20s). A rede pode estar lenta ou não está minerando.',
         };
       }
     } catch (error) {
-      this.logger.error('Erro ao registrar hash:', error.message);
+      const duration = Date.now() - startTime;
+
+      this.logger.error('Erro ao registrar hash', error.stack, 'BesuService', {
+        vehicleId,
+        eventType,
+        errorMessage: error.message,
+        duration: `${duration}ms`,
+      });
+
+      this.logger.logBlockchainTransaction('registerHash', null, 'failed', {
+        vehicleId,
+        eventType,
+        error: error.message,
+      });
+
       return {
         success: false,
-        error: error.message
+        error: error.message,
       };
     }
   }
@@ -258,9 +490,19 @@ export class BesuService {
         throw new Error('Contrato não inicializado');
       }
 
+      this.logger.debug('Verificando serviço na blockchain', 'BesuService', {
+        serviceId,
+      });
+
       const result = await this.contract.getService(serviceId);
 
       if (result && result.serviceId > 0) {
+        this.logger.debug('Serviço encontrado', 'BesuService', {
+          serviceId,
+          vehicleId: result.vehicleId,
+          isVerified: result.isVerified,
+        });
+
         return {
           exists: true,
           info: {
@@ -272,14 +514,23 @@ export class BesuService {
             serviceType: result.serviceType,
             timestamp: Number(result.timestamp),
             serviceProvider: result.serviceProvider,
-            isVerified: result.isVerified
-          }
+            isVerified: result.isVerified,
+          },
         };
       }
 
+      this.logger.debug('Serviço não encontrado', 'BesuService', { serviceId });
       return { exists: false };
     } catch (error) {
-      this.logger.error('Erro ao verificar serviço:', error.message);
+      this.logger.error(
+        'Erro ao verificar serviço',
+        error.stack,
+        'BesuService',
+        {
+          serviceId,
+          errorMessage: error.message,
+        },
+      );
       return { exists: false };
     }
   }
@@ -301,9 +552,11 @@ export class BesuService {
   }> {
     try {
       const exists = await this.verifyHashInContract(hash);
-      
+
       if (exists) {
-        this.logger.log(`Hash ${hash.substring(0, 10)}... encontrado na blockchain`);
+        this.logger.log(
+          `Hash ${hash.substring(0, 10)}... encontrado na blockchain`,
+        );
         return {
           exists: true,
           info: {
@@ -311,11 +564,13 @@ export class BesuService {
             timestamp: Date.now() / 1000,
             vehicleId: '',
             eventType: '',
-            verificationCount: 0
-          }
+            verificationCount: 0,
+          },
         };
       } else {
-        this.logger.log(`Hash ${hash.substring(0, 10)}... não encontrado na blockchain`);
+        this.logger.log(
+          `Hash ${hash.substring(0, 10)}... não encontrado na blockchain`,
+        );
         return { exists: false };
       }
     } catch (error) {
@@ -329,7 +584,9 @@ export class BesuService {
    * @param hash Hash a ser verificado
    * @returns Resultado da verificação
    */
-  async verifyAndCount(hash: string): Promise<{ success: boolean; transactionHash?: string; error?: string }> {
+  async verifyAndCount(
+    hash: string,
+  ): Promise<{ success: boolean; transactionHash?: string; error?: string }> {
     try {
       if (!this.contract) {
         throw new Error('Contrato não inicializado');
@@ -337,20 +594,20 @@ export class BesuService {
 
       const hashBytes32 = ethers.keccak256(ethers.toUtf8Bytes(hash));
       const tx = await this.contract.verifyAndCount(hashBytes32);
-      
+
       await tx.wait();
-      
+
       this.logger.log(`Verificação contabilizada: ${tx.hash}`);
 
       return {
         success: true,
-        transactionHash: tx.hash
+        transactionHash: tx.hash,
       };
     } catch (error) {
       this.logger.error('Erro ao verificar e contar:', error.message);
       return {
         success: false,
-        error: error.message
+        error: error.message,
       };
     }
   }
@@ -405,26 +662,29 @@ export class BesuService {
       if (!this.contract) {
         this.logger.warn('Contrato não inicializado, tentando inicializar...');
         await this.initializeBesu();
-        
+
         if (!this.contract) {
           throw new Error('Contrato não pôde ser inicializado');
         }
       }
 
-      const [_total, _verified, balance] = await this.contract.getStats();
+      const [, , balance] = await this.contract.getStats();
       const totalHashes = await this.contract.getRegisteredHashesCount();
-      
+
       this.logger.log(`Total de hashes no contrato: ${Number(totalHashes)}`);
-      
+
       return {
         totalHashes: Number(totalHashes),
-        contractBalance: ethers.formatEther(balance)
+        contractBalance: ethers.formatEther(balance),
       };
     } catch (error) {
-      this.logger.error('Erro ao obter estatísticas do contrato:', error.message);
+      this.logger.error(
+        'Erro ao obter estatísticas do contrato:',
+        error.message,
+      );
       return {
         totalHashes: 0,
-        contractBalance: '0'
+        contractBalance: '0',
       };
     }
   }
@@ -443,7 +703,7 @@ export class BesuService {
       if (!this.provider) {
         this.logger.warn('Provider não inicializado, tentando inicializar...');
         await this.initializeBesu();
-        
+
         if (!this.provider) {
           throw new Error('Provider não pôde ser inicializado');
         }
@@ -452,14 +712,14 @@ export class BesuService {
       const [network, blockNumber, feeData] = await Promise.all([
         this.provider.getNetwork(),
         this.provider.getBlockNumber(),
-        this.provider.getFeeData()
+        this.provider.getFeeData(),
       ]);
 
       return {
         chainId: Number(network.chainId),
         blockNumber,
         gasPrice: ethers.formatUnits(feeData.gasPrice || 0, 'gwei'),
-        networkName: network.name
+        networkName: network.name,
       };
     } catch (error) {
       this.logger.error('Erro ao obter informações da rede:', error.message);
@@ -476,7 +736,7 @@ export class BesuService {
       if (!this.provider) {
         this.logger.warn('Provider não inicializado, tentando inicializar...');
         await this.initializeBesu();
-        
+
         if (!this.provider) {
           return false;
         }
@@ -484,7 +744,7 @@ export class BesuService {
 
       await this.provider.getBlockNumber();
       return true;
-    } catch (error) {
+    } catch {
       return false;
     }
   }
@@ -516,20 +776,21 @@ export class BesuService {
         return result;
       }
 
-      // 2. Informações da rede
       await this.checkBlockNumber(result, issues);
 
-      // 3. Verificar Chain ID
       await this.checkChainId(result, issues);
 
-      // 4. Verificar Gas Price
       await this.checkGasPrice(result, issues);
 
-      // 5. Verificar contrato
       await this.checkContract(result, issues);
 
-      // 6. Verificar velocidade da rede (tempo entre blocos)
       await this.checkBlockTime(result, issues);
+
+      await this.checkMiningActivity(result, issues);
+
+      if (result.contractDeployed) {
+        await this.testContractFunctionality(result, issues);
+      }
 
       this.logDiagnosisResults(issues);
 
@@ -545,9 +806,9 @@ export class BesuService {
       const blockNumber = await this.provider.getBlockNumber();
       result.blockNumber = blockNumber;
       this.logger.log(`Bloco atual: ${blockNumber}`);
-      
+
       if (blockNumber === 0) {
-        issues.push('Blockchain está no bloco 0 - pode não estar minerando');
+        issues.push('Blockchain no bloco 0');
       }
     } catch (error) {
       issues.push(`Erro ao obter número do bloco: ${error.message}`);
@@ -569,7 +830,7 @@ export class BesuService {
       const feeData = await this.provider.getFeeData();
       result.gasPrice = ethers.formatUnits(feeData.gasPrice || 0, 'gwei');
       this.logger.log(`Gas Price: ${result.gasPrice} Gwei`);
-    } catch (_error) {
+    } catch {
       issues.push(`Erro ao obter Gas Price`);
     }
   }
@@ -584,11 +845,11 @@ export class BesuService {
       result.contractAddress = await this.contract.getAddress();
       const code = await this.provider.getCode(result.contractAddress);
       result.contractDeployed = code !== '0x';
-      
+
       if (result.contractDeployed) {
         this.logger.log(`Contrato implantado em: ${result.contractAddress}`);
       } else {
-        issues.push(`Contrato NÃO está implantado no endereço ${result.contractAddress}`);
+        issues.push(`Contrato não implantado`);
       }
     } catch (error) {
       issues.push(`Erro ao verificar contrato: ${error.message}`);
@@ -598,29 +859,111 @@ export class BesuService {
   private async checkBlockTime(result: any, issues: string[]): Promise<void> {
     try {
       const latestBlock = await this.provider.getBlock('latest');
-      const previousBlock = await this.provider.getBlock(latestBlock.number - 1);
-      
+      const previousBlock = await this.provider.getBlock(
+        latestBlock.number - 1,
+      );
+
       if (latestBlock && previousBlock) {
         result.lastBlockTime = latestBlock.timestamp - previousBlock.timestamp;
         this.logger.log(`Tempo entre blocos: ${result.lastBlockTime}s`);
-        
+
         if (result.lastBlockTime > 30) {
-          issues.push(`Rede está lenta: ${result.lastBlockTime}s entre blocos (esperado < 15s)`);
+          issues.push(`Rede lenta - ${result.lastBlockTime}s entre blocos`);
         }
       }
     } catch (error) {
-      this.logger.warn(`Não foi possível calcular tempo entre blocos: ${error.message}`);
+      this.logger.warn(
+        `Não foi possível calcular tempo entre blocos: ${error.message}`,
+      );
+    }
+  }
+
+  private async checkMiningActivity(
+    result: any,
+    issues: string[],
+  ): Promise<void> {
+    try {
+      const initialBlockNumber = await this.provider.getBlockNumber();
+      result.blockNumber = initialBlockNumber;
+
+      await new Promise((resolve) => setTimeout(resolve, 5000));
+
+      const finalBlockNumber = await this.provider.getBlockNumber();
+      const blocksMined = finalBlockNumber - initialBlockNumber;
+
+      result.mining = blocksMined > 0;
+      result.blocksMinedDuringCheck = blocksMined;
+
+      if (blocksMined === 0) {
+        try {
+          const latestBlock = await this.provider.getBlock('latest');
+          const now = Math.floor(Date.now() / 1000);
+          const timeSinceLastBlock = now - latestBlock.timestamp;
+
+          result.lastBlockTimestamp = latestBlock.timestamp;
+          result.timeSinceLastBlock = timeSinceLastBlock;
+
+          if (timeSinceLastBlock > 60) {
+            const minutes = Math.floor(timeSinceLastBlock / 60);
+            const seconds = timeSinceLastBlock % 60;
+            if (minutes > 0) {
+              issues.push(
+                `Blockchain parada - último bloco minerado há ${minutes}m ${seconds}s`,
+              );
+            } else {
+              issues.push(
+                `Blockchain parada - último bloco minerado há ${timeSinceLastBlock}s`,
+              );
+            }
+          } else {
+            issues.push('Blockchain parada - não está minerando blocos');
+          }
+        } catch {
+          issues.push('Blockchain parada - não está minerando blocos');
+        }
+      } else {
+        this.logger.log(
+          `Blockchain está minerando: ${blocksMined} bloco(s) em 5s`,
+          'BesuService',
+        );
+      }
+    } catch (error) {
+      issues.push(`Erro ao verificar atividade de mineração: ${error.message}`);
+    }
+  }
+
+  private async testContractFunctionality(
+    result: any,
+    issues: string[],
+  ): Promise<void> {
+    if (!this.contract) {
+      return;
+    }
+
+    try {
+      const totalServices = await this.contract.totalServices();
+      result.contractTestPassed = true;
+      this.logger.log(
+        `Teste de contrato passou: totalServices = ${totalServices.toString()}`,
+        'BesuService',
+      );
+    } catch (error) {
+      issues.push(`Contrato não funcional: ${error.message}`);
+      result.contractTestPassed = false;
+      result.contractError = error.message;
     }
   }
 
   private logDiagnosisResults(issues: string[]): void {
     if (issues.length === 0) {
-      this.logger.log('Rede Besu está saudável');
+      this.logger.log('Rede Besu está saudável', 'BesuService', {
+        status: 'healthy',
+      });
     } else {
-      this.logger.warn(`Encontrados ${issues.length} problemas na rede`);
-      for (const issue of issues) {
-        this.logger.warn(issue);
-      }
+      this.logger.warn('Problemas encontrados na rede Besu', 'BesuService', {
+        issuesCount: issues.length,
+        issues: issues,
+      });
     }
   }
 
@@ -634,17 +977,18 @@ export class BesuService {
       if (!this.contract) {
         this.logger.warn('Contrato não inicializado, tentando inicializar...');
         await this.initializeBesu();
-        
+
         if (!this.contract) {
           throw new Error('Contrato não pôde ser inicializado');
         }
       }
 
-      // Verificar se o hash existe no contrato
       const exists = await this.contract.hashExists(hash);
-      
-      this.logger.log(`Hash ${hash.substring(0, 10)}... existe no contrato: ${exists}`);
-      
+
+      this.logger.log(
+        `Hash ${hash.substring(0, 10)}... existe no contrato: ${exists}`,
+      );
+
       return exists;
     } catch (error) {
       this.logger.error('Erro ao verificar hash no contrato:', error.message);

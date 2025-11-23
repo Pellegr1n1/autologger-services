@@ -1,4 +1,8 @@
-import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
+import {
+  Injectable,
+  BadRequestException,
+  NotFoundException,
+} from '@nestjs/common';
 import { EmailVerificationRepository } from './email-verification.repository';
 import { EmailService } from '../email/email.service';
 import { UserService } from '../user/services/user.service';
@@ -11,7 +15,6 @@ export class EmailVerificationService {
     private readonly emailService: EmailService,
     private readonly userService: UserService,
   ) {}
-
 
   /**
    * Enviar email de verificação
@@ -34,11 +37,7 @@ export class EmailVerificationService {
 
     await this.tokenRepository.create(token, userId, expiresAt);
 
-    await this.emailService.sendVerificationEmail(
-      user.email,
-      token,
-      user.name,
-    );
+    await this.emailService.sendVerificationEmail(user.email, token, user.name);
   }
 
   /**
@@ -69,7 +68,7 @@ export class EmailVerificationService {
    */
   async resendVerificationEmail(userId: string): Promise<void> {
     const user = await this.userService.findById(userId);
-    
+
     if (user.isEmailVerified) {
       throw new BadRequestException('Email já verificado');
     }
@@ -85,4 +84,3 @@ export class EmailVerificationService {
     return user.isEmailVerified;
   }
 }
-

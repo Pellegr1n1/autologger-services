@@ -7,10 +7,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { VehicleService } from '../vehicle/entities/vehicle-service.entity';
 
 @Module({
-  imports: [
-    ConfigModule,
-    TypeOrmModule.forFeature([VehicleService])
-  ],
+  imports: [ConfigModule, TypeOrmModule.forFeature([VehicleService])],
   providers: [BlockchainService, BesuService],
   controllers: [BlockchainController],
   exports: [BlockchainService, BesuService],

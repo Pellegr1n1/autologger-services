@@ -176,12 +176,7 @@ describe('EncryptionUtil', () => {
     });
 
     it('should encrypt and decrypt various plate formats', () => {
-      const plates = [
-        'ABC-1234',
-        'XYZ-5678',
-        'DEF-9012',
-        'GHI-3456',
-      ];
+      const plates = ['ABC-1234', 'XYZ-5678', 'DEF-9012', 'GHI-3456'];
 
       for (const plate of plates) {
         const encrypted = EncryptionUtil.encrypt(plate);
@@ -248,4 +243,3 @@ describe('EncryptionUtil', () => {
     });
   });
 });
-

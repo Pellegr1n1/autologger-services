@@ -27,4 +27,3 @@ export interface IStorage {
    */
   getAccessibleUrl?(fileUrl: string, expiresIn?: number): Promise<string>;
 }
-

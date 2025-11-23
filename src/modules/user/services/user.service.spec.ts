@@ -6,6 +6,9 @@ import { EmailVerificationRepository } from '../../email-verification/email-veri
 import { PasswordResetRepository } from '../../password-reset/password-reset.repository';
 import { CreateUserDto } from '../dto/create-user.dto';
 import { UpdateUserDto } from '../dto/update-user.dto';
+import { LoggerService } from '../../../common/logger/logger.service';
+import { EmailService } from '../../email/email.service';
+import { LoggerServiceTestHelper } from '../../../common/test-helpers/logger-service.test-helper';
 import * as bcrypt from 'bcryptjs';
 
 jest.mock('bcryptjs');
@@ -48,6 +51,13 @@ describe('UserService', () => {
       deleteUserTokens: jest.fn(),
     };
 
+    const mockLoggerService = LoggerServiceTestHelper.createMockLoggerService();
+    const mockEmailService = {
+      sendVerificationEmail: jest.fn(),
+      sendPasswordResetEmail: jest.fn(),
+      sendWelcomeEmail: jest.fn(),
+    };
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         UserService,
@@ -62,6 +72,14 @@ describe('UserService', () => {
         {
           provide: PasswordResetRepository,
           useValue: mockPasswordResetRepository,
+        },
+        {
+          provide: LoggerService,
+          useValue: mockLoggerService,
+        },
+        {
+          provide: EmailService,
+          useValue: mockEmailService,
         },
       ],
     }).compile();
@@ -239,6 +257,87 @@ describe('UserService', () => {
 
       expect(result.email).toBe('newemail@example.com');
     });
+
+    it('should throw BadRequestException when trying to update email for Google user', async () => {
+      const updateUserDto: UpdateUserDto = {
+        email: 'newemail@example.com',
+      };
+
+      const googleUser = { ...mockUser, authProvider: 'google' };
+      repository.findById.mockResolvedValue(googleUser as any);
+
+      await expect(
+        service.updateProfile('user-123', updateUserDto),
+      ).rejects.toThrow(
+        'Não é possível alterar o email de uma conta autenticada via Google',
+      );
+    });
+
+    it('should throw NotFoundException when update returns null', async () => {
+      const updateUserDto: UpdateUserDto = {
+        name: 'Updated Name',
+      };
+
+      repository.findById.mockResolvedValue(mockUser as any);
+      repository.update.mockResolvedValue(null);
+
+      await expect(
+        service.updateProfile('user-123', updateUserDto),
+      ).rejects.toThrow('Erro ao atualizar usuário');
+    });
+
+    it('should handle email change notification error gracefully', async () => {
+      const updateUserDto: UpdateUserDto = {
+        email: 'newemail@example.com',
+      };
+
+      repository.findById.mockResolvedValue(mockUser as any);
+      repository.findByEmail.mockResolvedValue(null);
+      repository.update.mockResolvedValue({
+        ...mockUser,
+        email: 'newemail@example.com',
+      } as any);
+
+      // Mock emailService para lançar erro
+      const mockEmailService = {
+        sendEmailChangeNotification: jest
+          .fn()
+          .mockRejectedValue(new Error('Email error')),
+      };
+
+      const module: TestingModule = await Test.createTestingModule({
+        providers: [
+          UserService,
+          {
+            provide: UserRepository,
+            useValue: repository,
+          },
+          {
+            provide: EmailVerificationRepository,
+            useValue: emailVerificationRepository,
+          },
+          {
+            provide: PasswordResetRepository,
+            useValue: passwordResetRepository,
+          },
+          {
+            provide: LoggerService,
+            useValue: LoggerServiceTestHelper.createMockLoggerService(),
+          },
+          {
+            provide: EmailService,
+            useValue: mockEmailService,
+          },
+        ],
+      }).compile();
+
+      const userService = module.get<UserService>(UserService);
+
+      // Não deve lançar erro, apenas logar
+      const result = await userService.updateProfile('user-123', updateUserDto);
+
+      expect(result.email).toBe('newemail@example.com');
+    });
   });
 
   describe('updateProfileAllowInactive', () => {
@@ -262,6 +361,191 @@ describe('UserService', () => {
       );
 
       expect(result.isActive).toBe(true);
+    });
+
+    it('should throw NotFoundException when user not found', async () => {
+      const updateUserDto: UpdateUserDto = {
+        name: 'Updated Name',
+      };
+
+      repository.findById.mockResolvedValue(null);
+
+      await expect(
+        service.updateProfileAllowInactive('user-123', updateUserDto),
+      ).rejects.toThrow(NotFoundException);
+    });
+
+    it('should throw ConflictException when email is already in use', async () => {
+      const updateUserDto: UpdateUserDto = {
+        email: 'newemail@example.com',
+      };
+
+      const inactiveUser = { ...mockUser, isActive: false };
+      repository.findById.mockResolvedValue(inactiveUser as any);
+      repository.findByEmail.mockResolvedValue({
+        ...mockUser,
+        id: 'other-user-id',
+      } as any);
+
+      await expect(
+        service.updateProfileAllowInactive('user-123', updateUserDto),
+      ).rejects.toThrow(ConflictException);
+    });
+
+    it('should update all optional fields in buildUpdateData', async () => {
+      const updateUserDto: UpdateUserDto = {
+        name: 'Updated Name',
+        googleId: 'new-google-id',
+        avatar: 'new-avatar-url',
+        authProvider: 'google',
+        isActive: false,
+      };
+
+      repository.findById.mockResolvedValue(mockUser as any);
+      repository.update.mockResolvedValue({
+        ...mockUser,
+        ...updateUserDto,
+      } as any);
+
+      const result = await service.updateProfileAllowInactive(
+        'user-123',
+        updateUserDto,
+      );
+
+      expect(result.name).toBe('Updated Name');
+      expect(repository.update).toHaveBeenCalledWith(
+        'user-123',
+        expect.objectContaining({
+          name: 'Updated Name',
+          googleId: 'new-google-id',
+          avatar: 'new-avatar-url',
+          authProvider: 'google',
+          isActive: false,
+        }),
+      );
+    });
+
+    it('should update only googleId when provided', async () => {
+      const updateUserDto: UpdateUserDto = {
+        googleId: 'new-google-id',
+      };
+
+      repository.findById.mockResolvedValue(mockUser as any);
+      repository.update.mockResolvedValue({
+        ...mockUser,
+        googleId: 'new-google-id',
+      } as any);
+
+      await service.updateProfileAllowInactive('user-123', updateUserDto);
+
+      expect(repository.update).toHaveBeenCalledWith(
+        'user-123',
+        expect.objectContaining({
+          googleId: 'new-google-id',
+        }),
+      );
+    });
+
+    it('should update only avatar when provided', async () => {
+      const updateUserDto: UpdateUserDto = {
+        avatar: 'new-avatar-url',
+      };
+
+      repository.findById.mockResolvedValue(mockUser as any);
+      repository.update.mockResolvedValue({
+        ...mockUser,
+        avatar: 'new-avatar-url',
+      } as any);
+
+      await service.updateProfileAllowInactive('user-123', updateUserDto);
+
+      expect(repository.update).toHaveBeenCalledWith(
+        'user-123',
+        expect.objectContaining({
+          avatar: 'new-avatar-url',
+        }),
+      );
+    });
+
+    it('should update only authProvider when provided', async () => {
+      const updateUserDto: UpdateUserDto = {
+        authProvider: 'google',
+      };
+
+      repository.findById.mockResolvedValue(mockUser as any);
+      repository.update.mockResolvedValue({
+        ...mockUser,
+        authProvider: 'google',
+      } as any);
+
+      await service.updateProfileAllowInactive('user-123', updateUserDto);
+
+      expect(repository.update).toHaveBeenCalledWith(
+        'user-123',
+        expect.objectContaining({
+          authProvider: 'google',
+        }),
+      );
+    });
+
+    it('should update only isActive when provided', async () => {
+      const updateUserDto: UpdateUserDto = {
+        isActive: false,
+      };
+
+      repository.findById.mockResolvedValue(mockUser as any);
+      repository.update.mockResolvedValue({
+        ...mockUser,
+        isActive: false,
+      } as any);
+
+      await service.updateProfileAllowInactive('user-123', updateUserDto);
+
+      expect(repository.update).toHaveBeenCalledWith(
+        'user-123',
+        expect.objectContaining({
+          isActive: false,
+        }),
+      );
+    });
+
+    it('should throw NotFoundException when update returns null in updateProfileAllowInactive', async () => {
+      const updateUserDto: UpdateUserDto = {
+        name: 'Updated Name',
+      };
+
+      repository.findById.mockResolvedValue(mockUser as any);
+      repository.update.mockResolvedValue(null);
+
+      await expect(
+        service.updateProfileAllowInactive('user-123', updateUserDto),
+      ).rejects.toThrow('Erro ao atualizar usuário');
+    });
+
+    it('should update email in updateProfileAllowInactive', async () => {
+      const updateUserDto: UpdateUserDto = {
+        email: 'newemail@example.com',
+      };
+
+      repository.findById.mockResolvedValue(mockUser as any);
+      repository.findByEmail.mockResolvedValue(null);
+      repository.update.mockResolvedValue({
+        ...mockUser,
+        email: 'newemail@example.com',
+      } as any);
+
+      const result = await service.updateProfileAllowInactive(
+        'user-123',
+        updateUserDto,
+      );
+
+      expect(result.email).toBe('newemail@example.com');
+      expect(repository.update).toHaveBeenCalledWith(
+        'user-123',
+        expect.objectContaining({
+          email: 'newemail@example.com',
+        }),
+      );
     });
   });
 
@@ -293,8 +577,12 @@ describe('UserService', () => {
 
       await service.deleteAccount('user-123');
 
-      expect(emailVerificationRepository.deleteUserTokens).toHaveBeenCalledWith('user-123');
-      expect(passwordResetRepository.deleteUserTokens).toHaveBeenCalledWith('user-123');
+      expect(emailVerificationRepository.deleteUserTokens).toHaveBeenCalledWith(
+        'user-123',
+      );
+      expect(passwordResetRepository.deleteUserTokens).toHaveBeenCalledWith(
+        'user-123',
+      );
       expect(repository.hardDelete).toHaveBeenCalledWith('user-123');
     });
 
@@ -360,4 +648,3 @@ describe('UserService', () => {
     });
   });
 });
-

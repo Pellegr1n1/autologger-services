@@ -1,4 +1,9 @@
-import { VehicleShareResponseDto, PublicVehicleInfoDto, PublicMaintenanceInfoDto, PublicAttachmentDto } from './vehicle-share-response.dto';
+import {
+  VehicleShareResponseDto,
+  PublicVehicleInfoDto,
+  PublicMaintenanceInfoDto,
+  PublicAttachmentDto,
+} from './vehicle-share-response.dto';
 
 describe('VehicleShareResponseDto', () => {
   it('should be defined', () => {
@@ -111,4 +116,3 @@ describe('PublicAttachmentDto', () => {
     expect(dto.fileSize).toBe(1024);
   });
 });
-

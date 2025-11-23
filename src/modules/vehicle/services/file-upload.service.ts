@@ -1,24 +1,24 @@
-import { Injectable, Logger, Inject } from '@nestjs/common';
+import { Injectable, Inject } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { v4 as uuidv4 } from 'uuid';
 import { IStorage } from '../../storage/interfaces/storage.interface';
+import { LoggerService } from '../../../common/logger/logger.service';
 
 @Injectable()
 export class FileUploadService {
-  private readonly logger = new Logger(FileUploadService.name);
-
   constructor(
     private configService: ConfigService,
     @Inject('STORAGE') private storage: IStorage,
-  ) {}
+    private readonly logger: LoggerService,
+  ) {
+    this.logger.setContext('FileUploadService');
+  }
 
   private generateUniqueFileName(originalName: string): string {
-    const fileExtension = originalName.includes('.') 
-      ? originalName.split('.').pop() 
+    const fileExtension = originalName.includes('.')
+      ? originalName.split('.').pop()
       : '';
-    return fileExtension 
-      ? `${uuidv4()}.${fileExtension}` 
-      : uuidv4();
+    return fileExtension ? `${uuidv4()}.${fileExtension}` : uuidv4();
   }
 
   private async uploadFile(file: any, folder: string): Promise<string> {
@@ -28,7 +28,22 @@ export class FileUploadService {
 
     const originalName = file.originalname || 'file';
     const fileName = this.generateUniqueFileName(originalName);
-    return await this.storage.upload(file.buffer, fileName, folder);
+
+    const startTime = Date.now();
+    const url = await this.storage.upload(file.buffer, fileName, folder);
+    const duration = Date.now() - startTime;
+
+    // Log apenas se for lento ou em desenvolvimento
+    const isProduction = process.env.NODE_ENV === 'production';
+    if (!isProduction || duration > 1000) {
+      this.logger.log('Upload de arquivo concluído', 'FileUploadService', {
+        fileName,
+        folder,
+        duration: `${duration}ms`,
+      });
+    }
+
+    return url;
   }
 
   private async deleteFile(fileUrl: string, fileType: string): Promise<void> {
@@ -39,7 +54,17 @@ export class FileUploadService {
     try {
       await this.storage.delete(fileUrl);
     } catch (error) {
-      this.logger.error(`Erro ao deletar ${fileType}:`, error);
+      this.logger.error(
+        `Erro ao deletar ${fileType}`,
+        error.stack,
+        'FileUploadService',
+        {
+          fileUrl,
+          fileType,
+          errorMessage: error.message,
+        },
+      );
+      throw error;
     }
   }
 
@@ -66,7 +91,7 @@ export class FileUploadService {
       return [];
     }
 
-    const uploadPromises = files.map(file => this.uploadAttachment(file));
+    const uploadPromises = files.map((file) => this.uploadAttachment(file));
     return await Promise.all(uploadPromises);
   }
 
@@ -74,4 +99,3 @@ export class FileUploadService {
     return this.deleteFile(attachmentUrl, 'anexo');
   }
 }
-
