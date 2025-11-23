@@ -26,9 +26,9 @@ export class UserRepository {
 
   async update(id: string, updateData: Partial<User>): Promise<User | null> {
     const filteredData = Object.fromEntries(
-      Object.entries(updateData).filter(([_, value]) => value !== undefined)
+      Object.entries(updateData).filter(([_, value]) => value !== undefined),
     );
-    
+
     await this.userRepository.update(id, filteredData);
     return await this.findById(id);
   }

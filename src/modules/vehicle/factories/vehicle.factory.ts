@@ -9,9 +9,7 @@ import { IStorage } from '../../storage/interfaces/storage.interface';
 export class VehicleFactory {
   private readonly logger = new Logger(VehicleFactory.name);
 
-  constructor(
-    @Inject('STORAGE') private readonly storage: IStorage,
-  ) {}
+  constructor(@Inject('STORAGE') private readonly storage: IStorage) {}
 
   /**
    * Converte uma entidade Vehicle para VehicleResponseDto
@@ -68,7 +66,9 @@ export class VehicleFactory {
    * Converte um array de Vehicle para array de VehicleResponseDto
    */
   async toResponseDtoArray(vehicles: Vehicle[]): Promise<VehicleResponseDto[]> {
-    return await Promise.all(vehicles.map(vehicle => this.toResponseDto(vehicle)));
+    return await Promise.all(
+      vehicles.map((vehicle) => this.toResponseDto(vehicle)),
+    );
   }
 
   /**
@@ -77,14 +77,14 @@ export class VehicleFactory {
   createVehicle(data: Partial<Vehicle>): Vehicle {
     // ✅ CORRIGIDO: Não usa mais o construtor customizado
     const vehicle = new Vehicle();
-    
+
     // Atribui todas as propriedades manualmente
     Object.assign(vehicle, {
       ...data,
       createdAt: data.createdAt || new Date(),
       updatedAt: data.updatedAt || new Date(),
     });
-    
+
     return vehicle;
   }
 
@@ -93,16 +93,15 @@ export class VehicleFactory {
    */
   formatPlate(plate: string): string {
     const cleanPlate = plate.toUpperCase().replace(/[^A-Z0-9]/g, '');
-    
+
     if (cleanPlate.length === 7) {
-      if (/^[A-Z]{3}[0-9]{4}$/.test(cleanPlate)) {
-        return cleanPlate.replace(/^([A-Z]{3})([0-9]{4})$/, '$1-$2');
-      }
-      else if (/^[A-Z]{3}[0-9][A-Z][0-9]{2}$/.test(cleanPlate)) {
+      if (/^[A-Z]{3}\d{4}$/.test(cleanPlate)) {
+        return cleanPlate.replace(/^([A-Z]{3})(\d{4})$/, '$1-$2');
+      } else if (/^[A-Z]{3}\d[A-Z]\d{2}$/.test(cleanPlate)) {
         return cleanPlate;
       }
     }
-    
+
     return cleanPlate;
   }
 
@@ -111,10 +110,10 @@ export class VehicleFactory {
    */
   isValidPlate(plate: string): boolean {
     const cleanPlate = plate.toUpperCase().replace(/[^A-Z0-9]/g, '');
-    
-    const oldFormat = /^[A-Z]{3}[0-9]{4}$/;
-    const mercosulFormat = /^[A-Z]{3}[0-9][A-Z][0-9]{2}$/;
-    
+
+    const oldFormat = /^[A-Z]{3}\d{4}$/;
+    const mercosulFormat = /^[A-Z]{3}\d[A-Z]\d{2}$/;
+
     return oldFormat.test(cleanPlate) || mercosulFormat.test(cleanPlate);
   }
 
@@ -167,7 +166,9 @@ export class VehicleFactory {
   normalizeVehicleData(data: Partial<Vehicle>): Partial<Vehicle> {
     return {
       ...data,
-      plate: data.plate ? data.plate.toUpperCase().replace(/[^A-Z0-9]/g, '') : undefined,
+      plate: data.plate
+        ? data.plate.toUpperCase().replace(/[^A-Z0-9]/g, '')
+        : undefined,
       brand: data.brand ? this.capitalizeFirstLetter(data.brand) : undefined,
       model: data.model ? this.capitalizeFirstLetter(data.model) : undefined,
       color: data.color ? this.capitalizeFirstLetter(data.color) : undefined,

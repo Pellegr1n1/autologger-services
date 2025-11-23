@@ -8,17 +8,16 @@ export class DtoValidationTestHelper {
   /**
    * Valida um DTO e retorna os erros
    */
-  static async validateDto<T extends object>(dto: T): Promise<ValidationError[]> {
+  static async validateDto<T extends object>(
+    dto: T,
+  ): Promise<ValidationError[]> {
     return await validate(dto);
   }
 
   /**
    * Cria um DTO com valores padrão e permite sobrescrever propriedades
    */
-  static createDto<T>(
-    DtoClass: new () => T,
-    overrides: Partial<T> = {}
-  ): T {
+  static createDto<T>(DtoClass: new () => T, overrides: Partial<T> = {}): T {
     const dto = new DtoClass();
     Object.assign(dto, overrides);
     return dto;
@@ -29,7 +28,7 @@ export class DtoValidationTestHelper {
    */
   static async expectValid<T extends object>(
     DtoClass: new () => T,
-    data: Partial<T>
+    data: Partial<T>,
   ): Promise<void> {
     const dto = this.createDto(DtoClass, data);
     const errors = await this.validateDto(dto);
@@ -42,7 +41,7 @@ export class DtoValidationTestHelper {
   static async expectInvalid<T extends object>(
     DtoClass: new () => T,
     data: Partial<T>,
-    expectedFailedProperty: keyof T
+    expectedFailedProperty: keyof T,
   ): Promise<void> {
     const dto = this.createDto(DtoClass, data);
     const errors = await this.validateDto(dto);
@@ -50,4 +49,3 @@ export class DtoValidationTestHelper {
     expect(errors[0].property).toBe(expectedFailedProperty as string);
   }
 }
-

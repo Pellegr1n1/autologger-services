@@ -1,6 +1,11 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { S3Client, PutObjectCommand, DeleteObjectCommand, GetObjectCommand } from '@aws-sdk/client-s3';
+import {
+  S3Client,
+  PutObjectCommand,
+  DeleteObjectCommand,
+  GetObjectCommand,
+} from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { IStorage } from '../interfaces/storage.interface';
 
@@ -15,9 +20,13 @@ export class S3StorageProvider implements IStorage {
   constructor(private configService: ConfigService) {
     this.bucketName = this.configService.get<string>('AWS_S3_BUCKET_NAME');
     this.region = this.configService.get<string>('AWS_REGION', 'us-east-1');
-    this.useSignedUrls = this.configService.get<string>('AWS_S3_USE_SIGNED_URLS', 'true') === 'true';
+    this.useSignedUrls =
+      this.configService.get<string>('AWS_S3_USE_SIGNED_URLS', 'true') ===
+      'true';
     const accessKeyId = this.configService.get<string>('AWS_ACCESS_KEY_ID');
-    const secretAccessKey = this.configService.get<string>('AWS_SECRET_ACCESS_KEY');
+    const secretAccessKey = this.configService.get<string>(
+      'AWS_SECRET_ACCESS_KEY',
+    );
 
     if (!this.bucketName) {
       throw new Error('AWS_S3_BUCKET_NAME deve estar configurado');
@@ -25,7 +34,7 @@ export class S3StorageProvider implements IStorage {
 
     if (!accessKeyId || !secretAccessKey) {
       throw new Error(
-        'AWS S3 não está configurado. Configure AWS_ACCESS_KEY_ID e AWS_SECRET_ACCESS_KEY'
+        'AWS S3 não está configurado. Configure AWS_ACCESS_KEY_ID e AWS_SECRET_ACCESS_KEY',
       );
     }
 
@@ -38,19 +47,27 @@ export class S3StorageProvider implements IStorage {
           secretAccessKey,
         },
       });
-      
-      const urlType = this.useSignedUrls ? 'URLs assinadas (privado)' : 'URLs públicas';
-      this.logger.log(`AWS S3 inicializado com sucesso (bucket: ${this.bucketName}, region: ${this.region}, modo: ${urlType})`);
+
+      const urlType = this.useSignedUrls
+        ? 'URLs assinadas (privado)'
+        : 'URLs públicas';
+      this.logger.log(
+        `AWS S3 inicializado com sucesso (bucket: ${this.bucketName}, region: ${this.region}, modo: ${urlType})`,
+      );
     } catch (error) {
       this.logger.error('Erro ao inicializar AWS S3:', error);
       throw error;
     }
   }
 
-  async upload(fileBuffer: Buffer, fileName: string, folder: string): Promise<string> {
+  async upload(
+    fileBuffer: Buffer,
+    fileName: string,
+    folder: string,
+  ): Promise<string> {
     try {
       const filePath = `${folder}/${fileName}`;
-      
+
       const command = new PutObjectCommand({
         Bucket: this.bucketName,
         Key: filePath,
@@ -62,7 +79,7 @@ export class S3StorageProvider implements IStorage {
       });
 
       await this.s3Client.send(command);
-      
+
       this.logger.log(`Arquivo enviado para AWS S3: ${filePath}`);
 
       // Se usar URLs assinadas, retornar a URL do arquivo (não assinada ainda)
@@ -76,16 +93,16 @@ export class S3StorageProvider implements IStorage {
       return `https://${this.bucketName}.s3.${this.region}.amazonaws.com/${filePath}`;
     } catch (error) {
       this.logger.error('Erro ao fazer upload para AWS S3:', error);
-      
+
       // Mensagem mais clara para erro de bucket não encontrado
       if (this.isNotFoundError(error)) {
-        const errorMessage = 
+        const errorMessage =
           `Bucket "${this.bucketName}" não existe. ` +
           `Verifique se o bucket foi criado na região ${this.region}.`;
         this.logger.error(errorMessage);
         throw new Error(errorMessage);
       }
-      
+
       throw error;
     }
   }
@@ -96,10 +113,13 @@ export class S3StorageProvider implements IStorage {
    * @param expiresIn Tempo de expiração em segundos (padrão: 3600 = 1 hora)
    * @returns URL assinada temporária
    */
-  async getSignedUrlForFile(fileUrl: string, expiresIn: number = 3600): Promise<string> {
+  async getSignedUrlForFile(
+    fileUrl: string,
+    expiresIn: number = 3600,
+  ): Promise<string> {
     try {
       const filePath = this.extractFilePathFromUrl(fileUrl);
-      
+
       if (!filePath) {
         this.logger.warn(`URL inválida para gerar signed URL: ${fileUrl}`);
         return fileUrl; // Retornar a URL original se não conseguir extrair o path
@@ -110,10 +130,14 @@ export class S3StorageProvider implements IStorage {
         Key: filePath,
       });
 
-      const signedUrl = await getSignedUrl(this.s3Client, command, { expiresIn });
-      
-      this.logger.debug(`URL assinada gerada para ${filePath} (expira em ${expiresIn}s)`);
-      
+      const signedUrl = await getSignedUrl(this.s3Client, command, {
+        expiresIn,
+      });
+
+      this.logger.debug(
+        `URL assinada gerada para ${filePath} (expira em ${expiresIn}s)`,
+      );
+
       return signedUrl;
     } catch (error) {
       this.logger.error('Erro ao gerar URL assinada:', error);
@@ -128,7 +152,10 @@ export class S3StorageProvider implements IStorage {
    * @param expiresIn Tempo de expiração em segundos (padrão: 3600)
    * @returns URL acessível para o frontend
    */
-  async getAccessibleUrl(fileUrl: string, expiresIn: number = 3600): Promise<string> {
+  async getAccessibleUrl(
+    fileUrl: string,
+    expiresIn: number = 3600,
+  ): Promise<string> {
     if (!fileUrl) {
       return null;
     }
@@ -149,7 +176,7 @@ export class S3StorageProvider implements IStorage {
 
     try {
       const filePath = this.extractFilePathFromUrl(fileUrl);
-      
+
       if (!filePath) {
         this.logger.warn(`URL inválida do AWS S3: ${fileUrl}`);
         return;
@@ -167,13 +194,13 @@ export class S3StorageProvider implements IStorage {
         this.logger.warn(`Arquivo não encontrado no AWS S3: ${fileUrl}`);
         return;
       }
-      
+
       // Se for erro de URL inválida, apenas avisar e retornar
       if (error instanceof TypeError && error.message.includes('Invalid URL')) {
         this.logger.warn(`URL inválida fornecida para deleção: ${fileUrl}`);
         return;
       }
-      
+
       this.logger.error('Erro ao deletar arquivo do AWS S3:', error);
       throw error;
     }
@@ -189,11 +216,11 @@ export class S3StorageProvider implements IStorage {
 
   private getContentType(fileName: string): string {
     const ext = fileName.split('.').pop()?.toLowerCase();
-    
+
     if (!ext) {
       return 'application/octet-stream';
     }
-    
+
     const contentTypes: Record<string, string> = {
       jpg: 'image/jpeg',
       jpeg: 'image/jpeg',
@@ -266,4 +293,3 @@ export class S3StorageProvider implements IStorage {
     return false;
   }
 }
-

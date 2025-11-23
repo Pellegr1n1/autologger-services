@@ -195,7 +195,8 @@ describe('GoogleAuthController', () => {
       } as any;
 
       // Mock fetch for token exchange
-      globalThis.fetch = jest.fn()
+      globalThis.fetch = jest
+        .fn()
         .mockResolvedValueOnce({
           ok: true,
           json: async () => ({ access_token: 'access-token-123' }),
@@ -255,7 +256,10 @@ describe('GoogleAuthController', () => {
       } as any;
 
       await expect(
-        controller.authenticateWithGoogle({ credential: 'invalid' }, mockResponse),
+        controller.authenticateWithGoogle(
+          { credential: 'invalid' },
+          mockResponse,
+        ),
       ).rejects.toThrow(BadRequestException);
     });
 
@@ -367,7 +371,8 @@ describe('GoogleAuthController', () => {
         json: jest.fn(),
       } as any;
 
-      globalThis.fetch = jest.fn()
+      globalThis.fetch = jest
+        .fn()
         .mockResolvedValueOnce({
           ok: true,
           json: async () => ({ access_token: 'access-token-123' }),
@@ -400,4 +405,3 @@ describe('GoogleAuthController', () => {
     });
   });
 });
-

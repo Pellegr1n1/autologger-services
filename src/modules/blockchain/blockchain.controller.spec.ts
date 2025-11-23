@@ -2,6 +2,8 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { BlockchainController } from './blockchain.controller';
 import { BlockchainService } from './blockchain.service';
 import { BesuService } from './besu/besu.service';
+import { LoggerService } from '@/common/logger/logger.service';
+import { LoggerServiceTestHelper } from '@/common/test-helpers/logger-service.test-helper';
 
 describe('BlockchainController', () => {
   let controller: BlockchainController;
@@ -39,6 +41,8 @@ describe('BlockchainController', () => {
       diagnoseNetwork: jest.fn(),
     };
 
+    const mockLoggerService = LoggerServiceTestHelper.createMockLoggerService();
+
     const module: TestingModule = await Test.createTestingModule({
       controllers: [BlockchainController],
       providers: [
@@ -49,6 +53,10 @@ describe('BlockchainController', () => {
         {
           provide: BesuService,
           useValue: mockBesuService,
+        },
+        {
+          provide: LoggerService,
+          useValue: mockLoggerService,
         },
       ],
     }).compile();
@@ -87,6 +95,166 @@ describe('BlockchainController', () => {
       expect(blockchainService.submitServiceToBlockchain).toHaveBeenCalledWith(
         serviceData,
       );
+      expect(response).toEqual(result);
+    });
+  });
+
+  describe('resetRetryCount', () => {
+    it('should reset retry count for a service', async () => {
+      const result = { success: true };
+      blockchainService.resetRetryCount.mockResolvedValue(result as any);
+
+      const response = await controller.resetRetryCount('service-123');
+
+      expect(blockchainService.resetRetryCount).toHaveBeenCalledWith(
+        'service-123',
+      );
+      expect(response).toEqual(result);
+    });
+  });
+
+  describe('resetAllRetries', () => {
+    it('should reset all failed retries', async () => {
+      const result = { success: true, resetCount: 5 };
+      blockchainService.resetAllFailedRetries.mockResolvedValue(result as any);
+
+      const response = await controller.resetAllRetries();
+
+      expect(blockchainService.resetAllFailedRetries).toHaveBeenCalled();
+      expect(response).toEqual(result);
+    });
+  });
+
+  describe('forceVerifyAllServices', () => {
+    it('should force verify all services', async () => {
+      const result = { success: true, verified: 10 };
+      blockchainService.forceVerifyAllServices.mockResolvedValue(result as any);
+
+      const response = await controller.forceVerifyAllServices();
+
+      expect(blockchainService.forceVerifyAllServices).toHaveBeenCalled();
+      expect(response).toEqual(result);
+    });
+  });
+
+  describe('registerAllExistingHashes', () => {
+    it('should register all existing hashes', async () => {
+      const result = { success: true, registered: 5 };
+      blockchainService.registerAllExistingHashes.mockResolvedValue(
+        result as any,
+      );
+
+      const response = await controller.registerAllExistingHashes();
+
+      expect(blockchainService.registerAllExistingHashes).toHaveBeenCalled();
+      expect(response).toEqual(result);
+    });
+  });
+
+  describe('fixInvalidHashes', () => {
+    it('should fix invalid hashes', async () => {
+      const result = { success: true, fixed: 3 };
+      blockchainService.fixInvalidHashes.mockResolvedValue(result as any);
+
+      const response = await controller.fixInvalidHashes();
+
+      expect(blockchainService.fixInvalidHashes).toHaveBeenCalled();
+      expect(response).toEqual(result);
+    });
+  });
+
+  describe('cleanOrphanHashes', () => {
+    it('should clean orphan hashes', async () => {
+      const result = { success: true, cleaned: 2 };
+      blockchainService.cleanOrphanHashes.mockResolvedValue(result as any);
+
+      const response = await controller.cleanOrphanHashes();
+
+      expect(blockchainService.cleanOrphanHashes).toHaveBeenCalled();
+      expect(response).toEqual(result);
+    });
+  });
+
+  describe('fixFailingHashes', () => {
+    it('should fix failing hashes', async () => {
+      const result = { success: true, fixed: 4 };
+      blockchainService.fixFailingHashes.mockResolvedValue(result as any);
+
+      const response = await controller.fixFailingHashes();
+
+      expect(blockchainService.fixFailingHashes).toHaveBeenCalled();
+      expect(response).toEqual(result);
+    });
+  });
+
+  describe('fixIncorrectDates', () => {
+    it('should fix incorrect dates', async () => {
+      const result = { success: true, fixed: 1 };
+      blockchainService.fixIncorrectDates.mockResolvedValue(result as any);
+
+      const response = await controller.fixIncorrectDates({} as any);
+
+      expect(blockchainService.fixIncorrectDates).toHaveBeenCalled();
+      expect(response).toEqual(result);
+    });
+  });
+
+  describe('verifyAndCount', () => {
+    it('should verify hash and count', async () => {
+      const result = { exists: true, count: 1 };
+      besuService.verifyAndCount.mockResolvedValue(result as any);
+
+      const response = await controller.verifyAndCount('hash-123');
+
+      expect(besuService.verifyAndCount).toHaveBeenCalledWith('hash-123');
+      expect(response).toEqual(result);
+    });
+  });
+
+  describe('getVehicleHashes', () => {
+    it('should get vehicle hashes', async () => {
+      const result = { hashes: ['hash1', 'hash2'] };
+      besuService.getVehicleHashes.mockResolvedValue(result as any);
+
+      const response = await controller.getVehicleHashes('vehicle-123');
+
+      expect(besuService.getVehicleHashes).toHaveBeenCalledWith('vehicle-123');
+      expect(response).toEqual(result);
+    });
+  });
+
+  describe('getOwnerHashes', () => {
+    it('should get owner hashes', async () => {
+      const result = { hashes: ['hash1'] };
+      besuService.getOwnerHashes.mockResolvedValue(result as any);
+
+      const response = await controller.getOwnerHashes('0x123');
+
+      expect(besuService.getOwnerHashes).toHaveBeenCalledWith('0x123');
+      expect(response).toEqual(result);
+    });
+  });
+
+  describe('getNetworkInfo', () => {
+    it('should get network info', async () => {
+      const result = { chainId: '1337', blockNumber: 100 };
+      besuService.getNetworkInfo.mockResolvedValue(result as any);
+
+      const response = await controller.getNetworkInfo();
+
+      expect(besuService.getNetworkInfo).toHaveBeenCalled();
+      expect(response).toEqual(result);
+    });
+  });
+
+  describe('diagnoseNetwork', () => {
+    it('should diagnose network', async () => {
+      const result = { connected: true, blockNumber: 100 };
+      besuService.diagnoseNetwork.mockResolvedValue(result as any);
+
+      const response = await controller.diagnoseNetwork();
+
+      expect(besuService.diagnoseNetwork).toHaveBeenCalled();
       expect(response).toEqual(result);
     });
   });
@@ -142,9 +310,7 @@ describe('BlockchainController', () => {
       const request = { user: { id: 'user-123' } };
       const response = await controller.getAllServices(request);
 
-      expect(blockchainService.getAllServices).toHaveBeenCalledWith(
-        'user-123',
-      );
+      expect(blockchainService.getAllServices).toHaveBeenCalledWith('user-123');
       expect(response).toEqual(services);
     });
   });
@@ -251,4 +417,3 @@ describe('BlockchainController', () => {
     });
   });
 });
-

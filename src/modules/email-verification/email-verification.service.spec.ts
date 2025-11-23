@@ -94,18 +94,18 @@ describe('EmailVerificationService', () => {
         new NotFoundException('Usuário não encontrado'),
       );
 
-      await expect(
-        service.sendVerificationEmail('user-123'),
-      ).rejects.toThrow(NotFoundException);
+      await expect(service.sendVerificationEmail('user-123')).rejects.toThrow(
+        NotFoundException,
+      );
     });
 
     it('should throw BadRequestException when email already verified', async () => {
       const verifiedUser = { ...mockUser, isEmailVerified: true };
       userService.findById.mockResolvedValue(verifiedUser as any);
 
-      await expect(
-        service.sendVerificationEmail('user-123'),
-      ).rejects.toThrow(BadRequestException);
+      await expect(service.sendVerificationEmail('user-123')).rejects.toThrow(
+        BadRequestException,
+      );
     });
   });
 
@@ -177,9 +177,9 @@ describe('EmailVerificationService', () => {
       const verifiedUser = { ...mockUser, isEmailVerified: true };
       userService.findById.mockResolvedValue(verifiedUser as any);
 
-      await expect(
-        service.resendVerificationEmail('user-123'),
-      ).rejects.toThrow(BadRequestException);
+      await expect(service.resendVerificationEmail('user-123')).rejects.toThrow(
+        BadRequestException,
+      );
     });
   });
 
@@ -202,4 +202,3 @@ describe('EmailVerificationService', () => {
     });
   });
 });
-

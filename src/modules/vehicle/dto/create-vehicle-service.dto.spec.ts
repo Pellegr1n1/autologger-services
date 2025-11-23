@@ -20,15 +20,19 @@ describe('CreateVehicleServiceDto', () => {
     };
 
     it('should pass validation with valid data', async () => {
-      await DtoValidationTestHelper.expectValid(CreateVehicleServiceDto, validBaseData);
+      await DtoValidationTestHelper.expectValid(
+        CreateVehicleServiceDto,
+        validBaseData,
+      );
     });
 
     it('should fail validation when vehicleId is missing', async () => {
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
       const { vehicleId: _vehicleId, ...dataWithoutVehicleId } = validBaseData;
       await DtoValidationTestHelper.expectInvalid(
         CreateVehicleServiceDto,
         dataWithoutVehicleId,
-        'vehicleId'
+        'vehicleId',
       );
     });
 
@@ -36,7 +40,7 @@ describe('CreateVehicleServiceDto', () => {
       await DtoValidationTestHelper.expectInvalid(
         CreateVehicleServiceDto,
         { ...validBaseData, type: 'INVALID_TYPE' as any },
-        'type'
+        'type',
       );
     });
 
@@ -49,15 +53,18 @@ describe('CreateVehicleServiceDto', () => {
         nextServiceDate: new Date(),
         notes: 'Observações',
       };
-      
-      await DtoValidationTestHelper.expectValid(CreateVehicleServiceDto, dataWithOptionals);
+
+      await DtoValidationTestHelper.expectValid(
+        CreateVehicleServiceDto,
+        dataWithOptionals,
+      );
     });
 
     it('should fail validation when serviceDate is not a date', async () => {
       await DtoValidationTestHelper.expectInvalid(
         CreateVehicleServiceDto,
         { ...validBaseData, serviceDate: 'invalid-date' as any },
-        'serviceDate'
+        'serviceDate',
       );
     });
 
@@ -65,9 +72,8 @@ describe('CreateVehicleServiceDto', () => {
       await DtoValidationTestHelper.expectInvalid(
         CreateVehicleServiceDto,
         { ...validBaseData, mileage: 'not-a-number' as any },
-        'mileage'
+        'mileage',
       );
     });
   });
 });
-

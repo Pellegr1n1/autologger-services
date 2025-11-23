@@ -17,7 +17,14 @@ import { FilesInterceptor } from '@nestjs/platform-express';
 import { VehicleServiceService } from '../services/vehicle-service.service';
 import { CreateVehicleServiceDto } from '../dto/create-vehicle-service.dto';
 import { UpdateVehicleServiceDto } from '../dto/update-vehicle-service.dto';
-import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiConsumes, ApiBody } from '@nestjs/swagger';
+import {
+  ApiTags,
+  ApiOperation,
+  ApiResponse,
+  ApiBearerAuth,
+  ApiConsumes,
+  ApiBody,
+} from '@nestjs/swagger';
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 import { VehicleService } from '../../vehicle/services/vehicle.service';
 import { FileUploadService } from '../services/file-upload.service';
@@ -37,17 +44,26 @@ export class VehicleServiceController {
   @ApiOperation({ summary: 'Criar um novo serviço de veículo' })
   @ApiResponse({ status: 201, description: 'Serviço criado com sucesso' })
   @ApiResponse({ status: 400, description: 'Dados inválidos' })
-  async create(@Body() createVehicleServiceDto: CreateVehicleServiceDto, @Request() req) {
+  async create(
+    @Body() createVehicleServiceDto: CreateVehicleServiceDto,
+    @Request() req,
+  ) {
     const userId = req.user?.id;
-    
+
     const userVehicles = await this.vehicleService.findUserVehicles(userId);
     if (!userVehicles.active || userVehicles.active.length === 0) {
-      throw new BadRequestException('Você precisa ter pelo menos um veículo cadastrado para criar serviços');
+      throw new BadRequestException(
+        'Você precisa ter pelo menos um veículo cadastrado para criar serviços',
+      );
     }
 
-    const vehicleExists = userVehicles.active.some(vehicle => vehicle.id === createVehicleServiceDto.vehicleId);
+    const vehicleExists = userVehicles.active.some(
+      (vehicle) => vehicle.id === createVehicleServiceDto.vehicleId,
+    );
     if (!vehicleExists) {
-      throw new BadRequestException('Veículo não encontrado ou não pertence ao usuário');
+      throw new BadRequestException(
+        'Veículo não encontrado ou não pertence ao usuário',
+      );
     }
 
     return this.vehicleServiceService.create(createVehicleServiceDto);
@@ -56,12 +72,17 @@ export class VehicleServiceController {
   @Post('upload-attachments')
   @UseInterceptors(FilesInterceptor('files', 10))
   @ApiConsumes('multipart/form-data')
-  @ApiOperation({ 
+  @ApiOperation({
     summary: 'Fazer upload de anexos para serviços',
-    description: 'Aceita apenas: Imagens (JPG, PNG, GIF, WEBP), PDFs e documentos Office (Word, Excel, PowerPoint). Limite: 10MB por arquivo.'
+    description:
+      'Aceita apenas: Imagens (JPG, PNG, GIF, WEBP), PDFs e documentos Office (Word, Excel, PowerPoint). Limite: 10MB por arquivo.',
   })
   @ApiResponse({ status: 201, description: 'Anexos enviados com sucesso' })
-  @ApiResponse({ status: 400, description: 'Erro no upload, tipo de arquivo não permitido ou arquivo muito grande' })
+  @ApiResponse({
+    status: 400,
+    description:
+      'Erro no upload, tipo de arquivo não permitido ou arquivo muito grande',
+  })
   @ApiBody({
     schema: {
       type: 'object',
@@ -85,46 +106,61 @@ export class VehicleServiceController {
     this.validateFileTypes(files);
 
     try {
-      const uploadedUrls = await this.fileUploadService.uploadMultipleAttachments(files);
-      
+      const uploadedUrls =
+        await this.fileUploadService.uploadMultipleAttachments(files);
+
       return {
         success: true,
         urls: uploadedUrls,
         count: uploadedUrls.length,
       };
     } catch (error) {
-      throw new BadRequestException(`Erro ao fazer upload dos arquivos: ${error instanceof Error ? error.message : String(error)}`);
+      throw new BadRequestException(
+        `Erro ao fazer upload dos arquivos: ${error instanceof Error ? error.message : String(error)}`,
+      );
     }
   }
 
   private validateFileSizes(files: any[]): void {
     const maxSize = 10 * 1024 * 1024; // 10MB
-    const oversizedFile = files.find(file => file.size > maxSize);
-    
+    const oversizedFile = files.find((file) => file.size > maxSize);
+
     if (oversizedFile) {
       throw new BadRequestException(
-        `Arquivo "${oversizedFile.originalname}" excede o tamanho máximo de 10MB`
+        `Arquivo "${oversizedFile.originalname}" excede o tamanho máximo de 10MB`,
       );
     }
   }
 
   private validateFileTypes(files: any[]): void {
     const allowedExtensions = new Set([
-      '.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp', // Imagens
+      '.jpg',
+      '.jpeg',
+      '.png',
+      '.gif',
+      '.webp',
+      '.bmp', // Imagens
       '.pdf', // PDFs
-      '.doc', '.docx', '.xls', '.xlsx', '.ppt', '.pptx', // Office
-      '.txt' // Texto
+      '.doc',
+      '.docx',
+      '.xls',
+      '.xlsx',
+      '.ppt',
+      '.pptx', // Office
+      '.txt', // Texto
     ]);
-    
-    const invalidFile = files.find(file => {
+
+    const invalidFile = files.find((file) => {
       const fileName = file.originalname?.toLowerCase() || '';
-      return !Array.from(allowedExtensions).some(ext => fileName.endsWith(ext));
+      return !Array.from(allowedExtensions).some((ext) =>
+        fileName.endsWith(ext),
+      );
     });
-    
+
     if (invalidFile) {
       throw new BadRequestException(
         `Tipo de arquivo não permitido: "${invalidFile.originalname}". ` +
-        `Aceitos: Imagens (JPG, PNG, GIF, WEBP), PDFs e documentos Office (Word, Excel, PowerPoint).`
+          `Aceitos: Imagens (JPG, PNG, GIF, WEBP), PDFs e documentos Office (Word, Excel, PowerPoint).`,
       );
     }
   }
@@ -157,7 +193,10 @@ export class VehicleServiceController {
   @ApiResponse({ status: 200, description: 'Lista de serviços por status' })
   findByStatus(@Param('status') status: string, @Request() req) {
     const userId = req.user?.id;
-    return this.vehicleServiceService.getServicesByStatus(status as any, userId);
+    return this.vehicleServiceService.getServicesByStatus(
+      status as any,
+      userId,
+    );
   }
 
   @Get('date-range')
@@ -178,7 +217,10 @@ export class VehicleServiceController {
 
   @Get('mileage-range')
   @ApiOperation({ summary: 'Listar serviços por intervalo de quilometragem' })
-  @ApiResponse({ status: 200, description: 'Lista de serviços por quilometragem' })
+  @ApiResponse({
+    status: 200,
+    description: 'Lista de serviços por quilometragem',
+  })
   findByMileageRange(
     @Query('minMileage') minMileage: number,
     @Query('maxMileage') maxMileage: number,
@@ -200,7 +242,8 @@ export class VehicleServiceController {
   @ApiOperation({ summary: 'Obter quantidade de serviços de um veículo' })
   @ApiResponse({ status: 200, description: 'Quantidade retornada' })
   async getServicesCountByVehicle(@Param('vehicleId') vehicleId: string) {
-    const count = await this.vehicleServiceService.getServicesCountByVehicle(vehicleId);
+    const count =
+      await this.vehicleServiceService.getServicesCountByVehicle(vehicleId);
     return { count };
   }
 

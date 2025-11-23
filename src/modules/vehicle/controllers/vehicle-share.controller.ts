@@ -18,7 +18,10 @@ import {
   ApiQuery,
 } from '@nestjs/swagger';
 import { VehicleShareService } from '../services/vehicle-share.service';
-import { VehicleShareResponseDto, PublicVehicleInfoDto } from '../dto/vehicle-share-response.dto';
+import {
+  VehicleShareResponseDto,
+  PublicVehicleInfoDto,
+} from '../dto/vehicle-share-response.dto';
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../../../common/decorators/current-user.decorator';
 import { UserResponseDto } from '@/modules/user/dto/user-response.dto';
@@ -34,8 +37,16 @@ export class VehicleShareController {
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({ summary: 'Gerar link de compartilhamento para veículo' })
   @ApiParam({ name: 'id', description: 'ID do veículo' })
-  @ApiQuery({ name: 'expiresInDays', required: false, description: 'Dias para expiração (padrão: 30)' })
-  @ApiQuery({ name: 'includeAttachments', required: false, description: 'Incluir anexos nos dados compartilhados (padrão: false)' })
+  @ApiQuery({
+    name: 'expiresInDays',
+    required: false,
+    description: 'Dias para expiração (padrão: 30)',
+  })
+  @ApiQuery({
+    name: 'includeAttachments',
+    required: false,
+    description: 'Incluir anexos nos dados compartilhados (padrão: false)',
+  })
   @ApiResponse({
     status: HttpStatus.CREATED,
     description: 'Link de compartilhamento gerado com sucesso',
@@ -57,7 +68,12 @@ export class VehicleShareController {
   ): Promise<VehicleShareResponseDto> {
     const days = expiresInDays ? Number.parseInt(expiresInDays) : 30;
     const includeAttachmentsBool = includeAttachments === 'true';
-    return this.vehicleShareService.generateShareToken(vehicleId, user.id, days, includeAttachmentsBool);
+    return this.vehicleShareService.generateShareToken(
+      vehicleId,
+      user.id,
+      days,
+      includeAttachmentsBool,
+    );
   }
 
   @Get('share/:shareToken')

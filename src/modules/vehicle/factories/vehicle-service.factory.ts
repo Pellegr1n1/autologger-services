@@ -6,9 +6,7 @@ import { IStorage } from '../../storage/interfaces/storage.interface';
 export class VehicleServiceFactory {
   private readonly logger = new Logger(VehicleServiceFactory.name);
 
-  constructor(
-    @Inject('STORAGE') private readonly storage: IStorage,
-  ) {}
+  constructor(@Inject('STORAGE') private readonly storage: IStorage) {}
 
   /**
    * Converte URLs de anexos s3:// para URLs acessíveis (assinadas ou públicas)
@@ -27,12 +25,14 @@ export class VehicleServiceFactory {
             try {
               return await this.storage.getAccessibleUrl(url);
             } catch (error) {
-              this.logger.error(`Erro ao gerar URL acessível para anexo: ${error}`);
+              this.logger.error(
+                `Erro ao gerar URL acessível para anexo: ${error}`,
+              );
               return url; // Retornar URL original em caso de erro
             }
-          })
+          }),
         );
-        
+
         return {
           ...service,
           attachments: accessibleAttachments,
@@ -49,8 +49,9 @@ export class VehicleServiceFactory {
   /**
    * Converte array de serviços
    */
-  async toResponseDtoArray(services: VehicleService[]): Promise<VehicleService[]> {
-    return Promise.all(services.map(service => this.toResponseDto(service)));
+  async toResponseDtoArray(
+    services: VehicleService[],
+  ): Promise<VehicleService[]> {
+    return Promise.all(services.map((service) => this.toResponseDto(service)));
   }
 }
-

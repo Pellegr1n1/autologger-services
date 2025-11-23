@@ -1,6 +1,10 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { VehicleServiceFactory } from './vehicle-service.factory';
-import { VehicleService, ServiceStatus, ServiceType } from '../entities/vehicle-service.entity';
+import {
+  VehicleService,
+  ServiceStatus,
+  ServiceType,
+} from '../entities/vehicle-service.entity';
 import { IStorage } from '../../storage/interfaces/storage.interface';
 
 describe('VehicleServiceFactory', () => {
@@ -18,7 +22,10 @@ describe('VehicleServiceFactory', () => {
     mileage: 50000,
     cost: 150,
     location: 'Oficina ABC',
-    attachments: ['s3://bucket/attachments/file1.pdf', 's3://bucket/attachments/file2.pdf'],
+    attachments: [
+      's3://bucket/attachments/file1.pdf',
+      's3://bucket/attachments/file2.pdf',
+    ],
     technician: 'João Silva',
     warranty: true,
     nextServiceDate: new Date('2025-07-15'),
@@ -40,7 +47,9 @@ describe('VehicleServiceFactory', () => {
       upload: jest.fn(),
       delete: jest.fn(),
       isConfigured: jest.fn(() => true),
-      getAccessibleUrl: jest.fn((url: string) => Promise.resolve(`https://signed-url.com/${url}`)),
+      getAccessibleUrl: jest.fn((url: string) =>
+        Promise.resolve(`https://signed-url.com/${url}`),
+      ),
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -65,13 +74,20 @@ describe('VehicleServiceFactory', () => {
       const result = await factory.toResponseDto(mockVehicleService);
 
       expect(result.attachments).toHaveLength(2);
-      expect(result.attachments[0]).toBe('https://signed-url.com/s3://bucket/attachments/file1.pdf');
-      expect(result.attachments[1]).toBe('https://signed-url.com/s3://bucket/attachments/file2.pdf');
+      expect(result.attachments[0]).toBe(
+        'https://signed-url.com/s3://bucket/attachments/file1.pdf',
+      );
+      expect(result.attachments[1]).toBe(
+        'https://signed-url.com/s3://bucket/attachments/file2.pdf',
+      );
       expect(mockStorage.getAccessibleUrl).toHaveBeenCalledTimes(2);
     });
 
     it('should return service as-is if no attachments', async () => {
-      const serviceWithoutAttachments = { ...mockVehicleService, attachments: null };
+      const serviceWithoutAttachments = {
+        ...mockVehicleService,
+        attachments: null,
+      };
       const result = await factory.toResponseDto(serviceWithoutAttachments);
 
       expect(result).toEqual(serviceWithoutAttachments);
@@ -79,7 +95,10 @@ describe('VehicleServiceFactory', () => {
     });
 
     it('should return service as-is if attachments is empty array', async () => {
-      const serviceWithEmptyAttachments = { ...mockVehicleService, attachments: [] };
+      const serviceWithEmptyAttachments = {
+        ...mockVehicleService,
+        attachments: [],
+      };
       const result = await factory.toResponseDto(serviceWithEmptyAttachments);
 
       expect(result).toEqual(serviceWithEmptyAttachments);
@@ -87,7 +106,8 @@ describe('VehicleServiceFactory', () => {
     });
 
     it('should handle error when converting attachment URL', async () => {
-      mockStorage.getAccessibleUrl = jest.fn()
+      mockStorage.getAccessibleUrl = jest
+        .fn()
         .mockRejectedValueOnce(new Error('S3 error'))
         .mockResolvedValueOnce('https://signed-url.com/file2.pdf');
 
@@ -110,14 +130,22 @@ describe('VehicleServiceFactory', () => {
     it('should convert array of services', async () => {
       const services = [
         mockVehicleService,
-        { ...mockVehicleService, id: '456', attachments: ['s3://bucket/attachments/file3.pdf'] },
+        {
+          ...mockVehicleService,
+          id: '456',
+          attachments: ['s3://bucket/attachments/file3.pdf'],
+        },
       ];
 
       const result = await factory.toResponseDtoArray(services);
 
       expect(result).toHaveLength(2);
-      expect(result[0].attachments[0]).toBe('https://signed-url.com/s3://bucket/attachments/file1.pdf');
-      expect(result[1].attachments[0]).toBe('https://signed-url.com/s3://bucket/attachments/file3.pdf');
+      expect(result[0].attachments[0]).toBe(
+        'https://signed-url.com/s3://bucket/attachments/file1.pdf',
+      );
+      expect(result[1].attachments[0]).toBe(
+        'https://signed-url.com/s3://bucket/attachments/file3.pdf',
+      );
       expect(mockStorage.getAccessibleUrl).toHaveBeenCalledTimes(3);
     });
 
@@ -129,4 +157,3 @@ describe('VehicleServiceFactory', () => {
     });
   });
 });
-

@@ -4,7 +4,12 @@ import { getRepositoryToken } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { BlockchainService } from './blockchain.service';
 import { BesuService } from './besu/besu.service';
-import { VehicleService, ServiceStatus } from '../vehicle/entities/vehicle-service.entity';
+import {
+  VehicleService,
+  ServiceStatus,
+} from '../vehicle/entities/vehicle-service.entity';
+import { LoggerService } from '@/common/logger/logger.service';
+import { LoggerServiceTestHelper } from '@/common/test-helpers/logger-service.test-helper';
 
 jest.mock('ethers', () => ({
   ethers: {
@@ -46,6 +51,8 @@ describe('BlockchainService', () => {
       createQueryBuilder: jest.fn().mockReturnValue(mockQueryBuilder),
     };
 
+    const mockLoggerService = LoggerServiceTestHelper.createMockLoggerService();
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         BlockchainService,
@@ -62,6 +69,10 @@ describe('BlockchainService', () => {
         {
           provide: getRepositoryToken(VehicleService),
           useValue: mockRepository,
+        },
+        {
+          provide: LoggerService,
+          useValue: mockLoggerService,
         },
       ],
     }).compile();
@@ -269,7 +280,9 @@ describe('BlockchainService', () => {
     });
 
     it('should handle errors when resetting retries', async () => {
-      vehicleServiceRepository.find.mockRejectedValue(new Error('Database error'));
+      vehicleServiceRepository.find.mockRejectedValue(
+        new Error('Database error'),
+      );
 
       const result = await service.resetAllFailedRetries();
 
@@ -374,7 +387,9 @@ describe('BlockchainService', () => {
       };
 
       vehicleServiceRepository.find.mockResolvedValue([mockService] as any);
-      besuService.verifyHashInContract.mockRejectedValue(new Error('Verification error'));
+      besuService.verifyHashInContract.mockRejectedValue(
+        new Error('Verification error'),
+      );
 
       const result = await service.forceVerifyAllServices();
 
@@ -383,9 +398,13 @@ describe('BlockchainService', () => {
     });
 
     it('should throw error when repository fails', async () => {
-      vehicleServiceRepository.find.mockRejectedValue(new Error('Database error'));
+      vehicleServiceRepository.find.mockRejectedValue(
+        new Error('Database error'),
+      );
 
-      await expect(service.forceVerifyAllServices()).rejects.toThrow('Database error');
+      await expect(service.forceVerifyAllServices()).rejects.toThrow(
+        'Database error',
+      );
     });
   });
 
@@ -456,11 +475,13 @@ describe('BlockchainService', () => {
       ];
 
       vehicleServiceRepository.find.mockResolvedValue(mockServices as any);
-      vehicleServiceRepository.update.mockRejectedValue(new Error('Update error'));
+      vehicleServiceRepository.update.mockRejectedValue(
+        new Error('Update error'),
+      );
 
       // The method catches errors and increments errorCount, it doesn't throw
       const result = await service.fixInvalidHashes();
-      
+
       expect(result.success).toBe(true);
       expect(result.errorCount).toBeGreaterThan(0);
     });
@@ -512,9 +533,13 @@ describe('BlockchainService', () => {
     });
 
     it('should handle errors during cleanup', async () => {
-      vehicleServiceRepository.find.mockRejectedValue(new Error('Database error'));
+      vehicleServiceRepository.find.mockRejectedValue(
+        new Error('Database error'),
+      );
 
-      await expect(service.cleanOrphanHashes()).rejects.toThrow('Database error');
+      await expect(service.cleanOrphanHashes()).rejects.toThrow(
+        'Database error',
+      );
     });
   });
 
@@ -583,7 +608,9 @@ describe('BlockchainService', () => {
 
       vehicleServiceRepository.find.mockResolvedValue(mockServices as any);
       besuService.verifyHashInContract.mockResolvedValue(false);
-      besuService.registerHash.mockRejectedValue(new Error('Registration error'));
+      besuService.registerHash.mockRejectedValue(
+        new Error('Registration error'),
+      );
 
       const result = await service.registerAllExistingHashes();
 
@@ -592,9 +619,13 @@ describe('BlockchainService', () => {
     });
 
     it('should throw error when repository fails', async () => {
-      vehicleServiceRepository.find.mockRejectedValue(new Error('Database error'));
+      vehicleServiceRepository.find.mockRejectedValue(
+        new Error('Database error'),
+      );
 
-      await expect(service.registerAllExistingHashes()).rejects.toThrow('Database error');
+      await expect(service.registerAllExistingHashes()).rejects.toThrow(
+        'Database error',
+      );
     });
   });
 
@@ -655,7 +686,9 @@ describe('BlockchainService', () => {
       ];
 
       vehicleServiceRepository.find.mockResolvedValue(mockServices as any);
-      besuService.verifyHashInContract.mockRejectedValue(new Error('Verification error'));
+      besuService.verifyHashInContract.mockRejectedValue(
+        new Error('Verification error'),
+      );
 
       const result = await service.fixFailingHashes();
 
@@ -664,9 +697,13 @@ describe('BlockchainService', () => {
     });
 
     it('should throw error when repository fails', async () => {
-      vehicleServiceRepository.find.mockRejectedValue(new Error('Database error'));
+      vehicleServiceRepository.find.mockRejectedValue(
+        new Error('Database error'),
+      );
 
-      await expect(service.fixFailingHashes()).rejects.toThrow('Database error');
+      await expect(service.fixFailingHashes()).rejects.toThrow(
+        'Database error',
+      );
     });
   });
 
@@ -733,9 +770,13 @@ describe('BlockchainService', () => {
     });
 
     it('should handle errors during date fixing', async () => {
-      vehicleServiceRepository.find.mockRejectedValue(new Error('Database error'));
+      vehicleServiceRepository.find.mockRejectedValue(
+        new Error('Database error'),
+      );
 
-      await expect(service.fixIncorrectDates()).rejects.toThrow('Database error');
+      await expect(service.fixIncorrectDates()).rejects.toThrow(
+        'Database error',
+      );
     });
   });
 
@@ -880,7 +921,7 @@ describe('BlockchainService', () => {
 
       vehicleServiceRepository.findOne.mockResolvedValue(mockService as any);
       besuService.isConnected.mockResolvedValue(true);
-      
+
       // When service can be resent directly (REJECTED status), it skips verification
       besuService.registerHash.mockResolvedValue({
         success: true,
@@ -953,7 +994,11 @@ describe('BlockchainService', () => {
         transactionHash: 'tx-hash-123',
       });
 
-      const result = await service.registerHashInContract('hash-123', 'vehicle-123', 'SERVICE');
+      const result = await service.registerHashInContract(
+        'hash-123',
+        'vehicle-123',
+        'SERVICE',
+      );
 
       expect(result.success).toBe(true);
       expect(result.transactionHash).toBe('tx-hash-123');
@@ -962,7 +1007,11 @@ describe('BlockchainService', () => {
     it('should return failure when not connected', async () => {
       besuService.isConnected.mockResolvedValue(false);
 
-      const result = await service.registerHashInContract('hash-123', 'vehicle-123', 'SERVICE');
+      const result = await service.registerHashInContract(
+        'hash-123',
+        'vehicle-123',
+        'SERVICE',
+      );
 
       expect(result.success).toBe(false);
       expect(result.error).toContain('não disponível');
@@ -970,13 +1019,19 @@ describe('BlockchainService', () => {
 
     it('should handle timeout during registration', async () => {
       besuService.isConnected.mockResolvedValue(true);
-      
+
       // Mock Promise.race to reject with timeout
       const originalPromiseRace = Promise.race;
-      Promise.race = jest.fn().mockRejectedValue(new Error('Timeout no registro (25s)'));
+      Promise.race = jest
+        .fn()
+        .mockRejectedValue(new Error('Timeout no registro (25s)'));
 
       try {
-        const result = await service.registerHashInContract('hash-123', 'vehicle-123', 'SERVICE');
+        const result = await service.registerHashInContract(
+          'hash-123',
+          'vehicle-123',
+          'SERVICE',
+        );
         expect(result.success).toBe(false);
         expect(result.error).toContain('Timeout');
       } finally {
@@ -988,7 +1043,11 @@ describe('BlockchainService', () => {
       besuService.isConnected.mockResolvedValue(true);
       besuService.registerHash.mockRejectedValue(new Error('Network error'));
 
-      const result = await service.registerHashInContract('hash-123', 'vehicle-123', 'SERVICE');
+      const result = await service.registerHashInContract(
+        'hash-123',
+        'vehicle-123',
+        'SERVICE',
+      );
 
       expect(result.success).toBe(false);
       expect(result.error).toContain('Falha na rede Besu');
@@ -997,7 +1056,11 @@ describe('BlockchainService', () => {
     it('should handle general errors', async () => {
       besuService.isConnected.mockRejectedValue(new Error('Connection error'));
 
-      const result = await service.registerHashInContract('hash-123', 'vehicle-123', 'SERVICE');
+      const result = await service.registerHashInContract(
+        'hash-123',
+        'vehicle-123',
+        'SERVICE',
+      );
 
       expect(result.success).toBe(false);
       expect(result.error).toBe('Connection error');
@@ -1064,4 +1127,3 @@ describe('BlockchainService', () => {
     });
   });
 });
-

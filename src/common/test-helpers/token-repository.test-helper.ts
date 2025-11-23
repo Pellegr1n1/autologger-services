@@ -28,7 +28,7 @@ export class TokenRepositoryTestHelper {
   static createMockToken<T extends BaseTokenEntity>(
     tokenValue: string,
     userId: string = 'user-123',
-    expiresInMs: number = 60 * 60 * 1000
+    expiresInMs: number = 60 * 60 * 1000,
   ): T {
     return {
       id: 'token-123',
@@ -46,8 +46,11 @@ export class TokenRepositoryTestHelper {
    */
   static async createTestingModule<T, E extends BaseTokenEntity>(
     repositoryClass: new (...args: any[]) => T,
-    entityClass: new () => E
-  ): Promise<{ module: TestingModule; mockRepository: jest.Mocked<Repository<E>> }> {
+    entityClass: new () => E,
+  ): Promise<{
+    module: TestingModule;
+    mockRepository: jest.Mocked<Repository<E>>;
+  }> {
     const mockRepository = this.createMockRepository();
 
     const module: TestingModule = await Test.createTestingModule({
@@ -77,4 +80,3 @@ export class TokenRepositoryTestHelper {
     };
   }
 }
-

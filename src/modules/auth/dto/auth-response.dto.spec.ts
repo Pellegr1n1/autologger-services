@@ -56,4 +56,3 @@ describe('AuthResponseDto', () => {
     expect(dto.user.isEmailVerified).toBe(false);
   });
 });
-

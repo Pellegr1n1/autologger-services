@@ -1,11 +1,19 @@
-import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, JoinColumn, CreateDateColumn, UpdateDateColumn } from 'typeorm';
+import {
+  Entity,
+  PrimaryGeneratedColumn,
+  Column,
+  ManyToOne,
+  JoinColumn,
+  CreateDateColumn,
+  UpdateDateColumn,
+} from 'typeorm';
 import { Vehicle } from './vehicle.entity';
 
 export enum ServiceStatus {
   PENDING = 'pending',
   CONFIRMED = 'confirmed',
   REJECTED = 'rejected',
-  EXPIRED = 'expired'
+  EXPIRED = 'expired',
 }
 
 export enum ServiceType {
@@ -14,7 +22,7 @@ export enum ServiceType {
   INSPECTION = 'inspection',
   FUEL = 'fuel',
   EXPENSE = 'expense',
-  OTHER = 'other'
+  OTHER = 'other',
 }
 
 @Entity('vehicle_services')
@@ -32,7 +40,7 @@ export class VehicleService {
   @Column({
     type: 'enum',
     enum: ServiceType,
-    default: ServiceType.MAINTENANCE
+    default: ServiceType.MAINTENANCE,
   })
   type: ServiceType;
 
@@ -72,7 +80,7 @@ export class VehicleService {
   @Column({
     type: 'enum',
     enum: ServiceStatus,
-    default: ServiceStatus.PENDING
+    default: ServiceStatus.PENDING,
   })
   status: ServiceStatus;
 

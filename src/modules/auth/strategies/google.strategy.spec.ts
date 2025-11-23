@@ -70,7 +70,9 @@ describe('GoogleStrategy', () => {
 
   describe('validate', () => {
     it('should validate and return user from Google profile', async () => {
-      authService.validateGoogleUser.mockResolvedValue(mockValidatedUser as any);
+      authService.validateGoogleUser.mockResolvedValue(
+        mockValidatedUser as any,
+      );
 
       const done = jest.fn();
 
@@ -123,12 +125,7 @@ describe('GoogleStrategy', () => {
 
       // The error is not caught in the strategy, so it propagates
       await expect(
-        strategy.validate(
-          'access-token',
-          'refresh-token',
-          mockProfile,
-          done,
-        ),
+        strategy.validate('access-token', 'refresh-token', mockProfile, done),
       ).rejects.toThrow('Validation failed');
 
       expect(authService.validateGoogleUser).toHaveBeenCalled();
@@ -136,4 +133,3 @@ describe('GoogleStrategy', () => {
     });
   });
 });
-

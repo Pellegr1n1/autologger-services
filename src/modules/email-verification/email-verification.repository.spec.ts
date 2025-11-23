@@ -7,19 +7,23 @@ describe('EmailVerificationRepository', () => {
   let repository: EmailVerificationRepository;
   let tokenRepository: jest.Mocked<Repository<EmailVerificationToken>>;
 
-  const mockToken = TokenRepositoryTestHelper.createMockToken<EmailVerificationToken>(
-    'verification-token',
-    'user-123',
-    24 * 60 * 60 * 1000
-  );
-
-  beforeEach(async () => {
-    const { module, mockRepository } = await TokenRepositoryTestHelper.createTestingModule(
-      EmailVerificationRepository,
-      EmailVerificationToken
+  const mockToken =
+    TokenRepositoryTestHelper.createMockToken<EmailVerificationToken>(
+      'verification-token',
+      'user-123',
+      24 * 60 * 60 * 1000,
     );
 
-    repository = module.get<EmailVerificationRepository>(EmailVerificationRepository);
+  beforeEach(async () => {
+    const { module, mockRepository } =
+      await TokenRepositoryTestHelper.createTestingModule(
+        EmailVerificationRepository,
+        EmailVerificationToken,
+      );
+
+    repository = module.get<EmailVerificationRepository>(
+      EmailVerificationRepository,
+    );
     tokenRepository = mockRepository;
   });
 
@@ -107,17 +111,22 @@ describe('EmailVerificationRepository', () => {
 
   describe('deleteExpiredTokens', () => {
     it('should delete expired tokens', async () => {
-      const mockQueryBuilder = TokenRepositoryTestHelper.createMockQueryBuilder(5);
+      const mockQueryBuilder =
+        TokenRepositoryTestHelper.createMockQueryBuilder(5);
 
-      tokenRepository.createQueryBuilder.mockReturnValue(mockQueryBuilder as any);
+      tokenRepository.createQueryBuilder.mockReturnValue(
+        mockQueryBuilder as any,
+      );
 
       await repository.deleteExpiredTokens();
 
       expect(tokenRepository.createQueryBuilder).toHaveBeenCalled();
       expect(mockQueryBuilder.delete).toHaveBeenCalled();
-      expect(mockQueryBuilder.where).toHaveBeenCalledWith('expiresAt < :now', expect.any(Object));
+      expect(mockQueryBuilder.where).toHaveBeenCalledWith(
+        'expiresAt < :now',
+        expect.any(Object),
+      );
       expect(mockQueryBuilder.execute).toHaveBeenCalled();
     });
   });
 });
-

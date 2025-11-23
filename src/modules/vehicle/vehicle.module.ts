@@ -23,7 +23,11 @@ import { StorageModule } from '../storage/storage.module';
     BlockchainModule,
     StorageModule,
   ],
-  controllers: [VehicleController, VehicleServiceController, VehicleShareController],
+  controllers: [
+    VehicleController,
+    VehicleServiceController,
+    VehicleShareController,
+  ],
   providers: [
     VehicleService,
     VehicleBusinessRulesService,

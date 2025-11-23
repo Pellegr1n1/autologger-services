@@ -7,13 +7,17 @@ describe('PasswordResetRepository', () => {
   let repository: PasswordResetRepository;
   let tokenRepository: jest.Mocked<Repository<PasswordResetToken>>;
 
-  const mockToken = TokenRepositoryTestHelper.createMockToken<PasswordResetToken>('reset-token');
+  const mockToken =
+    TokenRepositoryTestHelper.createMockToken<PasswordResetToken>(
+      'reset-token',
+    );
 
   beforeEach(async () => {
-    const { module, mockRepository } = await TokenRepositoryTestHelper.createTestingModule(
-      PasswordResetRepository,
-      PasswordResetToken
-    );
+    const { module, mockRepository } =
+      await TokenRepositoryTestHelper.createTestingModule(
+        PasswordResetRepository,
+        PasswordResetToken,
+      );
 
     repository = module.get<PasswordResetRepository>(PasswordResetRepository);
     tokenRepository = mockRepository;
@@ -101,4 +105,3 @@ describe('PasswordResetRepository', () => {
     });
   });
 });
-

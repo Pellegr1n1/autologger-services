@@ -6,14 +6,25 @@ import { MarkVehicleSoldDto } from '../dto/mark-vehicle-sold.dto';
 import { VehicleStatus } from '../enums/vehicle-status.enum';
 
 export interface IVehicleService {
-  createVehicle(createVehicleDto: CreateVehicleDto, userId: string): Promise<VehicleResponseDto>;
+  createVehicle(
+    createVehicleDto: CreateVehicleDto,
+    userId: string,
+  ): Promise<VehicleResponseDto>;
   findUserVehicles(userId: string): Promise<{
     active: VehicleResponseDto[];
     sold: VehicleResponseDto[];
   }>;
   findVehicleById(id: string, userId: string): Promise<VehicleResponseDto>;
-  updateVehicle(id: string, updateVehicleDto: UpdateVehicleDto, userId: string): Promise<VehicleResponseDto>;
-  markVehicleAsSold(id: string, markVehicleSoldDto: MarkVehicleSoldDto, userId: string): Promise<VehicleResponseDto>;
+  updateVehicle(
+    id: string,
+    updateVehicleDto: UpdateVehicleDto,
+    userId: string,
+  ): Promise<VehicleResponseDto>;
+  markVehicleAsSold(
+    id: string,
+    markVehicleSoldDto: MarkVehicleSoldDto,
+    userId: string,
+  ): Promise<VehicleResponseDto>;
   getActiveVehiclesCount(userId: string): Promise<number>;
   deleteVehicle(id: string, userId: string): Promise<void>;
 }
@@ -43,7 +54,10 @@ export interface IVehicleBusinessRules {
 
 export interface IVehicleFactory {
   toResponseDto(vehicle: Vehicle): VehicleResponseDto;
-  fromCreateDto(createVehicleDto: CreateVehicleDto, userId: string): Partial<Vehicle>;
+  fromCreateDto(
+    createVehicleDto: CreateVehicleDto,
+    userId: string,
+  ): Partial<Vehicle>;
   toResponseDtoArray(vehicles: Vehicle[]): VehicleResponseDto[];
   createVehicle(data: Partial<Vehicle>): Vehicle;
   formatPlate(plate: string): string;

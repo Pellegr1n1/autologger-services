@@ -16,4 +16,3 @@ import { UserModule } from '../user/user.module';
   exports: [PasswordResetService, PasswordResetRepository],
 })
 export class PasswordResetModule {}
-

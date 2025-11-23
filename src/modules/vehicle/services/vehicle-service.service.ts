@@ -1,13 +1,22 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  BadRequestException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { ethers } from 'ethers';
-import { VehicleService, ServiceStatus, ServiceType } from '../entities/vehicle-service.entity';
+import {
+  VehicleService,
+  ServiceStatus,
+  ServiceType,
+} from '../entities/vehicle-service.entity';
 import { CreateVehicleServiceDto } from '../dto/create-vehicle-service.dto';
 import { UpdateVehicleServiceDto } from '../dto/update-vehicle-service.dto';
-import { BlockchainService } from '../../blockchain/blockchain.service';
+import { BlockchainService } from '@/modules/blockchain/blockchain.service';
 import { Vehicle } from '../entities/vehicle.entity';
 import { VehicleServiceFactory } from '../factories/vehicle-service.factory';
+import { LoggerService } from '../../../common/logger/logger.service';
 
 @Injectable()
 export class VehicleServiceService {
@@ -18,29 +27,47 @@ export class VehicleServiceService {
     private vehicleRepository: Repository<Vehicle>,
     private blockchainService: BlockchainService,
     private vehicleServiceFactory: VehicleServiceFactory,
-  ) {}
+    private readonly logger: LoggerService,
+  ) {
+    this.logger.setContext('VehicleServiceService');
+  }
 
-  async create(createVehicleServiceDto: CreateVehicleServiceDto): Promise<VehicleService> {
-    // Verificar se o veículo existe e pertence ao usuário
+  async create(
+    createVehicleServiceDto: CreateVehicleServiceDto,
+  ): Promise<VehicleService> {
     const vehicle = await this.vehicleRepository.findOne({
       where: { id: createVehicleServiceDto.vehicleId },
     });
 
     if (!vehicle) {
+      this.logger.warn(
+        'Tentativa de criar serviço para veículo inexistente',
+        'VehicleServiceService',
+        {
+          vehicleId: createVehicleServiceDto.vehicleId,
+        },
+      );
       throw new BadRequestException('Veículo não encontrado');
     }
 
-    // Criar o serviço no banco de dados
     const vehicleService = this.vehicleServiceRepository.create({
       ...createVehicleServiceDto,
       status: ServiceStatus.PENDING,
     });
 
-    const savedService = await this.vehicleServiceRepository.save(vehicleService);
+    const savedService =
+      await this.vehicleServiceRepository.save(vehicleService);
 
-    // Processar blockchain de forma assíncrona (não bloquear a resposta)
-    this.processBlockchainAsync(savedService).catch(() => {
-      // Erro silenciosamente processado
+    this.processBlockchainAsync(savedService).catch((error) => {
+      this.logger.error(
+        'Erro ao processar serviço na blockchain de forma assíncrona',
+        error.stack,
+        'VehicleServiceService',
+        {
+          serviceId: savedService.id,
+          errorMessage: error.message,
+        },
+      );
     });
 
     return savedService;
@@ -52,27 +79,26 @@ export class VehicleServiceService {
    */
   private async processBlockchainAsync(service: VehicleService): Promise<void> {
     try {
-      // Primeiro, gerar o hash do serviço
       const eventData = {
         serviceId: service.id,
         vehicleId: service.vehicleId,
         type: service.type,
         description: service.description,
         serviceDate: service.serviceDate,
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
       };
-      
-      const serviceHash = ethers.keccak256(ethers.toUtf8Bytes(JSON.stringify(eventData)));
-      
-      // Registrar o hash no contrato blockchain
+
+      const serviceHash = ethers.keccak256(
+        ethers.toUtf8Bytes(JSON.stringify(eventData)),
+      );
+
       const hashResult = await this.blockchainService.registerHashInContract(
         serviceHash,
         service.vehicleId,
-        service.type || 'MANUTENCAO'
+        service.type || 'MANUTENCAO',
       );
 
       if (hashResult.success) {
-        // Atualizar o serviço com informações da blockchain
         service.blockchainHash = serviceHash;
         service.status = ServiceStatus.CONFIRMED;
         service.isImmutable = true;
@@ -82,17 +108,34 @@ export class VehicleServiceService {
 
         await this.vehicleServiceRepository.save(service);
       } else {
-        // Marcar como rejeitado quando falha na blockchain
+        this.logger.warn(
+          'Falha ao registrar serviço na blockchain',
+          'VehicleServiceService',
+          {
+            serviceId: service.id,
+            error: hashResult.error,
+          },
+        );
+
         service.status = ServiceStatus.REJECTED;
-        service.canEdit = true; // Permite edição quando rejeitado
-        
+        service.canEdit = true;
+
         await this.vehicleServiceRepository.save(service);
       }
-    } catch (_error) {
-      // Marcar como rejeitado quando há exceção na blockchain
+    } catch (error) {
+      this.logger.error(
+        'Erro ao processar serviço na blockchain',
+        error.stack,
+        'VehicleServiceService',
+        {
+          serviceId: service.id,
+          errorMessage: error.message,
+        },
+      );
+
       service.status = ServiceStatus.REJECTED;
-      service.canEdit = true; // Permite edição quando rejeitado
-      
+      service.canEdit = true;
+
       await this.vehicleServiceRepository.save(service);
     }
   }
@@ -133,11 +176,16 @@ export class VehicleServiceService {
     return await this.vehicleServiceFactory.toResponseDto(vehicleService);
   }
 
-  async update(id: string, updateVehicleServiceDto: UpdateVehicleServiceDto): Promise<VehicleService> {
+  async update(
+    id: string,
+    updateVehicleServiceDto: UpdateVehicleServiceDto,
+  ): Promise<VehicleService> {
     const vehicleService = await this.findOne(id);
 
     if (vehicleService.isImmutable) {
-      throw new BadRequestException('Este serviço não pode ser editado pois está na blockchain');
+      throw new BadRequestException(
+        'Este serviço não pode ser editado pois está na blockchain',
+      );
     }
 
     Object.assign(vehicleService, updateVehicleServiceDto);
@@ -148,7 +196,16 @@ export class VehicleServiceService {
     const vehicleService = await this.findOne(id);
 
     if (vehicleService.isImmutable) {
-      throw new BadRequestException('Este serviço não pode ser removido pois está na blockchain');
+      this.logger.warn(
+        'Tentativa de remover serviço imutável na blockchain',
+        'VehicleServiceService',
+        {
+          serviceId: id,
+        },
+      );
+      throw new BadRequestException(
+        'Este serviço não pode ser removido pois está na blockchain',
+      );
     }
 
     await this.vehicleServiceRepository.remove(vehicleService);
@@ -169,7 +226,7 @@ export class VehicleServiceService {
         type: vehicleService.type,
         description: vehicleService.description,
         serviceDate: vehicleService.serviceDate,
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
       };
       hash = ethers.keccak256(ethers.toUtf8Bytes(JSON.stringify(eventData)));
     }
@@ -185,7 +242,10 @@ export class VehicleServiceService {
     return await this.vehicleServiceRepository.save(vehicleService);
   }
 
-  async getServicesByType(type: ServiceType, userId?: string): Promise<VehicleService[]> {
+  async getServicesByType(
+    type: ServiceType,
+    userId?: string,
+  ): Promise<VehicleService[]> {
     const queryBuilder = this.vehicleServiceRepository
       .createQueryBuilder('vehicleService')
       .leftJoinAndSelect('vehicleService.vehicle', 'vehicle')
@@ -199,7 +259,10 @@ export class VehicleServiceService {
     return await queryBuilder.getMany();
   }
 
-  async getServicesByStatus(status: ServiceStatus, userId?: string): Promise<VehicleService[]> {
+  async getServicesByStatus(
+    status: ServiceStatus,
+    userId?: string,
+  ): Promise<VehicleService[]> {
     const queryBuilder = this.vehicleServiceRepository
       .createQueryBuilder('vehicleService')
       .leftJoinAndSelect('vehicleService.vehicle', 'vehicle')

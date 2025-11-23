@@ -1,11 +1,4 @@
-import {
-  Controller,
-  Get,
-  Delete,
-  Put,
-  Body,
-  UseGuards,
-} from '@nestjs/common';
+import { Controller, Get, Delete, Put, Body, UseGuards } from '@nestjs/common';
 import { UserService } from '../services/user.service';
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 import { UserResponseDto } from '../dto/user-response.dto';
@@ -18,7 +11,9 @@ export class UserController {
   constructor(private readonly userService: UserService) {}
 
   @Get('profile')
-  async getProfile(@CurrentUser() user: UserResponseDto): Promise<UserResponseDto> {
+  async getProfile(
+    @CurrentUser() user: UserResponseDto,
+  ): Promise<UserResponseDto> {
     return user;
   }
 
@@ -31,7 +26,9 @@ export class UserController {
   }
 
   @Delete('account')
-  async deleteAccount(@CurrentUser() user: UserResponseDto): Promise<{ message: string }> {
+  async deleteAccount(
+    @CurrentUser() user: UserResponseDto,
+  ): Promise<{ message: string }> {
     await this.userService.deleteAccount(user.id);
     return { message: 'Conta excluída com sucesso' };
   }

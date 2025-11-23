@@ -6,11 +6,16 @@ import { UserService } from '../user/services/user.service';
 import { UserRepository } from '../user/repositories/user.repository';
 import { AuthRegisterDto } from './dto/auth-register.dto';
 import { AuthLoginDto } from './dto/auth-login.dto';
+import { LoggerService } from '../../common/logger/logger.service';
+import { EmailService } from '../email/email.service';
+import { LoggerServiceTestHelper } from '../../common/test-helpers/logger-service.test-helper';
 
 describe('AuthService', () => {
   let service: AuthService;
   let userService: jest.Mocked<UserService>;
   let jwtService: jest.Mocked<JwtService>;
+  let mockLoggerService: jest.Mocked<LoggerService>;
+  let mockEmailService: jest.Mocked<EmailService>;
 
   const mockUser = {
     id: 'user-123',
@@ -43,6 +48,16 @@ describe('AuthService', () => {
       update: jest.fn(),
     };
 
+    mockLoggerService = LoggerServiceTestHelper.createMockLoggerService();
+    mockEmailService = {
+      sendVerificationEmail: jest.fn(),
+      sendPasswordResetEmail: jest.fn(),
+      sendWelcomeEmail: jest.fn(),
+      sendPasswordChangeNotification: jest.fn(),
+      sendAccountDeletionNotification: jest.fn(),
+      sendEmailChangeNotification: jest.fn(),
+    } as any;
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         AuthService,
@@ -57,6 +72,14 @@ describe('AuthService', () => {
         {
           provide: UserRepository,
           useValue: mockUserRepository,
+        },
+        {
+          provide: LoggerService,
+          useValue: mockLoggerService,
+        },
+        {
+          provide: EmailService,
+          useValue: mockEmailService,
         },
       ],
     }).compile();
@@ -302,6 +325,86 @@ describe('AuthService', () => {
       expect(userService.createGoogleUser).toHaveBeenCalledWith(googleUser);
       expect(result).toEqual(mockUser);
     });
+
+    it('should reactivate inactive user when found by email', async () => {
+      const googleUser = {
+        googleId: 'google-123',
+        email: 'test@example.com',
+        name: 'Test User',
+        avatar: 'avatar-url',
+      };
+
+      // Usuário inativo com authProvider 'google' (não 'local')
+      const inactiveUser = {
+        ...mockUser,
+        isActive: false,
+        authProvider: 'google',
+        googleId: 'old-google-id',
+      };
+      const reactivatedUser = {
+        ...mockUser,
+        isActive: true,
+        authProvider: 'google',
+      };
+
+      userService.findByGoogleId.mockResolvedValue(null);
+      userService.findByEmail
+        .mockResolvedValueOnce(inactiveUser as any) // Primeira chamada em validateGoogleUser
+        .mockResolvedValueOnce(reactivatedUser as any); // Segunda chamada após updateProfileAllowInactive
+      userService.updateProfileAllowInactive.mockResolvedValue(
+        reactivatedUser as any,
+      );
+
+      const result = await service.validateGoogleUser(googleUser);
+
+      expect(userService.updateProfileAllowInactive).toHaveBeenCalledWith(
+        inactiveUser.id,
+        expect.objectContaining({
+          isActive: true,
+          googleId: googleUser.googleId,
+          avatar: googleUser.avatar,
+          authProvider: 'google',
+          name: googleUser.name,
+        }),
+      );
+      expect(result.isActive).toBe(true);
+    });
+
+    it('should link Google ID to existing user without Google ID but with google authProvider', async () => {
+      const googleUser = {
+        googleId: 'google-123',
+        email: 'test@example.com',
+        name: 'Test User',
+        avatar: 'avatar-url',
+      };
+
+      // Usuário que já tem authProvider 'google' mas não tem googleId ainda
+      const userWithoutGoogleId = {
+        ...mockUser,
+        googleId: null,
+        authProvider: 'google',
+        isActive: true,
+      };
+
+      userService.findByGoogleId.mockResolvedValue(null);
+      userService.findByEmail.mockResolvedValue(userWithoutGoogleId as any);
+      userService.updateProfile.mockResolvedValue({
+        ...userWithoutGoogleId,
+        googleId: googleUser.googleId,
+      } as any);
+
+      const result = await service.validateGoogleUser(googleUser);
+
+      expect(userService.updateProfile).toHaveBeenCalledWith(
+        userWithoutGoogleId.id,
+        expect.objectContaining({
+          googleId: googleUser.googleId,
+          avatar: googleUser.avatar,
+          authProvider: 'google',
+        }),
+      );
+      expect(result).toEqual(userWithoutGoogleId);
+    });
   });
 
   describe('googleLogin', () => {
@@ -317,5 +420,297 @@ describe('AuthService', () => {
       expect(result.user.isEmailVerified).toBe(true);
     });
   });
-});
 
+  describe('changePassword', () => {
+    it('should change password successfully', async () => {
+      const changePasswordDto = {
+        currentPassword: 'OldPassword123!',
+        newPassword: 'NewPassword123!',
+        confirmPassword: 'NewPassword123!',
+      };
+
+      const mockUserRepository = {
+        findById: jest.fn().mockResolvedValue({
+          ...mockUser,
+          password: 'hashedOldPassword',
+          authProvider: 'local',
+        }),
+        update: jest.fn().mockResolvedValue(undefined),
+      };
+
+      const mockEmailService = {
+        sendPasswordChangeNotification: jest.fn().mockResolvedValue(undefined),
+      };
+
+      const module: TestingModule = await Test.createTestingModule({
+        providers: [
+          AuthService,
+          {
+            provide: UserService,
+            useValue: {
+              ...userService,
+              validatePassword: jest.fn().mockResolvedValue(true),
+            },
+          },
+          {
+            provide: JwtService,
+            useValue: jwtService,
+          },
+          {
+            provide: UserRepository,
+            useValue: mockUserRepository,
+          },
+          {
+            provide: LoggerService,
+            useValue: mockLoggerService,
+          },
+          {
+            provide: EmailService,
+            useValue: mockEmailService,
+          },
+        ],
+      }).compile();
+
+      const authService = module.get<AuthService>(AuthService);
+
+      const result = await authService.changePassword(
+        'user-123',
+        changePasswordDto,
+      );
+
+      expect(result.message).toBe('Senha alterada com sucesso');
+      expect(mockUserRepository.update).toHaveBeenCalled();
+      expect(
+        mockEmailService.sendPasswordChangeNotification,
+      ).toHaveBeenCalled();
+    });
+
+    it('should throw BadRequestException when passwords do not match', async () => {
+      const changePasswordDto = {
+        currentPassword: 'oldPassword123',
+        newPassword: 'newPassword123',
+        confirmPassword: 'differentPassword',
+      };
+
+      await expect(
+        service.changePassword('user-123', changePasswordDto),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('should throw BadRequestException when new password is weak', async () => {
+      const changePasswordDto = {
+        currentPassword: 'OldPassword123!',
+        newPassword: 'weak',
+        confirmPassword: 'weak',
+      };
+
+      await expect(
+        service.changePassword('user-123', changePasswordDto),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('should throw UnauthorizedException when user is not found', async () => {
+      const changePasswordDto = {
+        currentPassword: 'OldPassword123!',
+        newPassword: 'NewPassword123!',
+        confirmPassword: 'NewPassword123!',
+      };
+
+      const mockUserRepository = {
+        findById: jest.fn().mockResolvedValue(null),
+      };
+
+      const module: TestingModule = await Test.createTestingModule({
+        providers: [
+          AuthService,
+          {
+            provide: UserService,
+            useValue: userService,
+          },
+          {
+            provide: JwtService,
+            useValue: jwtService,
+          },
+          {
+            provide: UserRepository,
+            useValue: mockUserRepository,
+          },
+          {
+            provide: LoggerService,
+            useValue: mockLoggerService,
+          },
+          {
+            provide: EmailService,
+            useValue: mockEmailService,
+          },
+        ],
+      }).compile();
+
+      const authService = module.get<AuthService>(AuthService);
+
+      await expect(
+        authService.changePassword('user-123', changePasswordDto),
+      ).rejects.toThrow(UnauthorizedException);
+    });
+
+    it('should throw BadRequestException when user is Google authenticated', async () => {
+      const changePasswordDto = {
+        currentPassword: 'OldPassword123!',
+        newPassword: 'NewPassword123!',
+        confirmPassword: 'NewPassword123!',
+      };
+
+      const mockUserRepository = {
+        findById: jest.fn().mockResolvedValue({
+          ...mockUser,
+          authProvider: 'google',
+        }),
+      };
+
+      const module: TestingModule = await Test.createTestingModule({
+        providers: [
+          AuthService,
+          {
+            provide: UserService,
+            useValue: userService,
+          },
+          {
+            provide: JwtService,
+            useValue: jwtService,
+          },
+          {
+            provide: UserRepository,
+            useValue: mockUserRepository,
+          },
+          {
+            provide: LoggerService,
+            useValue: mockLoggerService,
+          },
+          {
+            provide: EmailService,
+            useValue: mockEmailService,
+          },
+        ],
+      }).compile();
+
+      const authService = module.get<AuthService>(AuthService);
+
+      await expect(
+        authService.changePassword('user-123', changePasswordDto),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('should throw UnauthorizedException when current password is incorrect', async () => {
+      const changePasswordDto = {
+        currentPassword: 'WrongPassword123!',
+        newPassword: 'NewPassword123!',
+        confirmPassword: 'NewPassword123!',
+      };
+
+      const mockUserRepository = {
+        findById: jest.fn().mockResolvedValue({
+          ...mockUser,
+          password: 'hashedPassword',
+          authProvider: 'local',
+        }),
+      };
+
+      const module: TestingModule = await Test.createTestingModule({
+        providers: [
+          AuthService,
+          {
+            provide: UserService,
+            useValue: {
+              ...userService,
+              validatePassword: jest.fn().mockResolvedValue(false),
+            },
+          },
+          {
+            provide: JwtService,
+            useValue: jwtService,
+          },
+          {
+            provide: UserRepository,
+            useValue: mockUserRepository,
+          },
+          {
+            provide: LoggerService,
+            useValue: mockLoggerService,
+          },
+          {
+            provide: EmailService,
+            useValue: mockEmailService,
+          },
+        ],
+      }).compile();
+
+      const authService = module.get<AuthService>(AuthService);
+
+      await expect(
+        authService.changePassword('user-123', changePasswordDto),
+      ).rejects.toThrow(UnauthorizedException);
+    });
+
+    it('should continue even if email notification fails', async () => {
+      const changePasswordDto = {
+        currentPassword: 'OldPassword123!',
+        newPassword: 'NewPassword123!',
+        confirmPassword: 'NewPassword123!',
+      };
+
+      const mockUserRepository = {
+        findById: jest.fn().mockResolvedValue({
+          ...mockUser,
+          password: 'hashedOldPassword',
+          authProvider: 'local',
+        }),
+        update: jest.fn().mockResolvedValue(undefined),
+      };
+
+      const mockEmailServiceWithError = {
+        sendPasswordChangeNotification: jest
+          .fn()
+          .mockRejectedValue(new Error('Email error')),
+      };
+
+      const module: TestingModule = await Test.createTestingModule({
+        providers: [
+          AuthService,
+          {
+            provide: UserService,
+            useValue: {
+              ...userService,
+              validatePassword: jest.fn().mockResolvedValue(true),
+            },
+          },
+          {
+            provide: JwtService,
+            useValue: jwtService,
+          },
+          {
+            provide: UserRepository,
+            useValue: mockUserRepository,
+          },
+          {
+            provide: LoggerService,
+            useValue: mockLoggerService,
+          },
+          {
+            provide: EmailService,
+            useValue: mockEmailServiceWithError,
+          },
+        ],
+      }).compile();
+
+      const authService = module.get<AuthService>(AuthService);
+
+      const result = await authService.changePassword(
+        'user-123',
+        changePasswordDto,
+      );
+
+      expect(result.message).toBe('Senha alterada com sucesso');
+      expect(mockUserRepository.update).toHaveBeenCalled();
+    });
+  });
+});

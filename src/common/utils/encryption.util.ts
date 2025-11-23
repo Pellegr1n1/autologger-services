@@ -2,12 +2,12 @@ import * as crypto from 'node:crypto';
 
 /**
  * Utilitário de criptografia para dados sensíveis
- * 
+ *
  * IMPORTANTE: Usa criptografia determinística (mesmo input = mesmo output)
  * para permitir buscas e constraints UNIQUE no banco de dados.
- * 
- * NOTA DE SEGURANÇA: Criptografia determinística permite verificações de 
- * unicidade sem descriptografar todos os registros, mas oferece menos 
+ *
+ * NOTA DE SEGURANÇA: Criptografia determinística permite verificações de
+ * unicidade sem descriptografar todos os registros, mas oferece menos
  * proteção contra análise de padrões. Adequado para placas de veículos.
  */
 export class EncryptionUtil {
@@ -25,7 +25,7 @@ export class EncryptionUtil {
     if (!key) {
       throw new Error(
         'ENCRYPTION_KEY não configurada. Defina uma chave de 32 bytes (64 caracteres hex) ' +
-        'ou use SHA256 de uma string secreta.'
+          'ou use SHA256 de uma string secreta.',
       );
     }
 
@@ -49,7 +49,7 @@ export class EncryptionUtil {
 
     try {
       const key = this.getEncryptionKey();
-      
+
       // Para criptografia determinística, usar um IV fixo derivado do texto
       // Isso permite que o mesmo texto sempre gere a mesma criptografia
       const iv = crypto
@@ -59,7 +59,7 @@ export class EncryptionUtil {
         .slice(0, this.IV_LENGTH);
 
       const cipher = crypto.createCipheriv(this.ALGORITHM, key, iv);
-      
+
       let encrypted = cipher.update(text, 'utf8', 'hex');
       encrypted += cipher.final('hex');
 
@@ -81,18 +81,18 @@ export class EncryptionUtil {
 
     try {
       const key = this.getEncryptionKey();
-      
+
       // Decodificar base64
       const combined = Buffer.from(encryptedText, 'base64').toString('hex');
-      
+
       // Extrair IV (primeiros 32 caracteres hex = 16 bytes)
       const iv = Buffer.from(combined.slice(0, this.IV_LENGTH * 2), 'hex');
-      
+
       // Extrair texto criptografado
       const encrypted = combined.slice(this.IV_LENGTH * 2);
 
       const decipher = crypto.createDecipheriv(this.ALGORITHM, key, iv);
-      
+
       let decrypted = decipher.update(encrypted, 'hex', 'utf8');
       decrypted += decipher.final('utf8');
 
@@ -113,4 +113,3 @@ export class EncryptionUtil {
     }
   }
 }
-

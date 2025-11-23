@@ -1,4 +1,13 @@
-import { Controller, Get, Post, Req, Res, UseGuards, Body, BadRequestException } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Req,
+  Res,
+  UseGuards,
+  Body,
+  BadRequestException,
+} from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { Request, Response } from 'express';
 import { AuthService } from '../auth.service';
@@ -24,11 +33,11 @@ export class GoogleAuthController {
     try {
       const user = req.user as any;
       const result = await this.authService.googleLogin(user);
-      
+
       // Configurar cookie httpOnly
       const isProduction = process.env.NODE_ENV === 'production';
       const maxAge = 24 * 60 * 60 * 1000; // 24 horas
-      
+
       const cookieOptions: any = {
         httpOnly: true,
         secure: isProduction,
@@ -36,14 +45,14 @@ export class GoogleAuthController {
         maxAge,
         path: '/',
       };
-      
+
       // Em desenvolvimento, usar domain 'localhost' para compartilhar cookie entre portas
       if (!isProduction) {
         cookieOptions.domain = 'localhost';
       }
-      
+
       res.cookie('autologger_token', result.access_token, cookieOptions);
-      
+
       const { frontendUrl } = validateGoogleOAuthEnvVars();
       const safeUserData = {
         id: result.user.id,
@@ -53,11 +62,12 @@ export class GoogleAuthController {
         authProvider: 'google',
       };
       const redirectUrl = `${frontendUrl}/auth/callback?user=${encodeURIComponent(JSON.stringify(safeUserData))}`;
-      
+
       res.redirect(redirectUrl);
     } catch (error) {
       const { frontendUrl } = validateGoogleOAuthEnvVars();
-      const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido';
+      const errorMessage =
+        error instanceof Error ? error.message : 'Erro desconhecido';
       const redirectUrl = `${frontendUrl}/auth/callback?error=${encodeURIComponent(errorMessage)}`;
       res.redirect(redirectUrl);
     }
@@ -65,11 +75,14 @@ export class GoogleAuthController {
 
   @Public()
   @Post('authenticate')
-  async authenticateWithGoogle(@Body() body: { credential?: string; code?: string }, @Res() res: Response): Promise<void> {
+  async authenticateWithGoogle(
+    @Body() body: { credential?: string; code?: string },
+    @Res() res: Response,
+  ): Promise<void> {
     const { credential, code } = body;
-    
+
     let result: AuthResponseDto;
-    
+
     if (code) {
       result = await this.handleOAuth2Code(code);
     } else if (credential) {
@@ -82,34 +95,42 @@ export class GoogleAuthController {
         // Validar e decodificar payload do JWT de forma segura
         const decoded = Buffer.from(parts[1], 'base64').toString('utf-8');
         const payload = JSON.parse(decoded);
-        
+
         if (!payload.sub || !payload.email) {
-          throw new BadRequestException('Invalid Google credential: missing required fields');
+          throw new BadRequestException(
+            'Invalid Google credential: missing required fields',
+          );
         }
-        
+
         const googleUser = {
           googleId: payload.sub,
           email: payload.email,
-          name: payload.name || payload.given_name + ' ' + payload.family_name || 'Google User',
+          name:
+            payload.name ||
+            payload.given_name + ' ' + payload.family_name ||
+            'Google User',
           avatar: payload.picture,
           authProvider: 'google' as const,
         };
 
-        const validatedUser = await this.authService.validateGoogleUser(googleUser);
+        const validatedUser =
+          await this.authService.validateGoogleUser(googleUser);
         result = await this.authService.googleLogin(validatedUser);
       } catch (error) {
         if (error instanceof BadRequestException) {
           throw error;
         }
-        throw new BadRequestException('Invalid Google credential: ' + error.message);
+        throw new BadRequestException(
+          'Invalid Google credential: ' + error.message,
+        );
       }
     } else {
       throw new BadRequestException('Credential or code is required');
     }
-    
+
     const isProduction = process.env.NODE_ENV === 'production';
     const maxAge = 24 * 60 * 60 * 1000; // 24 horas
-    
+
     const cookieOptions: any = {
       httpOnly: true,
       secure: isProduction,
@@ -117,14 +138,14 @@ export class GoogleAuthController {
       maxAge,
       path: '/',
     };
-    
+
     // Em desenvolvimento, usar domain 'localhost' para compartilhar cookie entre portas
     if (!isProduction) {
       cookieOptions.domain = 'localhost';
     }
-    
+
     res.cookie('autologger_token', result.access_token, cookieOptions);
-    
+
     res.json({
       user: result.user,
     });
@@ -133,20 +154,24 @@ export class GoogleAuthController {
   private async handleOAuth2Code(code: string): Promise<AuthResponseDto> {
     try {
       const tokenResponse = await this.exchangeCodeForToken(code);
-      
+
       const userInfo = await this.getUserInfo(tokenResponse.access_token);
-      
+
       const googleUser = {
         googleId: userInfo.id,
         email: userInfo.email,
-        name: userInfo.name || userInfo.given_name + ' ' + userInfo.family_name || 'Google User',
+        name:
+          userInfo.name ||
+          userInfo.given_name + ' ' + userInfo.family_name ||
+          'Google User',
         avatar: userInfo.picture,
         authProvider: 'google' as const,
       };
 
-      const validatedUser = await this.authService.validateGoogleUser(googleUser);
+      const validatedUser =
+        await this.authService.validateGoogleUser(googleUser);
       const result = await this.authService.googleLogin(validatedUser);
-      
+
       return result;
     } catch (error) {
       throw new BadRequestException('Invalid OAuth2 code: ' + error.message);
@@ -155,12 +180,15 @@ export class GoogleAuthController {
 
   private async exchangeCodeForToken(code: string): Promise<any> {
     const tokenUrl = 'https://oauth2.googleapis.com/token';
-    const { clientId, clientSecret, frontendUrl } = validateGoogleOAuthEnvVars();
-    
+    const { clientId, clientSecret, frontendUrl } =
+      validateGoogleOAuthEnvVars();
+
     if (!clientId || !clientSecret) {
-      throw new BadRequestException('Google OAuth não está configurado. Configure GOOGLE_CLIENT_ID e GOOGLE_CLIENT_SECRET.');
+      throw new BadRequestException(
+        'Google OAuth não está configurado. Configure GOOGLE_CLIENT_ID e GOOGLE_CLIENT_SECRET.',
+      );
     }
-    
+
     const redirectUri = `${frontendUrl}/auth/callback`;
 
     const response = await fetch(tokenUrl, {
@@ -187,10 +215,10 @@ export class GoogleAuthController {
 
   private async getUserInfo(accessToken: string): Promise<any> {
     const userInfoUrl = 'https://www.googleapis.com/oauth2/v2/userinfo';
-    
+
     const response = await fetch(userInfoUrl, {
       headers: {
-        'Authorization': `Bearer ${accessToken}`,
+        Authorization: `Bearer ${accessToken}`,
       },
     });
 

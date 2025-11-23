@@ -10,4 +10,3 @@ describe('VehicleModule', () => {
     expect(module).toBeInstanceOf(VehicleModule);
   });
 });
-

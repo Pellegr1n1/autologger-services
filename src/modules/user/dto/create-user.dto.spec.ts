@@ -21,7 +21,7 @@ describe('CreateUserDto', () => {
       await DtoValidationTestHelper.expectInvalid(
         CreateUserDto,
         { ...validData, name: 'A' },
-        'name'
+        'name',
       );
     });
 
@@ -29,7 +29,7 @@ describe('CreateUserDto', () => {
       await DtoValidationTestHelper.expectInvalid(
         CreateUserDto,
         { ...validData, email: 'invalid-email' },
-        'email'
+        'email',
       );
     });
 
@@ -37,14 +37,17 @@ describe('CreateUserDto', () => {
       await DtoValidationTestHelper.expectInvalid(
         CreateUserDto,
         { ...validData, password: 'short' },
-        'password'
+        'password',
       );
     });
 
     it('should pass validation when password is optional', async () => {
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
       const { password: _password, ...dataWithoutPassword } = validData;
-      await DtoValidationTestHelper.expectValid(CreateUserDto, dataWithoutPassword);
+      await DtoValidationTestHelper.expectValid(
+        CreateUserDto,
+        dataWithoutPassword,
+      );
     });
   });
 });
-

@@ -1,4 +1,11 @@
-import { IsEmail, IsString, MinLength, IsOptional, IsEnum, IsBoolean } from 'class-validator';
+import {
+  IsEmail,
+  IsString,
+  MinLength,
+  IsOptional,
+  IsEnum,
+  IsBoolean,
+} from 'class-validator';
 
 export class UpdateUserDto {
   @IsOptional()
@@ -10,7 +17,6 @@ export class UpdateUserDto {
   @IsEmail({}, { message: 'Email deve ter um formato válido' })
   email?: string;
 
-
   @IsOptional()
   @IsString({ message: 'Google ID deve ser uma string' })
   googleId?: string;
@@ -20,7 +26,9 @@ export class UpdateUserDto {
   avatar?: string;
 
   @IsOptional()
-  @IsEnum(['local', 'google'], { message: 'Provedor de autenticação deve ser local ou google' })
+  @IsEnum(['local', 'google'], {
+    message: 'Provedor de autenticação deve ser local ou google',
+  })
   authProvider?: 'local' | 'google';
 
   @IsOptional()

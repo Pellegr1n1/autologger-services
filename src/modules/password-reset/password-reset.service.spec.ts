@@ -146,7 +146,11 @@ describe('PasswordResetService', () => {
       tokenRepository.findByToken.mockResolvedValue(null);
 
       await expect(
-        service.resetPassword('invalid-token', 'NewPassword123!', 'NewPassword123!'),
+        service.resetPassword(
+          'invalid-token',
+          'NewPassword123!',
+          'NewPassword123!',
+        ),
       ).rejects.toThrow(NotFoundException);
     });
 
@@ -155,7 +159,11 @@ describe('PasswordResetService', () => {
       tokenRepository.findByToken.mockResolvedValue(usedToken as any);
 
       await expect(
-        service.resetPassword('reset-token', 'NewPassword123!', 'NewPassword123!'),
+        service.resetPassword(
+          'reset-token',
+          'NewPassword123!',
+          'NewPassword123!',
+        ),
       ).rejects.toThrow(BadRequestException);
     });
 
@@ -167,7 +175,11 @@ describe('PasswordResetService', () => {
       tokenRepository.findByToken.mockResolvedValue(expiredToken as any);
 
       await expect(
-        service.resetPassword('reset-token', 'NewPassword123!', 'NewPassword123!'),
+        service.resetPassword(
+          'reset-token',
+          'NewPassword123!',
+          'NewPassword123!',
+        ),
       ).rejects.toThrow(BadRequestException);
     });
   });
@@ -211,4 +223,3 @@ describe('PasswordResetService', () => {
     });
   });
 });
-

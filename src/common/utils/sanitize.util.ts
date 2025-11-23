@@ -37,8 +37,9 @@ export function sanitizeUserName(userName: string | null | undefined): string {
 
   // Remove caracteres HTML perigosos e limita tamanho
   const sanitized = escapeHtml(userName.trim());
-  
-  // Limita a 100 caracteres para evitar problemas de layout
-  return sanitized.length > 100 ? sanitized.substring(0, 100) + '...' : sanitized;
-}
 
+  // Limita a 100 caracteres para evitar problemas de layout
+  return sanitized.length > 100
+    ? sanitized.substring(0, 100) + '...'
+    : sanitized;
+}

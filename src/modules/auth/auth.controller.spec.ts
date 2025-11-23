@@ -6,6 +6,8 @@ import { EmailVerificationService } from '../email-verification/email-verificati
 import { PasswordResetService } from '../password-reset/password-reset.service';
 import { AuthRegisterDto } from './dto/auth-register.dto';
 import { AuthLoginDto } from './dto/auth-login.dto';
+import { LoggerService } from '../../common/logger/logger.service';
+import { LoggerServiceTestHelper } from '../../common/test-helpers/logger-service.test-helper';
 
 describe('AuthController', () => {
   let controller: AuthController;
@@ -43,6 +45,8 @@ describe('AuthController', () => {
       resetPassword: jest.fn(),
     };
 
+    const mockLoggerService = LoggerServiceTestHelper.createMockLoggerService();
+
     const module: TestingModule = await Test.createTestingModule({
       controllers: [AuthController],
       providers: [
@@ -63,6 +67,10 @@ describe('AuthController', () => {
           useValue: {
             get: jest.fn(),
           },
+        },
+        {
+          provide: LoggerService,
+          useValue: mockLoggerService,
         },
       ],
     }).compile();
@@ -263,4 +271,3 @@ describe('AuthController', () => {
     });
   });
 });
-

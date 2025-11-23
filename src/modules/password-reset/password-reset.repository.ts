@@ -13,4 +13,3 @@ export class PasswordResetRepository extends BaseTokenRepository<PasswordResetTo
     super(tokenRepository);
   }
 }
-

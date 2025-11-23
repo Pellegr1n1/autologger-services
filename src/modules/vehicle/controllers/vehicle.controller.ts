@@ -75,11 +75,11 @@ export class VehicleController {
   ): Promise<VehicleResponseDto> {
     const vehicleData = {
       ...createVehicleDto,
-      year: parseInt(createVehicleDto.year as any),
-      mileage: parseInt(createVehicleDto.mileage as any) || 0,
+      year: Number.parseInt(createVehicleDto.year as any, 10),
+      mileage: Number.parseInt(createVehicleDto.mileage as any, 10) || 0,
       photo,
     };
-    
+
     return this.vehicleService.createVehicle(vehicleData, user.id);
   }
 
@@ -160,11 +160,15 @@ export class VehicleController {
   ): Promise<VehicleResponseDto> {
     const vehicleData = {
       ...updateVehicleDto,
-      year: updateVehicleDto.year ? parseInt(updateVehicleDto.year as any) : undefined,
-      mileage: updateVehicleDto.mileage ? parseInt(updateVehicleDto.mileage as any) : undefined,
+      year: updateVehicleDto.year
+        ? Number.parseInt(updateVehicleDto.year as any, 10)
+        : undefined,
+      mileage: updateVehicleDto.mileage
+        ? Number.parseInt(updateVehicleDto.mileage as any, 10)
+        : undefined,
       photo,
     };
-    
+
     return this.vehicleService.updateVehicle(id, vehicleData, user.id);
   }
 
@@ -189,7 +193,11 @@ export class VehicleController {
     @Body() markVehicleSoldDto: MarkVehicleSoldDto,
     @CurrentUser() user: UserResponseDto,
   ): Promise<VehicleResponseDto> {
-    return this.vehicleService.markVehicleAsSold(id, markVehicleSoldDto, user.id);
+    return this.vehicleService.markVehicleAsSold(
+      id,
+      markVehicleSoldDto,
+      user.id,
+    );
   }
 
   @Get('stats/active-count')
@@ -209,7 +217,7 @@ export class VehicleController {
   async getActiveVehiclesStats(@CurrentUser() user: UserResponseDto) {
     const count = await this.vehicleService.getActiveVehiclesCount(user.id);
     const limit = 2;
-    
+
     return {
       count,
       limit,

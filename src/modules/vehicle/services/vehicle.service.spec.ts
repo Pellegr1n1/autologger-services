@@ -9,6 +9,8 @@ import { CreateVehicleDto } from '../dto/create-vehicle.dto';
 import { UpdateVehicleDto } from '../dto/update-vehicle.dto';
 import { MarkVehicleSoldDto } from '../dto/mark-vehicle-sold.dto';
 import { VehicleStatus } from '../enums/vehicle-status.enum';
+import { LoggerService } from '../../../common/logger/logger.service';
+import { LoggerServiceTestHelper } from '../../../common/test-helpers/logger-service.test-helper';
 
 describe('VehicleService', () => {
   let service: VehicleService;
@@ -74,6 +76,8 @@ describe('VehicleService', () => {
       deletePhoto: jest.fn(),
     };
 
+    const mockLoggerService = LoggerServiceTestHelper.createMockLoggerService();
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         VehicleService,
@@ -92,6 +96,10 @@ describe('VehicleService', () => {
         {
           provide: FileUploadService,
           useValue: mockFileUploadService,
+        },
+        {
+          provide: LoggerService,
+          useValue: mockLoggerService,
         },
       ],
     }).compile();
@@ -124,17 +132,12 @@ describe('VehicleService', () => {
       repository.create.mockResolvedValue(mockVehicle as any);
       vehicleFactory.toResponseDto.mockResolvedValue(mockResponseDto);
 
-      const result = await service.createVehicle(
-        createVehicleDto,
-        'user-123',
-      );
+      const result = await service.createVehicle(createVehicleDto, 'user-123');
 
       expect(businessRules.validateActiveVehicleLimit).toHaveBeenCalledWith(
         'user-123',
       );
-      expect(businessRules.validateUniquePlate).toHaveBeenCalledWith(
-        'ABC1234',
-      );
+      expect(businessRules.validateUniquePlate).toHaveBeenCalledWith('ABC1234');
       expect(repository.create).toHaveBeenCalled();
       expect(result).toEqual(mockResponseDto);
     });
@@ -339,4 +342,3 @@ describe('VehicleService', () => {
     });
   });
 });
-

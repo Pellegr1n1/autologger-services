@@ -3,12 +3,18 @@ import { getRepositoryToken } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { VehicleServiceService } from './vehicle-service.service';
-import { VehicleService, ServiceStatus, ServiceType } from '../entities/vehicle-service.entity';
+import {
+  VehicleService,
+  ServiceStatus,
+  ServiceType,
+} from '../entities/vehicle-service.entity';
 import { Vehicle } from '../entities/vehicle.entity';
 import { BlockchainService } from '../../blockchain/blockchain.service';
 import { VehicleServiceFactory } from '../factories/vehicle-service.factory';
 import { CreateVehicleServiceDto } from '../dto/create-vehicle-service.dto';
 import { UpdateVehicleServiceDto } from '../dto/update-vehicle-service.dto';
+import { LoggerService } from '../../../common/logger/logger.service';
+import { LoggerServiceTestHelper } from '../../../common/test-helpers/logger-service.test-helper';
 
 describe('VehicleServiceService', () => {
   let service: VehicleServiceService;
@@ -70,6 +76,8 @@ describe('VehicleServiceService', () => {
       toResponseDtoArray: jest.fn((services) => Promise.resolve(services)),
     };
 
+    const mockLoggerService = LoggerServiceTestHelper.createMockLoggerService();
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         VehicleServiceService,
@@ -88,6 +96,10 @@ describe('VehicleServiceService', () => {
         {
           provide: VehicleServiceFactory,
           useValue: mockVehicleServiceFactory,
+        },
+        {
+          provide: LoggerService,
+          useValue: mockLoggerService,
         },
       ],
     }).compile();
@@ -116,9 +128,15 @@ describe('VehicleServiceService', () => {
       };
 
       vehicleRepository.findOne.mockResolvedValue(mockVehicle as any);
-      vehicleServiceRepository.create.mockReturnValue(mockVehicleService as any);
-      vehicleServiceRepository.save.mockResolvedValue(mockVehicleService as any);
-      blockchainService.registerHashInContract.mockResolvedValue({ success: true });
+      vehicleServiceRepository.create.mockReturnValue(
+        mockVehicleService as any,
+      );
+      vehicleServiceRepository.save.mockResolvedValue(
+        mockVehicleService as any,
+      );
+      blockchainService.registerHashInContract.mockResolvedValue({
+        success: true,
+      });
 
       const result = await service.create(createDto);
 
@@ -146,7 +164,9 @@ describe('VehicleServiceService', () => {
 
       vehicleRepository.findOne.mockResolvedValue(null);
 
-      await expect(service.create(createDto)).rejects.toThrow(BadRequestException);
+      await expect(service.create(createDto)).rejects.toThrow(
+        BadRequestException,
+      );
     });
 
     it('should handle blockchain processing error', async () => {
@@ -162,9 +182,15 @@ describe('VehicleServiceService', () => {
       };
 
       vehicleRepository.findOne.mockResolvedValue(mockVehicle as any);
-      vehicleServiceRepository.create.mockReturnValue(mockVehicleService as any);
-      vehicleServiceRepository.save.mockResolvedValue(mockVehicleService as any);
-      blockchainService.registerHashInContract.mockRejectedValue(new Error('Blockchain error'));
+      vehicleServiceRepository.create.mockReturnValue(
+        mockVehicleService as any,
+      );
+      vehicleServiceRepository.save.mockResolvedValue(
+        mockVehicleService as any,
+      );
+      blockchainService.registerHashInContract.mockRejectedValue(
+        new Error('Blockchain error'),
+      );
 
       const consoleSpy = jest.spyOn(console, 'error').mockImplementation();
 
@@ -172,8 +198,8 @@ describe('VehicleServiceService', () => {
 
       expect(result).toEqual(mockVehicleService);
       // Wait a bit for async processing
-      await new Promise(resolve => setTimeout(resolve, 100));
-      
+      await new Promise((resolve) => setTimeout(resolve, 100));
+
       consoleSpy.mockRestore();
     });
   });
@@ -188,11 +214,16 @@ describe('VehicleServiceService', () => {
         getMany: jest.fn().mockResolvedValue(services),
       };
 
-      vehicleServiceRepository.createQueryBuilder.mockReturnValue(queryBuilder as any);
+      vehicleServiceRepository.createQueryBuilder.mockReturnValue(
+        queryBuilder as any,
+      );
 
       const result = await service.findAll('user-123');
 
-      expect(queryBuilder.where).toHaveBeenCalledWith('vehicle.userId = :userId', { userId: 'user-123' });
+      expect(queryBuilder.where).toHaveBeenCalledWith(
+        'vehicle.userId = :userId',
+        { userId: 'user-123' },
+      );
       expect(result).toEqual(services);
     });
 
@@ -205,7 +236,9 @@ describe('VehicleServiceService', () => {
         getMany: jest.fn().mockResolvedValue(services),
       };
 
-      vehicleServiceRepository.createQueryBuilder.mockReturnValue(queryBuilder as any);
+      vehicleServiceRepository.createQueryBuilder.mockReturnValue(
+        queryBuilder as any,
+      );
 
       const result = await service.findAll();
 
@@ -232,7 +265,9 @@ describe('VehicleServiceService', () => {
 
   describe('findOne', () => {
     it('should return service by id', async () => {
-      vehicleServiceRepository.findOne.mockResolvedValue(mockVehicleService as any);
+      vehicleServiceRepository.findOne.mockResolvedValue(
+        mockVehicleService as any,
+      );
 
       const result = await service.findOne('service-123');
 
@@ -246,7 +281,9 @@ describe('VehicleServiceService', () => {
     it('should throw NotFoundException when service not found', async () => {
       vehicleServiceRepository.findOne.mockResolvedValue(null);
 
-      await expect(service.findOne('service-999')).rejects.toThrow(NotFoundException);
+      await expect(service.findOne('service-999')).rejects.toThrow(
+        NotFoundException,
+      );
     });
   });
 
@@ -257,8 +294,13 @@ describe('VehicleServiceService', () => {
       };
 
       const serviceToUpdate = { ...mockVehicleService, isImmutable: false };
-      const updatedService = { ...serviceToUpdate, description: 'Nova descricao' };
-      vehicleServiceRepository.findOne.mockResolvedValue(serviceToUpdate as any);
+      const updatedService = {
+        ...serviceToUpdate,
+        description: 'Nova descricao',
+      };
+      vehicleServiceRepository.findOne.mockResolvedValue(
+        serviceToUpdate as any,
+      );
       vehicleServiceRepository.save.mockResolvedValue(updatedService as any);
 
       const result = await service.update('service-123', updateDto);
@@ -273,28 +315,40 @@ describe('VehicleServiceService', () => {
       };
 
       const immutableService = { ...mockVehicleService, isImmutable: true };
-      vehicleServiceRepository.findOne.mockResolvedValue(immutableService as any);
+      vehicleServiceRepository.findOne.mockResolvedValue(
+        immutableService as any,
+      );
 
-      await expect(service.update('service-123', updateDto)).rejects.toThrow(BadRequestException);
+      await expect(service.update('service-123', updateDto)).rejects.toThrow(
+        BadRequestException,
+      );
     });
   });
 
   describe('remove', () => {
     it('should remove service successfully', async () => {
       const serviceToRemove = { ...mockVehicleService, isImmutable: false };
-      vehicleServiceRepository.findOne.mockResolvedValue(serviceToRemove as any);
+      vehicleServiceRepository.findOne.mockResolvedValue(
+        serviceToRemove as any,
+      );
       vehicleServiceRepository.remove.mockResolvedValue(serviceToRemove as any);
 
       await service.remove('service-123');
 
-      expect(vehicleServiceRepository.remove).toHaveBeenCalledWith(serviceToRemove);
+      expect(vehicleServiceRepository.remove).toHaveBeenCalledWith(
+        serviceToRemove,
+      );
     });
 
     it('should throw BadRequestException when service is immutable', async () => {
       const immutableService = { ...mockVehicleService, isImmutable: true };
-      vehicleServiceRepository.findOne.mockResolvedValue(immutableService as any);
+      vehicleServiceRepository.findOne.mockResolvedValue(
+        immutableService as any,
+      );
 
-      await expect(service.remove('service-123')).rejects.toThrow(BadRequestException);
+      await expect(service.remove('service-123')).rejects.toThrow(
+        BadRequestException,
+      );
     });
   });
 
@@ -309,10 +363,16 @@ describe('VehicleServiceService', () => {
         status: ServiceStatus.PENDING,
       };
 
-      vehicleServiceRepository.findOne.mockResolvedValue(mockVehicleService as any);
+      vehicleServiceRepository.findOne.mockResolvedValue(
+        mockVehicleService as any,
+      );
       vehicleServiceRepository.save.mockResolvedValue(updatedService as any);
 
-      const result = await service.updateBlockchainStatus('service-123', hash, confirmedBy);
+      const result = await service.updateBlockchainStatus(
+        'service-123',
+        hash,
+        confirmedBy,
+      );
 
       expect(vehicleServiceRepository.save).toHaveBeenCalled();
       expect(result.blockchainHash).toBe(hash);
@@ -327,10 +387,16 @@ describe('VehicleServiceService', () => {
         status: ServiceStatus.PENDING,
       };
 
-      vehicleServiceRepository.findOne.mockResolvedValue(mockVehicleService as any);
+      vehicleServiceRepository.findOne.mockResolvedValue(
+        mockVehicleService as any,
+      );
       vehicleServiceRepository.save.mockResolvedValue(updatedService as any);
 
-      const result = await service.updateBlockchainStatus('service-123', null, confirmedBy);
+      const result = await service.updateBlockchainStatus(
+        'service-123',
+        null,
+        confirmedBy,
+      );
 
       expect(vehicleServiceRepository.save).toHaveBeenCalled();
       expect(result.blockchainHash).toBeDefined();
@@ -348,12 +414,23 @@ describe('VehicleServiceService', () => {
         getMany: jest.fn().mockResolvedValue(services),
       };
 
-      vehicleServiceRepository.createQueryBuilder.mockReturnValue(queryBuilder as any);
+      vehicleServiceRepository.createQueryBuilder.mockReturnValue(
+        queryBuilder as any,
+      );
 
-      const result = await service.getServicesByType(ServiceType.MAINTENANCE, 'user-123');
+      const result = await service.getServicesByType(
+        ServiceType.MAINTENANCE,
+        'user-123',
+      );
 
-      expect(queryBuilder.where).toHaveBeenCalledWith('vehicleService.type = :type', { type: ServiceType.MAINTENANCE });
-      expect(queryBuilder.andWhere).toHaveBeenCalledWith('vehicle.userId = :userId', { userId: 'user-123' });
+      expect(queryBuilder.where).toHaveBeenCalledWith(
+        'vehicleService.type = :type',
+        { type: ServiceType.MAINTENANCE },
+      );
+      expect(queryBuilder.andWhere).toHaveBeenCalledWith(
+        'vehicle.userId = :userId',
+        { userId: 'user-123' },
+      );
       expect(result).toEqual(services);
     });
 
@@ -367,7 +444,9 @@ describe('VehicleServiceService', () => {
         getMany: jest.fn().mockResolvedValue(services),
       };
 
-      vehicleServiceRepository.createQueryBuilder.mockReturnValue(queryBuilder as any);
+      vehicleServiceRepository.createQueryBuilder.mockReturnValue(
+        queryBuilder as any,
+      );
 
       const result = await service.getServicesByType(ServiceType.MAINTENANCE);
 
@@ -387,12 +466,23 @@ describe('VehicleServiceService', () => {
         getMany: jest.fn().mockResolvedValue(services),
       };
 
-      vehicleServiceRepository.createQueryBuilder.mockReturnValue(queryBuilder as any);
+      vehicleServiceRepository.createQueryBuilder.mockReturnValue(
+        queryBuilder as any,
+      );
 
-      const result = await service.getServicesByStatus(ServiceStatus.PENDING, 'user-123');
+      const result = await service.getServicesByStatus(
+        ServiceStatus.PENDING,
+        'user-123',
+      );
 
-      expect(queryBuilder.where).toHaveBeenCalledWith('vehicleService.status = :status', { status: ServiceStatus.PENDING });
-      expect(queryBuilder.andWhere).toHaveBeenCalledWith('vehicle.userId = :userId', { userId: 'user-123' });
+      expect(queryBuilder.where).toHaveBeenCalledWith(
+        'vehicleService.status = :status',
+        { status: ServiceStatus.PENDING },
+      );
+      expect(queryBuilder.andWhere).toHaveBeenCalledWith(
+        'vehicle.userId = :userId',
+        { userId: 'user-123' },
+      );
       expect(result).toEqual(services);
     });
   });
@@ -410,15 +500,27 @@ describe('VehicleServiceService', () => {
         getMany: jest.fn().mockResolvedValue(services),
       };
 
-      vehicleServiceRepository.createQueryBuilder.mockReturnValue(queryBuilder as any);
+      vehicleServiceRepository.createQueryBuilder.mockReturnValue(
+        queryBuilder as any,
+      );
 
-      const result = await service.getServicesByDateRange(startDate, endDate, 'user-123');
-
-      expect(queryBuilder.where).toHaveBeenCalledWith('service.serviceDate BETWEEN :startDate AND :endDate', {
+      const result = await service.getServicesByDateRange(
         startDate,
         endDate,
-      });
-      expect(queryBuilder.andWhere).toHaveBeenCalledWith('vehicle.userId = :userId', { userId: 'user-123' });
+        'user-123',
+      );
+
+      expect(queryBuilder.where).toHaveBeenCalledWith(
+        'service.serviceDate BETWEEN :startDate AND :endDate',
+        {
+          startDate,
+          endDate,
+        },
+      );
+      expect(queryBuilder.andWhere).toHaveBeenCalledWith(
+        'vehicle.userId = :userId',
+        { userId: 'user-123' },
+      );
       expect(result).toEqual(services);
     });
   });
@@ -433,14 +535,19 @@ describe('VehicleServiceService', () => {
         getMany: jest.fn().mockResolvedValue(services),
       };
 
-      vehicleServiceRepository.createQueryBuilder.mockReturnValue(queryBuilder as any);
+      vehicleServiceRepository.createQueryBuilder.mockReturnValue(
+        queryBuilder as any,
+      );
 
       const result = await service.getServicesByMileageRange(0, 100000);
 
-      expect(queryBuilder.where).toHaveBeenCalledWith('service.mileage BETWEEN :minMileage AND :maxMileage', {
-        minMileage: 0,
-        maxMileage: 100000,
-      });
+      expect(queryBuilder.where).toHaveBeenCalledWith(
+        'service.mileage BETWEEN :minMileage AND :maxMileage',
+        {
+          minMileage: 0,
+          maxMileage: 100000,
+        },
+      );
       expect(result).toEqual(services);
     });
   });
@@ -453,12 +560,20 @@ describe('VehicleServiceService', () => {
         getRawOne: jest.fn().mockResolvedValue({ total: '500' }),
       };
 
-      vehicleServiceRepository.createQueryBuilder.mockReturnValue(queryBuilder as any);
+      vehicleServiceRepository.createQueryBuilder.mockReturnValue(
+        queryBuilder as any,
+      );
 
       const result = await service.getTotalCostByVehicle('vehicle-123');
 
-      expect(queryBuilder.select).toHaveBeenCalledWith('SUM(service.cost)', 'total');
-      expect(queryBuilder.where).toHaveBeenCalledWith('service.vehicleId = :vehicleId', { vehicleId: 'vehicle-123' });
+      expect(queryBuilder.select).toHaveBeenCalledWith(
+        'SUM(service.cost)',
+        'total',
+      );
+      expect(queryBuilder.where).toHaveBeenCalledWith(
+        'service.vehicleId = :vehicleId',
+        { vehicleId: 'vehicle-123' },
+      );
       expect(result).toBe(500);
     });
 
@@ -469,7 +584,9 @@ describe('VehicleServiceService', () => {
         getRawOne: jest.fn().mockResolvedValue({ total: null }),
       };
 
-      vehicleServiceRepository.createQueryBuilder.mockReturnValue(queryBuilder as any);
+      vehicleServiceRepository.createQueryBuilder.mockReturnValue(
+        queryBuilder as any,
+      );
 
       const result = await service.getTotalCostByVehicle('vehicle-123');
 
@@ -490,4 +607,3 @@ describe('VehicleServiceService', () => {
     });
   });
 });
-

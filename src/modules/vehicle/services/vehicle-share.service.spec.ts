@@ -1,7 +1,11 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { NotFoundException, UnauthorizedException, BadRequestException } from '@nestjs/common';
+import {
+  NotFoundException,
+  UnauthorizedException,
+  BadRequestException,
+} from '@nestjs/common';
 import { VehicleShareService } from './vehicle-share.service';
 import { VehicleShare } from '../entities/vehicle-share.entity';
 import { VehicleService } from './vehicle.service';
@@ -126,7 +130,10 @@ describe('VehicleShareService', () => {
         includeAttachments,
       );
 
-      expect(vehicleService.findVehicleById).toHaveBeenCalledWith('vehicle-123', 'user-123');
+      expect(vehicleService.findVehicleById).toHaveBeenCalledWith(
+        'vehicle-123',
+        'user-123',
+      );
       expect(vehicleShareRepository.create).toHaveBeenCalled();
       expect(vehicleShareRepository.save).toHaveBeenCalled();
       expect(result.shareToken).toBeDefined();
@@ -155,7 +162,12 @@ describe('VehicleShareService', () => {
         includeAttachments: true,
       } as any);
 
-      const result = await service.generateShareToken('vehicle-123', 'user-123', 30, true);
+      const result = await service.generateShareToken(
+        'vehicle-123',
+        'user-123',
+        30,
+        true,
+      );
 
       expect(result.isActive).toBe(true);
     });
@@ -164,7 +176,9 @@ describe('VehicleShareService', () => {
   describe('getPublicVehicleInfo', () => {
     it('should return public vehicle info successfully', async () => {
       vehicleShareRepository.findOne.mockResolvedValue(mockVehicleShare as any);
-      vehicleServiceService.findByVehicleId.mockResolvedValue([mockService] as any);
+      vehicleServiceService.findByVehicleId.mockResolvedValue([
+        mockService,
+      ] as any);
       vehicleShareRepository.save.mockResolvedValue(mockVehicleShare as any);
 
       const result = await service.getPublicVehicleInfo('token-123');
@@ -180,9 +194,9 @@ describe('VehicleShareService', () => {
     it('should throw NotFoundException when share token not found', async () => {
       vehicleShareRepository.findOne.mockResolvedValue(null);
 
-      await expect(service.getPublicVehicleInfo('invalid-token')).rejects.toThrow(
-        NotFoundException,
-      );
+      await expect(
+        service.getPublicVehicleInfo('invalid-token'),
+      ).rejects.toThrow(NotFoundException);
     });
 
     it('should throw UnauthorizedException when share token expired', async () => {
@@ -203,7 +217,9 @@ describe('VehicleShareService', () => {
         ...mockVehicleShare,
         vehicle: soldVehicle,
       };
-      vehicleShareRepository.findOne.mockResolvedValue(shareWithSoldVehicle as any);
+      vehicleShareRepository.findOne.mockResolvedValue(
+        shareWithSoldVehicle as any,
+      );
 
       await expect(service.getPublicVehicleInfo('token-123')).rejects.toThrow(
         UnauthorizedException,
@@ -226,18 +242,28 @@ describe('VehicleShareService', () => {
 
   describe('getPublicMaintenanceHistory', () => {
     it('should return maintenance history with attachments when includeAttachments is true', async () => {
-      vehicleServiceService.findByVehicleId.mockResolvedValue([mockService] as any);
+      vehicleServiceService.findByVehicleId.mockResolvedValue([
+        mockService,
+      ] as any);
 
-      const result = await (service as any).getPublicMaintenanceHistory('vehicle-123', true);
+      const result = await (service as any).getPublicMaintenanceHistory(
+        'vehicle-123',
+        true,
+      );
 
       expect(result).toHaveLength(1);
       expect(result[0].attachments).toBeDefined();
     });
 
     it('should return maintenance history without attachments when includeAttachments is false', async () => {
-      vehicleServiceService.findByVehicleId.mockResolvedValue([mockService] as any);
+      vehicleServiceService.findByVehicleId.mockResolvedValue([
+        mockService,
+      ] as any);
 
-      const result = await (service as any).getPublicMaintenanceHistory('vehicle-123', false);
+      const result = await (service as any).getPublicMaintenanceHistory(
+        'vehicle-123',
+        false,
+      );
 
       expect(result).toHaveLength(1);
       expect(result[0].attachments).toBeUndefined();
@@ -259,16 +285,19 @@ describe('VehicleShareService', () => {
         where: { shareToken: 'token-123' },
         relations: ['vehicle'],
       });
-      expect(vehicleService.findVehicleById).toHaveBeenCalledWith('vehicle-123', 'user-123');
+      expect(vehicleService.findVehicleById).toHaveBeenCalledWith(
+        'vehicle-123',
+        'user-123',
+      );
       expect(vehicleShareRepository.save).toHaveBeenCalled();
     });
 
     it('should throw NotFoundException when share token not found', async () => {
       vehicleShareRepository.findOne.mockResolvedValue(null);
 
-      await expect(service.deactivateShareToken('invalid-token', 'user-123')).rejects.toThrow(
-        NotFoundException,
-      );
+      await expect(
+        service.deactivateShareToken('invalid-token', 'user-123'),
+      ).rejects.toThrow(NotFoundException);
     });
   });
 
@@ -290,27 +319,47 @@ describe('VehicleShareService', () => {
 
   describe('mapServiceType', () => {
     it('should map service types correctly', () => {
-      expect((service as any).mapServiceType(ServiceType.MAINTENANCE)).toBe('Manutenção');
-      expect((service as any).mapServiceType(ServiceType.REPAIR)).toBe('Reparo');
-      expect((service as any).mapServiceType(ServiceType.INSPECTION)).toBe('Inspeção');
-      expect((service as any).mapServiceType(ServiceType.FUEL)).toBe('Combustível');
-      expect((service as any).mapServiceType(ServiceType.EXPENSE)).toBe('Despesa');
+      expect((service as any).mapServiceType(ServiceType.MAINTENANCE)).toBe(
+        'Manutenção',
+      );
+      expect((service as any).mapServiceType(ServiceType.REPAIR)).toBe(
+        'Reparo',
+      );
+      expect((service as any).mapServiceType(ServiceType.INSPECTION)).toBe(
+        'Inspeção',
+      );
+      expect((service as any).mapServiceType(ServiceType.FUEL)).toBe(
+        'Combustível',
+      );
+      expect((service as any).mapServiceType(ServiceType.EXPENSE)).toBe(
+        'Despesa',
+      );
       expect((service as any).mapServiceType(ServiceType.OTHER)).toBe('Outro');
     });
   });
 
   describe('mapBlockchainStatus', () => {
     it('should map blockchain status correctly', () => {
-      expect((service as any).mapBlockchainStatus(ServiceStatus.PENDING)).toBe('Pendente');
-      expect((service as any).mapBlockchainStatus(ServiceStatus.CONFIRMED)).toBe('Confirmado');
-      expect((service as any).mapBlockchainStatus(ServiceStatus.REJECTED)).toBe('Rejeitado');
-      expect((service as any).mapBlockchainStatus(ServiceStatus.EXPIRED)).toBe('Expirado');
+      expect((service as any).mapBlockchainStatus(ServiceStatus.PENDING)).toBe(
+        'Pendente',
+      );
+      expect(
+        (service as any).mapBlockchainStatus(ServiceStatus.CONFIRMED),
+      ).toBe('Confirmado');
+      expect((service as any).mapBlockchainStatus(ServiceStatus.REJECTED)).toBe(
+        'Rejeitado',
+      );
+      expect((service as any).mapBlockchainStatus(ServiceStatus.EXPIRED)).toBe(
+        'Expirado',
+      );
     });
   });
 
   describe('getFileNameFromUrl', () => {
     it('should extract file name from URL', () => {
-      expect((service as any).getFileNameFromUrl('https://example.com/file.pdf')).toBe('file.pdf');
+      expect(
+        (service as any).getFileNameFromUrl('https://example.com/file.pdf'),
+      ).toBe('file.pdf');
       expect((service as any).getFileNameFromUrl('')).toBe('Arquivo');
       expect((service as any).getFileNameFromUrl(null)).toBe('Arquivo');
     });
@@ -318,13 +367,18 @@ describe('VehicleShareService', () => {
 
   describe('getFileTypeFromUrl', () => {
     it('should extract file type from URL', () => {
-      expect((service as any).getFileTypeFromUrl('file.pdf')).toBe('application/pdf');
+      expect((service as any).getFileTypeFromUrl('file.pdf')).toBe(
+        'application/pdf',
+      );
       expect((service as any).getFileTypeFromUrl('file.jpg')).toBe('image');
       expect((service as any).getFileTypeFromUrl('file.png')).toBe('image');
-      expect((service as any).getFileTypeFromUrl('file.doc')).toBe('application/msword');
-      expect((service as any).getFileTypeFromUrl('file.unknown')).toBe('unknown');
+      expect((service as any).getFileTypeFromUrl('file.doc')).toBe(
+        'application/msword',
+      );
+      expect((service as any).getFileTypeFromUrl('file.unknown')).toBe(
+        'unknown',
+      );
       expect((service as any).getFileTypeFromUrl('')).toBe('unknown');
     });
   });
 });
-

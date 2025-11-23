@@ -1,6 +1,14 @@
-import { MigrationInterface, QueryRunner, Table, TableForeignKey, TableIndex } from 'typeorm';
+import {
+  MigrationInterface,
+  QueryRunner,
+  Table,
+  TableForeignKey,
+  TableIndex,
+} from 'typeorm';
 
-export class CreateVehicleServiceTable1753019587560 implements MigrationInterface {
+export class CreateVehicleServiceTable1753019587560
+  implements MigrationInterface
+{
   public async up(queryRunner: QueryRunner): Promise<void> {
     // Criar enum para ServiceType
     await queryRunner.query(`
@@ -35,7 +43,14 @@ export class CreateVehicleServiceTable1753019587560 implements MigrationInterfac
           {
             name: 'type',
             type: 'enum',
-            enum: ['maintenance', 'repair', 'inspection', 'fuel', 'expense', 'other'],
+            enum: [
+              'maintenance',
+              'repair',
+              'inspection',
+              'fuel',
+              'expense',
+              'other',
+            ],
             default: "'maintenance'",
           },
           {
@@ -223,7 +238,9 @@ export class CreateVehicleServiceTable1753019587560 implements MigrationInterfac
   public async down(queryRunner: QueryRunner): Promise<void> {
     // Remover foreign key
     const table = await queryRunner.getTable('vehicle_services');
-    const foreignKey = table.foreignKeys.find(fk => fk.columnNames.indexOf('vehicle_id') !== -1);
+    const foreignKey = table.foreignKeys.find(
+      (fk) => fk.columnNames.indexOf('vehicle_id') !== -1,
+    );
     if (foreignKey) {
       await queryRunner.dropForeignKey('vehicle_services', foreignKey);
     }

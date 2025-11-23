@@ -12,4 +12,3 @@ import * as crypto from 'node:crypto';
 export function generateSecureToken(length: number = 32): string {
   return crypto.randomBytes(length).toString('hex');
 }
-
