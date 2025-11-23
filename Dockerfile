@@ -2,11 +2,12 @@ FROM node:20-alpine AS builder
 
 WORKDIR /app
 
+ENV NPM_CONFIG_OPTIONAL=false
+
 COPY package*.json .npmrc ./
 
-# Install dependencies (including dev dependencies for build)
-# .npmrc ensures optional dependencies like fsevents are not installed
-RUN npm ci --ignore-scripts && npm cache clean --force
+RUN npm ci --omit=optional --ignore-scripts && \
+    npm cache clean --force
 
 COPY . .
 
@@ -16,19 +17,20 @@ FROM node:20-alpine
 
 WORKDIR /app
 
+ENV NPM_CONFIG_OPTIONAL=false \
+    NODE_ENV=production
+
 RUN apk add --no-cache dumb-init
 
 COPY package*.json .npmrc ./
 
-# Install only production dependencies
-# .npmrc ensures optional dependencies like fsevents are not installed
-RUN npm ci --omit=dev --ignore-scripts && npm cache clean --force
+RUN npm ci --omit=dev --omit=optional --ignore-scripts && \
+    npm cache clean --force
 
 COPY --from=builder /app/dist ./dist
 
-RUN mkdir -p storage/uploads logs
-
-RUN addgroup -g 1001 -S nodejs && \
+RUN mkdir -p storage/uploads logs && \
+    addgroup -g 1001 -S nodejs && \
     adduser -S nodejs -u 1001 && \
     chown -R nodejs:nodejs /app
 
@@ -41,4 +43,3 @@ HEALTHCHECK --interval=30s --timeout=3s --start-period=40s --retries=3 \
 
 ENTRYPOINT ["dumb-init", "--"]
 CMD ["node", "dist/main.js"]
-
