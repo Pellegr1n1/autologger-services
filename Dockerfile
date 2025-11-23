@@ -4,8 +4,7 @@ WORKDIR /app
 
 COPY package*.json ./
 
-ENV npm_config_optional=false
-RUN npm ci --ignore-scripts && npm cache clean --force
+RUN npm ci --omit=optional --ignore-scripts && npm cache clean --force
 
 COPY . .
 
@@ -19,8 +18,7 @@ RUN apk add --no-cache dumb-init
 
 COPY package*.json ./
 
-ENV npm_config_optional=false
-RUN npm ci --omit=dev --ignore-scripts && npm cache clean --force
+RUN npm ci --omit=dev --omit=optional --ignore-scripts && npm cache clean --force
 
 COPY --from=builder /app/dist ./dist
 
