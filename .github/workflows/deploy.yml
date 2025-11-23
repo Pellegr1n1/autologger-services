@@ -212,6 +212,7 @@ jobs:
 
       - name: Import existing ECR repositories if they exist
         working-directory: ./backend/infrastructure/aws/terraform
+        timeout-minutes: 5
         run: |
           ENVIRONMENT="${{ needs.build-and-push.outputs.environment }}"
           BACKEND_REPO="autologger-${ENVIRONMENT}-backend"
@@ -220,14 +221,36 @@ jobs:
           # Try to import backend repository if it exists
           if aws ecr describe-repositories --repository-names $BACKEND_REPO --region ${{ env.AWS_REGION }} >/dev/null 2>&1; then
             echo "Importing existing ECR repository: $BACKEND_REPO"
-            terraform import module.ecr.aws_ecr_repository.backend $BACKEND_REPO || echo "Repository already in state or import failed"
+            terraform import \
+              -input=false \
+              -var="environment=${ENVIRONMENT}" \
+              -var="db_password=${{ secrets.DB_PASSWORD }}" \
+              -var="jwt_secret=${{ secrets.JWT_SECRET }}" \
+              -var="cors_origins=${{ secrets.CORS_ORIGINS }}" \
+              module.ecr.aws_ecr_repository.backend $BACKEND_REPO 2>&1 || {
+              echo "⚠️  Import failed for $BACKEND_REPO (may already be in state)"
+            }
+          else
+            echo "ℹ️  Backend repository $BACKEND_REPO does not exist, will be created by Terraform"
           fi
           
           # Try to import frontend repository if it exists
           if aws ecr describe-repositories --repository-names $FRONTEND_REPO --region ${{ env.AWS_REGION }} >/dev/null 2>&1; then
             echo "Importing existing ECR repository: $FRONTEND_REPO"
-            terraform import module.ecr.aws_ecr_repository.frontend $FRONTEND_REPO || echo "Repository already in state or import failed"
+            terraform import \
+              -input=false \
+              -var="environment=${ENVIRONMENT}" \
+              -var="db_password=${{ secrets.DB_PASSWORD }}" \
+              -var="jwt_secret=${{ secrets.JWT_SECRET }}" \
+              -var="cors_origins=${{ secrets.CORS_ORIGINS }}" \
+              module.ecr.aws_ecr_repository.frontend $FRONTEND_REPO 2>&1 || {
+              echo "⚠️  Import failed for $FRONTEND_REPO (may already be in state)"
+            }
+          else
+            echo "ℹ️  Frontend repository $FRONTEND_REPO does not exist, will be created by Terraform"
           fi
+          
+          echo "✅ ECR import step completed"
 
       - name: Terraform Plan
         working-directory: ./backend/infrastructure/aws/terraform
@@ -244,6 +267,28 @@ jobs:
       - name: Terraform Apply
         working-directory: ./backend/infrastructure/aws/terraform
         run: terraform apply -auto-approve tfplan
+
+      - name: Display Application URLs
+        working-directory: ./backend/infrastructure/aws/terraform
+        run: |
+          echo "## URLs da Aplicação" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          BACKEND_URL=$(terraform output -raw backend_alb_dns 2>/dev/null || echo "N/A")
+          FRONTEND_URL=$(terraform output -raw frontend_alb_dns 2>/dev/null || echo "N/A")
+          
+          echo "### Frontend (Interface Web)" >> $GITHUB_STEP_SUMMARY
+          echo "- **URL:** http://$FRONTEND_URL" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          echo "### Backend API" >> $GITHUB_STEP_SUMMARY
+          echo "- **URL:** http://$BACKEND_URL" >> $GITHUB_STEP_SUMMARY
+          echo "- **Swagger Docs:** http://$BACKEND_URL/api" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          echo "Frontend: http://$FRONTEND_URL"
+          echo "Backend API: http://$BACKEND_URL"
+          echo "Swagger: http://$BACKEND_URL/api"
 
   deploy-services:
     name: Deploy ECS Services
