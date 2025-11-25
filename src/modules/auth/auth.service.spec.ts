@@ -8,6 +8,7 @@ import { AuthRegisterDto } from './dto/auth-register.dto';
 import { AuthLoginDto } from './dto/auth-login.dto';
 import { LoggerService } from '../../common/logger/logger.service';
 import { EmailService } from '../email/email.service';
+import { EmailVerificationService } from '../email-verification/email-verification.service';
 import { LoggerServiceTestHelper } from '../../common/test-helpers/logger-service.test-helper';
 
 describe('AuthService', () => {
@@ -16,6 +17,7 @@ describe('AuthService', () => {
   let jwtService: jest.Mocked<JwtService>;
   let mockLoggerService: jest.Mocked<LoggerService>;
   let mockEmailService: jest.Mocked<EmailService>;
+  let mockEmailVerificationService: jest.Mocked<EmailVerificationService>;
 
   const mockUser = {
     id: 'user-123',
@@ -58,6 +60,13 @@ describe('AuthService', () => {
       sendEmailChangeNotification: jest.fn(),
     } as any;
 
+    mockEmailVerificationService = {
+      sendVerificationEmail: jest.fn(),
+      verifyEmail: jest.fn(),
+      resendVerificationEmail: jest.fn(),
+      checkVerificationStatus: jest.fn(),
+    } as any;
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         AuthService,
@@ -80,6 +89,10 @@ describe('AuthService', () => {
         {
           provide: EmailService,
           useValue: mockEmailService,
+        },
+        {
+          provide: EmailVerificationService,
+          useValue: mockEmailVerificationService,
         },
       ],
     }).compile();
@@ -468,6 +481,10 @@ describe('AuthService', () => {
             provide: EmailService,
             useValue: mockEmailService,
           },
+          {
+            provide: EmailVerificationService,
+            useValue: mockEmailVerificationService,
+          },
         ],
       }).compile();
 
@@ -543,6 +560,10 @@ describe('AuthService', () => {
             provide: EmailService,
             useValue: mockEmailService,
           },
+          {
+            provide: EmailVerificationService,
+            useValue: mockEmailVerificationService,
+          },
         ],
       }).compile();
 
@@ -589,6 +610,10 @@ describe('AuthService', () => {
           {
             provide: EmailService,
             useValue: mockEmailService,
+          },
+          {
+            provide: EmailVerificationService,
+            useValue: mockEmailVerificationService,
           },
         ],
       }).compile();
@@ -640,6 +665,10 @@ describe('AuthService', () => {
           {
             provide: EmailService,
             useValue: mockEmailService,
+          },
+          {
+            provide: EmailVerificationService,
+            useValue: mockEmailVerificationService,
           },
         ],
       }).compile();
@@ -698,6 +727,10 @@ describe('AuthService', () => {
           {
             provide: EmailService,
             useValue: mockEmailServiceWithError,
+          },
+          {
+            provide: EmailVerificationService,
+            useValue: mockEmailVerificationService,
           },
         ],
       }).compile();

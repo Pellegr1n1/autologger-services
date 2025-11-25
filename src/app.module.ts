@@ -30,10 +30,7 @@ import { LoggingInterceptor } from './common/interceptors/logging.interceptor';
           autoLoadEntities: true,
           synchronize: configService.get('NODE_ENV') === 'development',
           logging: configService.get('NODE_ENV') === 'development',
-          ssl:
-            dbSsl === 'true'
-              ? { rejectUnauthorized: false }
-              : false,
+          ssl: dbSsl === 'true' ? { rejectUnauthorized: false } : false,
         };
       },
       inject: [ConfigService],

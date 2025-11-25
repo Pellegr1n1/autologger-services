@@ -18,10 +18,7 @@ export const AppDataSource = new DataSource({
   entities: ['src/**/*.entity.ts'],
   migrations: ['src/database/migrations/*.ts'],
   subscribers: ['src/**/*.subscriber.ts'],
-  ssl:
-    dbSsl === 'true'
-      ? { rejectUnauthorized: false }
-      : false,
+  ssl: dbSsl === 'true' ? { rejectUnauthorized: false } : false,
   extra: {
     max: 20,
     idleTimeoutMillis: 30000,
