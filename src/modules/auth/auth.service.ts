@@ -16,6 +16,7 @@ import { UserRepository } from '../user/repositories/user.repository';
 import { isPasswordStrong } from '../../common/utils/password.util';
 import { LoggerService } from '../../common/logger/logger.service';
 import { EmailService } from '../email/email.service';
+import { EmailVerificationService } from '../email-verification/email-verification.service';
 
 @Injectable()
 export class AuthService {
@@ -25,6 +26,7 @@ export class AuthService {
     private readonly userRepository: UserRepository,
     private readonly logger: LoggerService,
     private readonly emailService: EmailService,
+    private readonly emailVerificationService: EmailVerificationService,
   ) {
     this.logger.setContext('AuthService');
   }
@@ -49,6 +51,26 @@ export class AuthService {
       };
 
       const user = await this.userService.create(createUserDto);
+
+      // Enviar email de verificação automaticamente após o registro
+      try {
+        await this.emailVerificationService.sendVerificationEmail(user.id);
+        this.logger.log('Email de verificação enviado após registro', 'AuthService', {
+          userId: user.id,
+          email: user.email,
+        });
+      } catch (error) {
+        // Log do erro mas não falha o registro
+        this.logger.warn(
+          'Falha ao enviar email de verificação após registro',
+          'AuthService',
+          {
+            userId: user.id,
+            email: user.email,
+            errorMessage: error instanceof Error ? error.message : String(error),
+          },
+        );
+      }
 
       const payload: JwtPayload = {
         sub: user.id,

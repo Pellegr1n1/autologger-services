@@ -41,11 +41,16 @@ export class AuthController {
   private setTokenCookie(res: Response, token: string): void {
     const isProduction = process.env.NODE_ENV === 'production';
     const maxAge = 24 * 60 * 60 * 1000;
+    
+    // Verificar se está usando HTTPS
+    const isHttps = process.env.FRONTEND_URL?.startsWith('https://') || 
+                     process.env.CORS_ORIGINS?.includes('https://') ||
+                     false;
 
     const cookieOptions: any = {
       httpOnly: true,
-      secure: isProduction,
-      sameSite: 'lax',
+      secure: isHttps, // Só usar secure se for HTTPS
+      sameSite: isProduction ? 'none' : 'lax', // 'none' para cross-domain em produção
       maxAge,
       path: '/',
     };
@@ -211,10 +216,16 @@ export class AuthController {
   @Post('logout')
   async logout(@Res() res: Response): Promise<void> {
     const isProduction = process.env.NODE_ENV === 'production';
+    
+    // Verificar se está usando HTTPS
+    const isHttps = process.env.FRONTEND_URL?.startsWith('https://') || 
+                     process.env.CORS_ORIGINS?.includes('https://') ||
+                     false;
+
     const cookieOptions: any = {
       httpOnly: true,
-      secure: isProduction,
-      sameSite: 'lax',
+      secure: isHttps,
+      sameSite: isProduction ? 'none' : 'lax',
       path: '/',
     };
 

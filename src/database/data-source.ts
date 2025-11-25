@@ -4,6 +4,8 @@ import { config } from 'dotenv';
 
 config();
 
+const dbSsl = process.env.DB_SSL || 'false';
+
 export const AppDataSource = new DataSource({
   type: 'postgres',
   host: process.env.DB_HOST || 'localhost',
@@ -16,6 +18,10 @@ export const AppDataSource = new DataSource({
   entities: ['src/**/*.entity.ts'],
   migrations: ['src/database/migrations/*.ts'],
   subscribers: ['src/**/*.subscriber.ts'],
+  ssl:
+    dbSsl === 'true'
+      ? { rejectUnauthorized: false }
+      : false,
   extra: {
     max: 20,
     idleTimeoutMillis: 30000,
