@@ -19,4 +19,3 @@ export class AddPhotoUrlToVehicleTable1764111660752
     await queryRunner.dropColumn('vehicles', 'photoUrl');
   }
 }
-

@@ -6,6 +6,17 @@ config();
 
 const dbSsl = process.env.DB_SSL || 'false';
 
+const isProduction = process.env.NODE_ENV === 'production';
+const entitiesPath = isProduction
+  ? ['dist/**/*.entity.js']
+  : ['src/**/*.entity.ts'];
+const migrationsPath = isProduction
+  ? ['dist/database/migrations/*.js']
+  : ['src/database/migrations/*.ts'];
+const subscribersPath = isProduction
+  ? ['dist/**/*.subscriber.js']
+  : ['src/**/*.subscriber.ts'];
+
 export const AppDataSource = new DataSource({
   type: 'postgres',
   host: process.env.DB_HOST || 'localhost',
@@ -15,9 +26,9 @@ export const AppDataSource = new DataSource({
   database: process.env.DB_NAME || 'autologger',
   synchronize: false, // Sempre false para usar migrations
   logging: process.env.NODE_ENV === 'development',
-  entities: ['src/**/*.entity.ts'],
-  migrations: ['src/database/migrations/*.ts'],
-  subscribers: ['src/**/*.subscriber.ts'],
+  entities: entitiesPath,
+  migrations: migrationsPath,
+  subscribers: subscribersPath,
   ssl: dbSsl === 'true' ? { rejectUnauthorized: false } : false,
   extra: {
     max: 20,

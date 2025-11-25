@@ -285,6 +285,7 @@ jobs:
         run: |
           CLUSTER_NAME="${{ steps.get-cluster-info.outputs.cluster_name }}"
           TASK_ARN="${{ steps.run-migration-task.outputs.task_arn }}"
+          ENVIRONMENT="${{ steps.get-cluster-info.outputs.environment }}"
           
           echo "Waiting for task $TASK_ARN to complete..."
           
@@ -296,19 +297,35 @@ jobs:
             echo "⚠️  Task wait timeout, checking status..."
           }
           
-          # Get task exit code
-          EXIT_CODE=$(aws ecs describe-tasks \
+          # Get task details
+          TASK_DETAILS=$(aws ecs describe-tasks \
             --cluster $CLUSTER_NAME \
             --tasks $TASK_ARN \
-            --region ${{ env.AWS_REGION }} \
-            --query 'tasks[0].containers[0].exitCode' \
-            --output text)
+            --region ${{ env.AWS_REGION }})
+          
+          EXIT_CODE=$(echo "$TASK_DETAILS" | jq -r '.tasks[0].containers[0].exitCode // "null"')
+          STOPPED_REASON=$(echo "$TASK_DETAILS" | jq -r '.tasks[0].stoppedReason // "N/A"')
           
           echo "Task exit code: $EXIT_CODE"
+          echo "Stopped reason: $STOPPED_REASON"
+          
+          # Get recent logs from CloudWatch
+          LOG_GROUP="/ecs/autologger-${ENVIRONMENT}-backend"
+          echo ""
+          echo "=== Recent Migration Logs ==="
+          aws logs tail "$LOG_GROUP" \
+            --since 5m \
+            --format short \
+            --region ${{ env.AWS_REGION }} || echo "Could not fetch logs"
+          echo "=============================="
+          echo ""
           
           if [ "$EXIT_CODE" != "0" ] && [ "$EXIT_CODE" != "null" ]; then
             echo "Migration task failed with exit code: $EXIT_CODE"
-            echo "Check CloudWatch logs for details: /ecs/autologger-${{ steps.get-cluster-info.outputs.environment }}-backend"
+            echo "Stopped reason: $STOPPED_REASON"
+            echo ""
+            echo "View full logs in CloudWatch:"
+            echo "  https://console.aws.amazon.com/cloudwatch/home?region=${{ env.AWS_REGION }}#logsV2:log-groups/log-group/$LOG_GROUP"
             exit 1
           fi
           
