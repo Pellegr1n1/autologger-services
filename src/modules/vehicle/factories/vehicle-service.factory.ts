@@ -18,12 +18,17 @@ export class VehicleServiceFactory {
     }
 
     // Converter URLs dos anexos
-    if (this.storage.getAccessibleUrl) {
+    if (this.storage && this.storage.getAccessibleUrl) {
       try {
         const accessibleAttachments = await Promise.all(
           service.attachments.map(async (url) => {
+            if (!url) {
+              return url; // Retornar URL vazia/null como está
+            }
             try {
-              return await this.storage.getAccessibleUrl(url);
+              const accessibleUrl = await this.storage.getAccessibleUrl(url);
+              // Só usar a URL acessível se for válida
+              return accessibleUrl || url;
             } catch (error) {
               this.logger.error(
                 `Erro ao gerar URL acessível para anexo: ${error}`,
@@ -39,6 +44,7 @@ export class VehicleServiceFactory {
         };
       } catch (error) {
         this.logger.error(`Erro ao processar anexos: ${error}`);
+        // Em caso de erro geral, retornar o serviço com URLs originais
         return service;
       }
     }

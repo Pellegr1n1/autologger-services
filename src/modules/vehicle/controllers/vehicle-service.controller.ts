@@ -168,9 +168,19 @@ export class VehicleServiceController {
   @Get()
   @ApiOperation({ summary: 'Listar todos os serviços do usuário' })
   @ApiResponse({ status: 200, description: 'Lista de serviços retornada' })
-  findAll(@Request() req) {
-    const userId = req.user?.id;
-    return this.vehicleServiceService.findAll(userId);
+  async findAll(@Request() req) {
+    try {
+      const userId = req.user?.id;
+      if (!userId) {
+        throw new BadRequestException('Usuário não autenticado');
+      }
+      return await this.vehicleServiceService.findAll(userId);
+    } catch (error) {
+      if (error instanceof BadRequestException) {
+        throw error;
+      }
+      throw new BadRequestException('Erro ao buscar serviços de veículos');
+    }
   }
 
   @Get('vehicle/:vehicleId')

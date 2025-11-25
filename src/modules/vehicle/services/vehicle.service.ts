@@ -26,47 +26,77 @@ export class VehicleService implements IVehicleService {
     createVehicleDto: CreateVehicleDto,
     userId: string,
   ): Promise<VehicleResponseDto> {
-    await this.businessRules.validateActiveVehicleLimit(userId);
-    await this.businessRules.validateUniquePlate(createVehicleDto.plate);
+    try {
+      await this.businessRules.validateActiveVehicleLimit(userId);
+      await this.businessRules.validateUniquePlate(createVehicleDto.plate);
 
-    let photoUrl: string = null;
-    if (createVehicleDto.photo) {
-      photoUrl = await this.fileUploadService.uploadPhoto(
-        createVehicleDto.photo,
+      let photoUrl: string = null;
+      if (createVehicleDto.photo) {
+        try {
+          photoUrl = await this.fileUploadService.uploadPhoto(
+            createVehicleDto.photo,
+          );
+        } catch (error) {
+          this.logger.error(
+            'Erro ao fazer upload da foto do veículo',
+            error.stack,
+            'VehicleService',
+            { userId },
+          );
+          // Continuar sem foto se houver erro no upload
+        }
+      }
+
+      const vehicleData = {
+        ...createVehicleDto,
+        photoUrl,
+      };
+      delete vehicleData.photo;
+
+      const vehicle = await this.vehicleRepository.create(vehicleData, userId);
+      return await this.vehicleFactory.toResponseDto(vehicle);
+    } catch (error) {
+      this.logger.error(
+        'Erro ao criar veículo',
+        error.stack,
+        'VehicleService',
+        { userId, plate: createVehicleDto?.plate },
       );
+      throw error;
     }
-
-    const vehicleData = {
-      ...createVehicleDto,
-      photoUrl,
-    };
-    delete vehicleData.photo;
-
-    const vehicle = await this.vehicleRepository.create(vehicleData, userId);
-    return await this.vehicleFactory.toResponseDto(vehicle);
   }
 
   async findUserVehicles(userId: string): Promise<{
     active: VehicleResponseDto[];
     sold: VehicleResponseDto[];
   }> {
-    const [activeVehicles, soldVehicles] = await Promise.all([
-      this.vehicleRepository.findActiveByUserId(userId),
-      this.vehicleRepository.findSoldByUserId(userId),
-    ]);
+    try {
+      const [activeVehicles, soldVehicles] = await Promise.all([
+        this.vehicleRepository.findActiveByUserId(userId),
+        this.vehicleRepository.findSoldByUserId(userId),
+      ]);
 
-    return {
-      active: await Promise.all(
-        activeVehicles.map((vehicle) =>
-          this.vehicleFactory.toResponseDto(vehicle),
+      return {
+        active: await Promise.all(
+          activeVehicles.map((vehicle) =>
+            this.vehicleFactory.toResponseDto(vehicle),
+          ),
         ),
-      ),
-      sold: await Promise.all(
-        soldVehicles.map((vehicle) =>
-          this.vehicleFactory.toResponseDto(vehicle),
+        sold: await Promise.all(
+          soldVehicles.map((vehicle) =>
+            this.vehicleFactory.toResponseDto(vehicle),
+          ),
         ),
-      ),
-    };
+      };
+    } catch (error) {
+      this.logger.error(
+        'Erro ao buscar veículos do usuário',
+        error.stack,
+        'VehicleService',
+        { userId },
+      );
+      throw error;
+    }
   }
 
   async findVehicleById(
