@@ -28,13 +28,11 @@ RUN npm ci --omit=dev --omit=optional --ignore-scripts && \
     npm cache clean --force
 
 COPY --from=builder /app/dist ./dist
-COPY --from=builder /app/scripts ./scripts
 
 RUN mkdir -p storage/uploads logs && \
     addgroup -g 1001 -S nodejs && \
     adduser -S nodejs -u 1001 && \
-    chown -R nodejs:nodejs /app && \
-    chmod +x scripts/run-migrations.sh
+    chown -R nodejs:nodejs /app
 
 USER nodejs
 
