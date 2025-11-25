@@ -13,7 +13,7 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { Response } from 'express';
+import { Request, Response } from 'express';
 import { AuthService } from './auth.service';
 import { AuthRegisterDto } from './dto/auth-register.dto';
 import { AuthLoginDto } from './dto/auth-login.dto';
@@ -38,25 +38,62 @@ export class AuthController {
     this.logger.setContext('AuthController');
   }
 
-  private setTokenCookie(res: Response, token: string): void {
+  private setTokenCookie(res: Response, token: string, req?: Request): void {
     const isProduction = process.env.NODE_ENV === 'production';
     const maxAge = 24 * 60 * 60 * 1000;
     
-    // Verificar se está usando HTTPS
-    const isHttps = process.env.FRONTEND_URL?.startsWith('https://') || 
+    const envHttps = process.env.FRONTEND_URL?.startsWith('https://') || 
                      process.env.CORS_ORIGINS?.includes('https://') ||
                      false;
+    
+    const requestHttps = req?.protocol === 'https' || 
+                        req?.headers['x-forwarded-proto'] === 'https' ||
+                        false;
+    
+    const isHttps = requestHttps || envHttps || (isProduction && !process.env.FRONTEND_URL?.startsWith('http://'));
+
+    const frontendUrl = process.env.FRONTEND_URL || '';
+    let isCrossDomain = false;
+    
+    try {
+      if (frontendUrl) {
+        const frontendHost = new URL(frontendUrl).hostname;
+        // Se frontend não contém 'api', provavelmente é cross-domain
+        // (assumindo que backend está em api.autologger.online)
+        isCrossDomain = !frontendHost.includes('api') && 
+                       (frontendHost.includes('autologger.online') || 
+                        frontendHost.includes('app.autologger.online'));
+      }
+    } catch (error) {
+      // Se não conseguir parsear, assumir cross-domain em produção com HTTPS
+      isCrossDomain = isProduction && isHttps;
+    }
+    
+    // Se não conseguir determinar, em produção assumir cross-domain se usar HTTPS
+    const useSameSiteNone = isProduction && isHttps && (isCrossDomain || !frontendUrl);
 
     const cookieOptions: any = {
       httpOnly: true,
-      secure: isHttps, // Só usar secure se for HTTPS
-      sameSite: isProduction ? 'none' : 'lax', // 'none' para cross-domain em produção
+      secure: isHttps,
+      sameSite: useSameSiteNone ? 'none' : 'lax',
       maxAge,
       path: '/',
     };
 
     if (!isProduction) {
       cookieOptions.domain = 'localhost';
+    }
+
+    // Log para debug (apenas em desenvolvimento)
+    if (!isProduction) {
+      this.logger.debug('Configurando cookie', 'AuthController', {
+        isHttps,
+        useSameSiteNone,
+        secure: cookieOptions.secure,
+        sameSite: cookieOptions.sameSite,
+        requestProtocol: req?.protocol,
+        forwardedProto: req?.headers['x-forwarded-proto'],
+      });
     }
 
     res.cookie('autologger_token', token, cookieOptions);
@@ -67,9 +104,11 @@ export class AuthController {
   async register(
     @Body() authRegisterDto: AuthRegisterDto,
     @Res() res: Response,
+    @Req() req: Request,
   ): Promise<void> {
     const result = await this.authService.register(authRegisterDto);
-    this.setTokenCookie(res, result.access_token);
+    this.setTokenCookie(res, result.access_token, req);
+    // Token está no cookie httpOnly (não retornamos no body por segurança)
     res.json({
       user: result.user,
     });
@@ -81,9 +120,10 @@ export class AuthController {
   async login(
     @Body() authLoginDto: AuthLoginDto,
     @Res() res: Response,
+    @Req() req: Request,
   ): Promise<void> {
     const result = await this.authService.login(authLoginDto);
-    this.setTokenCookie(res, result.access_token);
+    this.setTokenCookie(res, result.access_token, req);
     res.json({
       user: result.user,
     });
@@ -225,7 +265,8 @@ export class AuthController {
     const cookieOptions: any = {
       httpOnly: true,
       secure: isHttps,
-      sameSite: isProduction ? 'none' : 'lax',
+      // IMPORTANTE: sameSite: 'none' REQUER secure: true
+      sameSite: isProduction && isHttps ? 'none' : 'lax',
       path: '/',
     };
 

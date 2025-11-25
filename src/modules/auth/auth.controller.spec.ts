@@ -99,9 +99,20 @@ describe('AuthController', () => {
         json: jest.fn(),
       } as any;
 
+      const mockRequest = {
+        protocol: 'http',
+        headers: {},
+      } as any;
+
+      // Garantir que está em desenvolvimento para os testes
+      const originalEnv = process.env.NODE_ENV;
+      process.env.NODE_ENV = 'development';
+      delete process.env.FRONTEND_URL;
+      delete process.env.CORS_ORIGINS;
+
       authService.register.mockResolvedValue(mockAuthResponse);
 
-      await controller.register(registerDto, mockResponse);
+      await controller.register(registerDto, mockResponse, mockRequest);
 
       expect(authService.register).toHaveBeenCalledWith(registerDto);
       expect(mockResponse.cookie).toHaveBeenCalledWith(
@@ -109,13 +120,17 @@ describe('AuthController', () => {
         mockAuthResponse.access_token,
         expect.objectContaining({
           httpOnly: true,
-          secure: false, // não é produção
-          sameSite: 'lax',
+          secure: false, // não é HTTPS em desenvolvimento
+          sameSite: 'lax', // não é produção
+          domain: 'localhost', // em desenvolvimento
         }),
       );
       expect(mockResponse.json).toHaveBeenCalledWith({
         user: mockAuthResponse.user,
       });
+
+      // Restaurar variável de ambiente
+      process.env.NODE_ENV = originalEnv;
     });
   });
 
@@ -131,9 +146,20 @@ describe('AuthController', () => {
         json: jest.fn(),
       } as any;
 
+      const mockRequest = {
+        protocol: 'http',
+        headers: {},
+      } as any;
+
+      // Garantir que está em desenvolvimento para os testes
+      const originalEnv = process.env.NODE_ENV;
+      process.env.NODE_ENV = 'development';
+      delete process.env.FRONTEND_URL;
+      delete process.env.CORS_ORIGINS;
+
       authService.login.mockResolvedValue(mockAuthResponse);
 
-      await controller.login(loginDto, mockResponse);
+      await controller.login(loginDto, mockResponse, mockRequest);
 
       expect(authService.login).toHaveBeenCalledWith(loginDto);
       expect(mockResponse.cookie).toHaveBeenCalledWith(
@@ -141,13 +167,17 @@ describe('AuthController', () => {
         mockAuthResponse.access_token,
         expect.objectContaining({
           httpOnly: true,
-          secure: false, // não é produção
-          sameSite: 'lax',
+          secure: false, // não é HTTPS em desenvolvimento
+          sameSite: 'lax', // não é produção
+          domain: 'localhost', // em desenvolvimento
         }),
       );
       expect(mockResponse.json).toHaveBeenCalledWith({
         user: mockAuthResponse.user,
       });
+
+      // Restaurar variável de ambiente
+      process.env.NODE_ENV = originalEnv;
     });
   });
 

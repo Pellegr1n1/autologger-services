@@ -46,7 +46,9 @@ export class GoogleAuthController {
       const cookieOptions: any = {
         httpOnly: true,
         secure: isHttps, // Só usar secure se for HTTPS
-        sameSite: isProduction ? 'none' : 'lax', // 'none' para cross-domain em produção
+        // IMPORTANTE: sameSite: 'none' REQUER secure: true
+        // Se não for HTTPS, usar 'lax' mesmo em produção
+        sameSite: isProduction && isHttps ? 'none' : 'lax',
         maxAge,
         path: '/',
       };
@@ -66,6 +68,7 @@ export class GoogleAuthController {
         isEmailVerified: result.user.isEmailVerified,
         authProvider: 'google',
       };
+      // Token está no cookie httpOnly (não incluímos na URL por segurança)
       const redirectUrl = `${frontendUrl}/auth/callback?user=${encodeURIComponent(JSON.stringify(safeUserData))}`;
 
       res.redirect(redirectUrl);
@@ -83,6 +86,7 @@ export class GoogleAuthController {
   async authenticateWithGoogle(
     @Body() body: { credential?: string; code?: string },
     @Res() res: Response,
+    @Req() req: Request,
   ): Promise<void> {
     const { credential, code } = body;
 
@@ -136,15 +140,47 @@ export class GoogleAuthController {
     const isProduction = process.env.NODE_ENV === 'production';
     const maxAge = 24 * 60 * 60 * 1000; // 24 horas
 
-    // Verificar se está usando HTTPS
-    const isHttps = process.env.FRONTEND_URL?.startsWith('https://') || 
+    // Verificar se está usando HTTPS de múltiplas formas
+    // 1. Verificar variáveis de ambiente
+    const envHttps = process.env.FRONTEND_URL?.startsWith('https://') || 
                      process.env.CORS_ORIGINS?.includes('https://') ||
                      false;
+    
+    // 2. Verificar se a requisição veio via HTTPS (mais confiável)
+    const requestHttps = req?.protocol === 'https' || 
+                        req?.headers['x-forwarded-proto'] === 'https' ||
+                        false;
+    
+    // 3. Em produção, assumir HTTPS se não conseguir detectar (mais seguro)
+    const isHttps = requestHttps || envHttps || (isProduction && !process.env.FRONTEND_URL?.startsWith('http://'));
+
+    // Se frontend e backend estão em domínios diferentes, usar 'none'
+    // Se estão no mesmo domínio, usar 'lax'
+    const frontendUrl = process.env.FRONTEND_URL || '';
+    let isCrossDomain = false;
+    
+    try {
+      if (frontendUrl) {
+        const frontendHost = new URL(frontendUrl).hostname;
+        // Se frontend não contém 'api', provavelmente é cross-domain
+        // (assumindo que backend está em api.autologger.online)
+        isCrossDomain = !frontendHost.includes('api') && 
+                       (frontendHost.includes('autologger.online') || 
+                        frontendHost.includes('app.autologger.online'));
+      }
+    } catch (error) {
+      // Se não conseguir parsear, assumir cross-domain em produção com HTTPS
+      isCrossDomain = isProduction && isHttps;
+    }
+    
+    // Se não conseguir determinar, em produção assumir cross-domain se usar HTTPS
+    const useSameSiteNone = isProduction && isHttps && (isCrossDomain || !frontendUrl);
 
     const cookieOptions: any = {
       httpOnly: true,
-      secure: isHttps,
-      sameSite: isProduction ? 'none' : 'lax',
+      secure: isHttps, // Só usar secure se for HTTPS
+      // IMPORTANTE: sameSite: 'none' REQUER secure: true
+      sameSite: useSameSiteNone ? 'none' : 'lax',
       maxAge,
       path: '/',
     };
@@ -156,6 +192,7 @@ export class GoogleAuthController {
 
     res.cookie('autologger_token', result.access_token, cookieOptions);
 
+    // Token está no cookie httpOnly (não retornamos no body por segurança)
     res.json({
       user: result.user,
     });

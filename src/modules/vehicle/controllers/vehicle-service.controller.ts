@@ -12,6 +12,8 @@ import {
   BadRequestException,
   UseInterceptors,
   UploadedFiles,
+  HttpException,
+  HttpStatus,
 } from '@nestjs/common';
 import { FilesInterceptor } from '@nestjs/platform-express';
 import { VehicleServiceService } from '../services/vehicle-service.service';
@@ -28,6 +30,8 @@ import {
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 import { VehicleService } from '../../vehicle/services/vehicle.service';
 import { FileUploadService } from '../services/file-upload.service';
+import { CurrentUser } from '../../../common/decorators/current-user.decorator';
+import { UserResponseDto } from '../../user/dto/user-response.dto';
 
 @ApiTags('vehicle-services')
 @ApiBearerAuth()
@@ -46,27 +50,46 @@ export class VehicleServiceController {
   @ApiResponse({ status: 400, description: 'Dados inválidos' })
   async create(
     @Body() createVehicleServiceDto: CreateVehicleServiceDto,
-    @Request() req,
+    @CurrentUser() user: UserResponseDto,
   ) {
-    const userId = req.user?.id;
-
-    const userVehicles = await this.vehicleService.findUserVehicles(userId);
-    if (!userVehicles.active || userVehicles.active.length === 0) {
-      throw new BadRequestException(
-        'Você precisa ter pelo menos um veículo cadastrado para criar serviços',
+    if (!user || !user.id) {
+      throw new HttpException(
+        'Usuário não autenticado',
+        HttpStatus.UNAUTHORIZED,
       );
     }
 
-    const vehicleExists = userVehicles.active.some(
-      (vehicle) => vehicle.id === createVehicleServiceDto.vehicleId,
-    );
-    if (!vehicleExists) {
-      throw new BadRequestException(
-        'Veículo não encontrado ou não pertence ao usuário',
+    try {
+      const userVehicles = await this.vehicleService.findUserVehicles(
+        user.id,
+      );
+      if (!userVehicles.active || userVehicles.active.length === 0) {
+        throw new BadRequestException(
+          'Você precisa ter pelo menos um veículo cadastrado para criar serviços',
+        );
+      }
+
+      const vehicleExists = userVehicles.active.some(
+        (vehicle) => vehicle.id === createVehicleServiceDto.vehicleId,
+      );
+      if (!vehicleExists) {
+        throw new BadRequestException(
+          'Veículo não encontrado ou não pertence ao usuário',
+        );
+      }
+
+      return this.vehicleServiceService.create(createVehicleServiceDto);
+    } catch (error) {
+      // Se já for uma exceção HTTP, re-throw
+      if (error instanceof HttpException || error instanceof BadRequestException) {
+        throw error;
+      }
+      // Caso contrário, logar e lançar erro genérico
+      throw new HttpException(
+        'Erro ao criar serviço de veículo',
+        HttpStatus.INTERNAL_SERVER_ERROR,
       );
     }
-
-    return this.vehicleServiceService.create(createVehicleServiceDto);
   }
 
   @Post('upload-attachments')
@@ -168,9 +191,14 @@ export class VehicleServiceController {
   @Get()
   @ApiOperation({ summary: 'Listar todos os serviços do usuário' })
   @ApiResponse({ status: 200, description: 'Lista de serviços retornada' })
-  findAll(@Request() req) {
-    const userId = req.user?.id;
-    return this.vehicleServiceService.findAll(userId);
+  findAll(@CurrentUser() user: UserResponseDto) {
+    if (!user || !user.id) {
+      throw new HttpException(
+        'Usuário não autenticado',
+        HttpStatus.UNAUTHORIZED,
+      );
+    }
+    return this.vehicleServiceService.findAll(user.id);
   }
 
   @Get('vehicle/:vehicleId')

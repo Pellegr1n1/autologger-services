@@ -8,6 +8,8 @@ import { AuthRegisterDto } from './dto/auth-register.dto';
 import { AuthLoginDto } from './dto/auth-login.dto';
 import { LoggerService } from '../../common/logger/logger.service';
 import { EmailService } from '../email/email.service';
+import { EmailVerificationService } from '../email-verification/email-verification.service';
+import { EmailVerificationRepository } from '../email-verification/email-verification.repository';
 import { LoggerServiceTestHelper } from '../../common/test-helpers/logger-service.test-helper';
 
 describe('AuthService', () => {
@@ -58,6 +60,18 @@ describe('AuthService', () => {
       sendEmailChangeNotification: jest.fn(),
     } as any;
 
+    const mockEmailVerificationRepository = {
+      invalidateUserTokens: jest.fn(),
+      create: jest.fn(),
+      findByToken: jest.fn(),
+      markAsUsed: jest.fn(),
+    };
+
+    const mockEmailVerificationService = {
+      sendVerificationEmail: jest.fn(),
+      verifyEmail: jest.fn(),
+    } as any;
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         AuthService,
@@ -80,6 +94,14 @@ describe('AuthService', () => {
         {
           provide: EmailService,
           useValue: mockEmailService,
+        },
+        {
+          provide: EmailVerificationRepository,
+          useValue: mockEmailVerificationRepository,
+        },
+        {
+          provide: EmailVerificationService,
+          useValue: mockEmailVerificationService,
         },
       ],
     }).compile();
@@ -442,6 +464,18 @@ describe('AuthService', () => {
         sendPasswordChangeNotification: jest.fn().mockResolvedValue(undefined),
       };
 
+      const mockEmailVerificationRepository = {
+        invalidateUserTokens: jest.fn(),
+        create: jest.fn(),
+        findByToken: jest.fn(),
+        markAsUsed: jest.fn(),
+      };
+
+      const mockEmailVerificationService = {
+        sendVerificationEmail: jest.fn(),
+        verifyEmail: jest.fn(),
+      } as any;
+
       const module: TestingModule = await Test.createTestingModule({
         providers: [
           AuthService,
@@ -467,6 +501,14 @@ describe('AuthService', () => {
           {
             provide: EmailService,
             useValue: mockEmailService,
+          },
+          {
+            provide: EmailVerificationRepository,
+            useValue: mockEmailVerificationRepository,
+          },
+          {
+            provide: EmailVerificationService,
+            useValue: mockEmailVerificationService,
           },
         ],
       }).compile();
@@ -520,6 +562,18 @@ describe('AuthService', () => {
         findById: jest.fn().mockResolvedValue(null),
       };
 
+      const mockEmailVerificationRepository = {
+        invalidateUserTokens: jest.fn(),
+        create: jest.fn(),
+        findByToken: jest.fn(),
+        markAsUsed: jest.fn(),
+      };
+
+      const mockEmailVerificationService = {
+        sendVerificationEmail: jest.fn(),
+        verifyEmail: jest.fn(),
+      } as any;
+
       const module: TestingModule = await Test.createTestingModule({
         providers: [
           AuthService,
@@ -542,6 +596,14 @@ describe('AuthService', () => {
           {
             provide: EmailService,
             useValue: mockEmailService,
+          },
+          {
+            provide: EmailVerificationRepository,
+            useValue: mockEmailVerificationRepository,
+          },
+          {
+            provide: EmailVerificationService,
+            useValue: mockEmailVerificationService,
           },
         ],
       }).compile();
@@ -567,6 +629,18 @@ describe('AuthService', () => {
         }),
       };
 
+      const mockEmailVerificationRepository = {
+        invalidateUserTokens: jest.fn(),
+        create: jest.fn(),
+        findByToken: jest.fn(),
+        markAsUsed: jest.fn(),
+      };
+
+      const mockEmailVerificationService = {
+        sendVerificationEmail: jest.fn(),
+        verifyEmail: jest.fn(),
+      } as any;
+
       const module: TestingModule = await Test.createTestingModule({
         providers: [
           AuthService,
@@ -589,6 +663,14 @@ describe('AuthService', () => {
           {
             provide: EmailService,
             useValue: mockEmailService,
+          },
+          {
+            provide: EmailVerificationRepository,
+            useValue: mockEmailVerificationRepository,
+          },
+          {
+            provide: EmailVerificationService,
+            useValue: mockEmailVerificationService,
           },
         ],
       }).compile();
@@ -615,6 +697,18 @@ describe('AuthService', () => {
         }),
       };
 
+      const mockEmailVerificationRepository = {
+        invalidateUserTokens: jest.fn(),
+        create: jest.fn(),
+        findByToken: jest.fn(),
+        markAsUsed: jest.fn(),
+      };
+
+      const mockEmailVerificationService = {
+        sendVerificationEmail: jest.fn(),
+        verifyEmail: jest.fn(),
+      } as any;
+
       const module: TestingModule = await Test.createTestingModule({
         providers: [
           AuthService,
@@ -640,6 +734,14 @@ describe('AuthService', () => {
           {
             provide: EmailService,
             useValue: mockEmailService,
+          },
+          {
+            provide: EmailVerificationRepository,
+            useValue: mockEmailVerificationRepository,
+          },
+          {
+            provide: EmailVerificationService,
+            useValue: mockEmailVerificationService,
           },
         ],
       }).compile();
@@ -673,6 +775,18 @@ describe('AuthService', () => {
           .mockRejectedValue(new Error('Email error')),
       };
 
+      const mockEmailVerificationRepository = {
+        invalidateUserTokens: jest.fn(),
+        create: jest.fn(),
+        findByToken: jest.fn(),
+        markAsUsed: jest.fn(),
+      };
+
+      const mockEmailVerificationService = {
+        sendVerificationEmail: jest.fn(),
+        verifyEmail: jest.fn(),
+      } as any;
+
       const module: TestingModule = await Test.createTestingModule({
         providers: [
           AuthService,
@@ -698,6 +812,14 @@ describe('AuthService', () => {
           {
             provide: EmailService,
             useValue: mockEmailServiceWithError,
+          },
+          {
+            provide: EmailVerificationRepository,
+            useValue: mockEmailVerificationRepository,
+          },
+          {
+            provide: EmailVerificationService,
+            useValue: mockEmailVerificationService,
           },
         ],
       }).compile();

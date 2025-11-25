@@ -18,12 +18,13 @@ export class VehicleFactory {
   async toResponseDto(vehicle: Vehicle): Promise<VehicleResponseDto> {
     // Converter URL do storage para URL acessível (pública ou assinada)
     let photoUrl = vehicle.photoUrl;
-    if (photoUrl && this.storage.getAccessibleUrl) {
+    if (photoUrl && this.storage && this.storage.getAccessibleUrl) {
       try {
         photoUrl = await this.storage.getAccessibleUrl(photoUrl);
       } catch (error) {
         // Em caso de erro, manter a URL original
         this.logger.error('Erro ao gerar URL acessível:', error);
+        // Não propagar o erro, apenas usar a URL original
       }
     }
 

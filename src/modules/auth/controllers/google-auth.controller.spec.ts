@@ -70,9 +70,13 @@ describe('GoogleAuthController', () => {
         redirect: jest.fn(),
       } as any;
 
-      authService.googleLogin.mockResolvedValue(mockAuthResponse);
-
+      // Garantir que está em desenvolvimento para os testes
+      const originalEnv = process.env.NODE_ENV;
+      process.env.NODE_ENV = 'development';
       process.env.FRONTEND_URL = 'http://localhost:5173';
+      delete process.env.CORS_ORIGINS;
+
+      authService.googleLogin.mockResolvedValue(mockAuthResponse);
 
       await controller.googleAuthRedirect(mockRequest, mockResponse);
 
@@ -82,10 +86,14 @@ describe('GoogleAuthController', () => {
         mockAuthResponse.access_token,
         expect.objectContaining({
           httpOnly: true,
-          secure: false, // não é produção
-          sameSite: 'lax',
+          secure: false, // não é HTTPS em desenvolvimento
+          sameSite: 'lax', // não é produção
+          domain: 'localhost', // em desenvolvimento
         }),
       );
+
+      // Restaurar variável de ambiente
+      process.env.NODE_ENV = originalEnv;
       // Token não é mais enviado na URL, apenas dados do usuário
       expect(mockResponse.redirect).toHaveBeenCalledWith(
         expect.stringContaining('http://localhost:5173/auth/callback?user='),
@@ -126,12 +134,29 @@ describe('GoogleAuthController', () => {
         redirect: jest.fn(),
       } as any;
 
-      authService.googleLogin.mockResolvedValue(mockAuthResponse);
+      // Garantir que está em desenvolvimento para os testes
+      const originalEnv = process.env.NODE_ENV;
+      process.env.NODE_ENV = 'development';
       delete process.env.FRONTEND_URL;
+      delete process.env.CORS_ORIGINS;
+
+      authService.googleLogin.mockResolvedValue(mockAuthResponse);
 
       await controller.googleAuthRedirect(mockRequest, mockResponse);
 
-      expect(mockResponse.cookie).toHaveBeenCalled();
+      expect(mockResponse.cookie).toHaveBeenCalledWith(
+        'autologger_token',
+        mockAuthResponse.access_token,
+        expect.objectContaining({
+          httpOnly: true,
+          secure: false,
+          sameSite: 'lax',
+          domain: 'localhost',
+        }),
+      );
+
+      // Restaurar variável de ambiente
+      process.env.NODE_ENV = originalEnv;
       // Token não é mais enviado na URL, apenas dados do usuário
       expect(mockResponse.redirect).toHaveBeenCalledWith(
         expect.stringContaining('http://localhost:5173/auth/callback?user='),
@@ -158,10 +183,21 @@ describe('GoogleAuthController', () => {
         json: jest.fn(),
       } as any;
 
+      // Garantir que está em desenvolvimento para os testes
+      const originalEnv = process.env.NODE_ENV;
+      process.env.NODE_ENV = 'development';
+      delete process.env.FRONTEND_URL;
+      delete process.env.CORS_ORIGINS;
+
       authService.validateGoogleUser.mockResolvedValue(mockGoogleUser as any);
       authService.googleLogin.mockResolvedValue(mockAuthResponse);
 
-      await controller.authenticateWithGoogle({ credential }, mockResponse);
+      const mockRequest = {
+        protocol: 'http',
+        headers: {},
+      } as any;
+
+      await controller.authenticateWithGoogle({ credential }, mockResponse, mockRequest);
 
       expect(authService.validateGoogleUser).toHaveBeenCalledWith({
         googleId: 'google-123',
@@ -176,10 +212,17 @@ describe('GoogleAuthController', () => {
         mockAuthResponse.access_token,
         expect.objectContaining({
           httpOnly: true,
-          secure: false, // não é produção
-          sameSite: 'lax',
+          secure: false, // não é HTTPS em desenvolvimento
+          sameSite: 'lax', // não é produção
+          domain: 'localhost', // em desenvolvimento
         }),
       );
+
+      // Restaurar variável de ambiente
+      process.env.NODE_ENV = originalEnv;
+
+      // Restaurar variável de ambiente
+      process.env.NODE_ENV = originalEnv;
       // Token não é mais retornado no body, apenas dados do usuário
       expect(mockResponse.json).toHaveBeenCalledWith({
         user: mockAuthResponse.user,
@@ -211,14 +254,23 @@ describe('GoogleAuthController', () => {
           }),
         });
 
-      authService.validateGoogleUser.mockResolvedValue(mockGoogleUser as any);
-      authService.googleLogin.mockResolvedValue(mockAuthResponse);
-
+      // Garantir que está em desenvolvimento para os testes
+      const originalEnv = process.env.NODE_ENV;
+      process.env.NODE_ENV = 'development';
       process.env.GOOGLE_CLIENT_ID = 'client-id';
       process.env.GOOGLE_CLIENT_SECRET = 'client-secret';
       process.env.FRONTEND_URL = 'http://localhost:5173';
+      delete process.env.CORS_ORIGINS;
 
-      await controller.authenticateWithGoogle({ code }, mockResponse);
+      authService.validateGoogleUser.mockResolvedValue(mockGoogleUser as any);
+      authService.googleLogin.mockResolvedValue(mockAuthResponse);
+
+      const mockRequest = {
+        protocol: 'http',
+        headers: {},
+      } as any;
+
+      await controller.authenticateWithGoogle({ code }, mockResponse, mockRequest);
 
       expect(globalThis.fetch).toHaveBeenCalledTimes(2);
       expect(authService.validateGoogleUser).toHaveBeenCalled();
@@ -228,10 +280,14 @@ describe('GoogleAuthController', () => {
         mockAuthResponse.access_token,
         expect.objectContaining({
           httpOnly: true,
-          secure: false, // não é produção
-          sameSite: 'lax',
+          secure: false, // não é HTTPS em desenvolvimento
+          sameSite: 'lax', // não é produção
+          domain: 'localhost', // em desenvolvimento
         }),
       );
+
+      // Restaurar variável de ambiente
+      process.env.NODE_ENV = originalEnv;
       // Token não é mais retornado no body, apenas dados do usuário
       expect(mockResponse.json).toHaveBeenCalledWith({
         user: mockAuthResponse.user,
@@ -244,8 +300,13 @@ describe('GoogleAuthController', () => {
         json: jest.fn(),
       } as any;
 
+      const mockRequest = {
+        protocol: 'http',
+        headers: {},
+      } as any;
+
       await expect(
-        controller.authenticateWithGoogle({}, mockResponse),
+        controller.authenticateWithGoogle({}, mockResponse, mockRequest),
       ).rejects.toThrow(BadRequestException);
     });
 
@@ -255,10 +316,16 @@ describe('GoogleAuthController', () => {
         json: jest.fn(),
       } as any;
 
+      const mockRequest = {
+        protocol: 'http',
+        headers: {},
+      } as any;
+
       await expect(
         controller.authenticateWithGoogle(
           { credential: 'invalid' },
           mockResponse,
+          mockRequest,
         ),
       ).rejects.toThrow(BadRequestException);
     });
@@ -276,8 +343,13 @@ describe('GoogleAuthController', () => {
         json: jest.fn(),
       } as any;
 
+      const mockRequest = {
+        protocol: 'http',
+        headers: {},
+      } as any;
+
       await expect(
-        controller.authenticateWithGoogle({ credential }, mockResponse),
+        controller.authenticateWithGoogle({ credential }, mockResponse, mockRequest),
       ).rejects.toThrow(BadRequestException);
     });
 
@@ -297,10 +369,21 @@ describe('GoogleAuthController', () => {
         json: jest.fn(),
       } as any;
 
+      // Garantir que está em desenvolvimento para os testes
+      const originalEnv = process.env.NODE_ENV;
+      process.env.NODE_ENV = 'development';
+      delete process.env.FRONTEND_URL;
+      delete process.env.CORS_ORIGINS;
+
       authService.validateGoogleUser.mockResolvedValue(mockGoogleUser as any);
       authService.googleLogin.mockResolvedValue(mockAuthResponse);
 
-      await controller.authenticateWithGoogle({ credential }, mockResponse);
+      const mockRequest = {
+        protocol: 'http',
+        headers: {},
+      } as any;
+
+      await controller.authenticateWithGoogle({ credential }, mockResponse, mockRequest);
 
       expect(authService.validateGoogleUser).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -309,6 +392,9 @@ describe('GoogleAuthController', () => {
       );
       expect(mockResponse.cookie).toHaveBeenCalled();
       expect(mockResponse.json).toHaveBeenCalled();
+
+      // Restaurar variável de ambiente
+      process.env.NODE_ENV = originalEnv;
     });
 
     it('should use default name when name fields are missing', async () => {
@@ -324,10 +410,21 @@ describe('GoogleAuthController', () => {
         json: jest.fn(),
       } as any;
 
+      // Garantir que está em desenvolvimento para os testes
+      const originalEnv = process.env.NODE_ENV;
+      process.env.NODE_ENV = 'development';
+      delete process.env.FRONTEND_URL;
+      delete process.env.CORS_ORIGINS;
+
       authService.validateGoogleUser.mockResolvedValue(mockGoogleUser as any);
       authService.googleLogin.mockResolvedValue(mockAuthResponse);
 
-      await controller.authenticateWithGoogle({ credential }, mockResponse);
+      const mockRequest = {
+        protocol: 'http',
+        headers: {},
+      } as any;
+
+      await controller.authenticateWithGoogle({ credential }, mockResponse, mockRequest);
 
       // The code actually concatenates undefined + ' ' + undefined = "undefined undefined"
       // So we check for that or "Google User" depending on the actual behavior
@@ -339,6 +436,9 @@ describe('GoogleAuthController', () => {
       );
       expect(mockResponse.cookie).toHaveBeenCalled();
       expect(mockResponse.json).toHaveBeenCalled();
+
+      // Restaurar variável de ambiente
+      process.env.NODE_ENV = originalEnv;
     });
 
     it('should handle OAuth2 token exchange failure', async () => {
@@ -358,8 +458,13 @@ describe('GoogleAuthController', () => {
       process.env.GOOGLE_CLIENT_SECRET = 'client-secret';
       process.env.FRONTEND_URL = 'http://localhost:5173';
 
+      const mockRequest = {
+        protocol: 'http',
+        headers: {},
+      } as any;
+
       await expect(
-        controller.authenticateWithGoogle({ code }, mockResponse),
+        controller.authenticateWithGoogle({ code }, mockResponse, mockRequest),
       ).rejects.toThrow(BadRequestException);
     });
 
@@ -386,8 +491,13 @@ describe('GoogleAuthController', () => {
       process.env.GOOGLE_CLIENT_SECRET = 'client-secret';
       process.env.FRONTEND_URL = 'http://localhost:5173';
 
+      const mockRequest = {
+        protocol: 'http',
+        headers: {},
+      } as any;
+
       await expect(
-        controller.authenticateWithGoogle({ code }, mockResponse),
+        controller.authenticateWithGoogle({ code }, mockResponse, mockRequest),
       ).rejects.toThrow(BadRequestException);
     });
 
@@ -399,8 +509,13 @@ describe('GoogleAuthController', () => {
         json: jest.fn(),
       } as any;
 
+      const mockRequest = {
+        protocol: 'http',
+        headers: {},
+      } as any;
+
       await expect(
-        controller.authenticateWithGoogle({ credential }, mockResponse),
+        controller.authenticateWithGoogle({ credential }, mockResponse, mockRequest),
       ).rejects.toThrow(BadRequestException);
     });
   });

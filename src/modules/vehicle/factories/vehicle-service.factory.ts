@@ -18,7 +18,7 @@ export class VehicleServiceFactory {
     }
 
     // Converter URLs dos anexos
-    if (this.storage.getAccessibleUrl) {
+    if (this.storage && this.storage.getAccessibleUrl) {
       try {
         const accessibleAttachments = await Promise.all(
           service.attachments.map(async (url) => {
@@ -39,6 +39,7 @@ export class VehicleServiceFactory {
         };
       } catch (error) {
         this.logger.error(`Erro ao processar anexos: ${error}`);
+        // Não propagar o erro, retornar serviço com URLs originais
         return service;
       }
     }

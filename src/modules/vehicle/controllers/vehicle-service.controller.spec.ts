@@ -17,6 +17,12 @@ describe('VehicleServiceController', () => {
     id: 'user-123',
     name: 'Test User',
     email: 'test@example.com',
+    avatar: undefined,
+    authProvider: 'local' as const,
+    isActive: true,
+    isEmailVerified: true,
+    createdAt: new Date(),
+    updatedAt: new Date(),
   };
 
   const mockVehicle = {
@@ -116,9 +122,7 @@ describe('VehicleServiceController', () => {
       });
       vehicleServiceService.create.mockResolvedValue(mockVehicleService as any);
 
-      const result = await controller.create(createDto, {
-        user: mockUser,
-      } as any);
+      const result = await controller.create(createDto, mockUser);
 
       expect(vehicleService.findUserVehicles).toHaveBeenCalledWith(mockUser.id);
       expect(vehicleServiceService.create).toHaveBeenCalledWith(createDto);
@@ -143,7 +147,7 @@ describe('VehicleServiceController', () => {
       });
 
       await expect(
-        controller.create(createDto, { user: mockUser } as any),
+        controller.create(createDto, mockUser),
       ).rejects.toThrow(BadRequestException);
     });
 
@@ -165,7 +169,7 @@ describe('VehicleServiceController', () => {
       });
 
       await expect(
-        controller.create(createDto, { user: mockUser } as any),
+        controller.create(createDto, mockUser),
       ).rejects.toThrow(BadRequestException);
     });
   });
@@ -212,7 +216,7 @@ describe('VehicleServiceController', () => {
       const services = [mockVehicleService];
       vehicleServiceService.findAll.mockResolvedValue(services as any);
 
-      const result = await controller.findAll({ user: mockUser } as any);
+      const result = await controller.findAll(mockUser);
 
       expect(vehicleServiceService.findAll).toHaveBeenCalledWith(mockUser.id);
       expect(result).toEqual(services);

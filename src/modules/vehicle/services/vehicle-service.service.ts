@@ -35,42 +35,56 @@ export class VehicleServiceService {
   async create(
     createVehicleServiceDto: CreateVehicleServiceDto,
   ): Promise<VehicleService> {
-    const vehicle = await this.vehicleRepository.findOne({
-      where: { id: createVehicleServiceDto.vehicleId },
-    });
+    try {
+      const vehicle = await this.vehicleRepository.findOne({
+        where: { id: createVehicleServiceDto.vehicleId },
+      });
 
-    if (!vehicle) {
-      this.logger.warn(
-        'Tentativa de criar serviço para veículo inexistente',
-        'VehicleServiceService',
-        {
-          vehicleId: createVehicleServiceDto.vehicleId,
-        },
-      );
-      throw new BadRequestException('Veículo não encontrado');
-    }
+      if (!vehicle) {
+        this.logger.warn(
+          'Tentativa de criar serviço para veículo inexistente',
+          'VehicleServiceService',
+          {
+            vehicleId: createVehicleServiceDto.vehicleId,
+          },
+        );
+        throw new BadRequestException('Veículo não encontrado');
+      }
 
-    const vehicleService = this.vehicleServiceRepository.create({
-      ...createVehicleServiceDto,
-      status: ServiceStatus.PENDING,
-    });
+      const vehicleService = this.vehicleServiceRepository.create({
+        ...createVehicleServiceDto,
+        status: ServiceStatus.PENDING,
+      });
 
-    const savedService =
-      await this.vehicleServiceRepository.save(vehicleService);
+      const savedService =
+        await this.vehicleServiceRepository.save(vehicleService);
 
-    this.processBlockchainAsync(savedService).catch((error) => {
+      this.processBlockchainAsync(savedService).catch((error) => {
+        this.logger.error(
+          'Erro ao processar serviço na blockchain de forma assíncrona',
+          error.stack,
+          'VehicleServiceService',
+          {
+            serviceId: savedService.id,
+            errorMessage: error.message,
+          },
+        );
+      });
+
+      return savedService;
+    } catch (error) {
       this.logger.error(
-        'Erro ao processar serviço na blockchain de forma assíncrona',
+        'Erro ao criar serviço de veículo',
         error.stack,
         'VehicleServiceService',
         {
-          serviceId: savedService.id,
+          vehicleId: createVehicleServiceDto.vehicleId,
           errorMessage: error.message,
         },
       );
-    });
-
-    return savedService;
+      // Re-throw para que o controller possa tratar adequadamente
+      throw error;
+    }
   }
 
   /**
@@ -141,17 +155,27 @@ export class VehicleServiceService {
   }
 
   async findAll(userId?: string): Promise<VehicleService[]> {
-    const queryBuilder = this.vehicleServiceRepository
-      .createQueryBuilder('vehicleService')
-      .leftJoinAndSelect('vehicleService.vehicle', 'vehicle')
-      .orderBy('vehicleService.createdAt', 'DESC');
+    try {
+      const queryBuilder = this.vehicleServiceRepository
+        .createQueryBuilder('vehicleService')
+        .leftJoinAndSelect('vehicleService.vehicle', 'vehicle')
+        .orderBy('vehicleService.createdAt', 'DESC');
 
-    if (userId) {
-      queryBuilder.where('vehicle.userId = :userId', { userId });
+      if (userId) {
+        queryBuilder.where('vehicle.userId = :userId', { userId });
+      }
+
+      const services = await queryBuilder.getMany();
+      return await this.vehicleServiceFactory.toResponseDtoArray(services);
+    } catch (error) {
+      this.logger.error(
+        'Erro ao buscar serviços de veículos',
+        error.stack,
+        'VehicleServiceService',
+        { userId },
+      );
+      throw error;
     }
-
-    const services = await queryBuilder.getMany();
-    return await this.vehicleServiceFactory.toResponseDtoArray(services);
   }
 
   async findByVehicleId(vehicleId: string): Promise<VehicleService[]> {

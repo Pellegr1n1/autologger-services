@@ -26,24 +26,60 @@ export class FileUploadService {
       return null;
     }
 
-    const originalName = file.originalname || 'file';
-    const fileName = this.generateUniqueFileName(originalName);
-
-    const startTime = Date.now();
-    const url = await this.storage.upload(file.buffer, fileName, folder);
-    const duration = Date.now() - startTime;
-
-    // Log apenas se for lento ou em desenvolvimento
-    const isProduction = process.env.NODE_ENV === 'production';
-    if (!isProduction || duration > 1000) {
-      this.logger.log('Upload de arquivo concluído', 'FileUploadService', {
-        fileName,
-        folder,
-        duration: `${duration}ms`,
-      });
+    if (!this.storage) {
+      this.logger.error(
+        'Storage não está configurado',
+        null,
+        'FileUploadService',
+      );
+      throw new Error('Storage não está configurado');
     }
 
-    return url;
+    if (!file.buffer) {
+      this.logger.error(
+        'Arquivo não possui buffer',
+        null,
+        'FileUploadService',
+        {
+          fileName: file.originalname,
+          folder,
+        },
+      );
+      throw new Error('Arquivo inválido: buffer não encontrado');
+    }
+
+    try {
+      const originalName = file.originalname || 'file';
+      const fileName = this.generateUniqueFileName(originalName);
+
+      const startTime = Date.now();
+      const url = await this.storage.upload(file.buffer, fileName, folder);
+      const duration = Date.now() - startTime;
+
+      // Log apenas se for lento ou em desenvolvimento
+      const isProduction = process.env.NODE_ENV === 'production';
+      if (!isProduction || duration > 1000) {
+        this.logger.log('Upload de arquivo concluído', 'FileUploadService', {
+          fileName,
+          folder,
+          duration: `${duration}ms`,
+        });
+      }
+
+      return url;
+    } catch (error) {
+      this.logger.error(
+        'Erro ao fazer upload de arquivo',
+        error.stack,
+        'FileUploadService',
+        {
+          fileName: file.originalname,
+          folder,
+          errorMessage: error.message,
+        },
+      );
+      throw error;
+    }
   }
 
   private async deleteFile(fileUrl: string, fileType: string): Promise<void> {

@@ -1,4 +1,8 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  BadRequestException,
+} from '@nestjs/common';
 import { VehicleRepository } from '../repositories/vehicle.repository';
 import { VehicleBusinessRulesService } from './vehicle-business-rules.service';
 import { VehicleFactory } from '../factories/vehicle.factory';
@@ -26,47 +30,103 @@ export class VehicleService implements IVehicleService {
     createVehicleDto: CreateVehicleDto,
     userId: string,
   ): Promise<VehicleResponseDto> {
-    await this.businessRules.validateActiveVehicleLimit(userId);
-    await this.businessRules.validateUniquePlate(createVehicleDto.plate);
-
-    let photoUrl: string = null;
-    if (createVehicleDto.photo) {
-      photoUrl = await this.fileUploadService.uploadPhoto(
-        createVehicleDto.photo,
+    if (!userId) {
+      this.logger.warn(
+        'Tentativa de criar veículo sem userId',
+        'VehicleService',
       );
+      throw new BadRequestException('Usuário não identificado');
     }
 
-    const vehicleData = {
-      ...createVehicleDto,
-      photoUrl,
-    };
-    delete vehicleData.photo;
+    try {
+      await this.businessRules.validateActiveVehicleLimit(userId);
+      await this.businessRules.validateUniquePlate(createVehicleDto.plate);
 
-    const vehicle = await this.vehicleRepository.create(vehicleData, userId);
-    return await this.vehicleFactory.toResponseDto(vehicle);
+      let photoUrl: string = null;
+      if (createVehicleDto.photo) {
+        try {
+          photoUrl = await this.fileUploadService.uploadPhoto(
+            createVehicleDto.photo,
+          );
+        } catch (error) {
+          this.logger.error(
+            'Erro ao fazer upload da foto do veículo',
+            error.stack,
+            'VehicleService',
+            {
+              userId,
+              plate: createVehicleDto.plate,
+              errorMessage: error.message,
+            },
+          );
+          // Não bloquear criação do veículo se upload falhar
+          // Apenas logar o erro e continuar sem foto
+        }
+      }
+
+      const vehicleData = {
+        ...createVehicleDto,
+        photoUrl,
+      };
+      delete vehicleData.photo;
+
+      const vehicle = await this.vehicleRepository.create(vehicleData, userId);
+      return await this.vehicleFactory.toResponseDto(vehicle);
+    } catch (error) {
+      this.logger.error(
+        'Erro ao criar veículo',
+        error.stack,
+        'VehicleService',
+        {
+          userId,
+          plate: createVehicleDto.plate,
+          errorMessage: error.message,
+        },
+      );
+      // Re-throw para que o controller possa tratar adequadamente
+      throw error;
+    }
   }
 
   async findUserVehicles(userId: string): Promise<{
     active: VehicleResponseDto[];
     sold: VehicleResponseDto[];
   }> {
-    const [activeVehicles, soldVehicles] = await Promise.all([
-      this.vehicleRepository.findActiveByUserId(userId),
-      this.vehicleRepository.findSoldByUserId(userId),
-    ]);
+    if (!userId) {
+      this.logger.warn(
+        'Tentativa de buscar veículos sem userId',
+        'VehicleService',
+      );
+      return { active: [], sold: [] };
+    }
 
-    return {
-      active: await Promise.all(
-        activeVehicles.map((vehicle) =>
-          this.vehicleFactory.toResponseDto(vehicle),
+    try {
+      const [activeVehicles, soldVehicles] = await Promise.all([
+        this.vehicleRepository.findActiveByUserId(userId),
+        this.vehicleRepository.findSoldByUserId(userId),
+      ]);
+
+      return {
+        active: await Promise.all(
+          activeVehicles.map((vehicle) =>
+            this.vehicleFactory.toResponseDto(vehicle),
+          ),
         ),
-      ),
-      sold: await Promise.all(
-        soldVehicles.map((vehicle) =>
-          this.vehicleFactory.toResponseDto(vehicle),
+        sold: await Promise.all(
+          soldVehicles.map((vehicle) =>
+            this.vehicleFactory.toResponseDto(vehicle),
+          ),
         ),
-      ),
-    };
+      };
+    } catch (error) {
+      this.logger.error(
+        'Erro ao buscar veículos do usuário',
+        error.stack,
+        'VehicleService',
+        { userId },
+      );
+      throw error;
+    }
   }
 
   async findVehicleById(

@@ -10,6 +10,7 @@ import {
   UseGuards,
   HttpStatus,
   HttpCode,
+  HttpException,
   UseInterceptors,
   UploadedFile,
   ParseFilePipe,
@@ -73,10 +74,40 @@ export class VehicleController {
     )
     photo?: any,
   ): Promise<VehicleResponseDto> {
+    if (!user || !user.id) {
+      throw new HttpException(
+        'Usuário não autenticado',
+        HttpStatus.UNAUTHORIZED,
+      );
+    }
+
+    // Validar e converter year
+    const year = Number.parseInt(
+      String(createVehicleDto.year || new Date().getFullYear()),
+      10,
+    );
+    if (isNaN(year) || year < 1900 || year > new Date().getFullYear() + 1) {
+      throw new HttpException(
+        'Ano do veículo inválido',
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+
+    // Validar e converter mileage
+    const mileage = createVehicleDto.mileage
+      ? Number.parseInt(String(createVehicleDto.mileage), 10)
+      : 0;
+    if (isNaN(mileage) || mileage < 0) {
+      throw new HttpException(
+        'Quilometragem inválida',
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+
     const vehicleData = {
       ...createVehicleDto,
-      year: Number.parseInt(createVehicleDto.year as any, 10),
-      mileage: Number.parseInt(createVehicleDto.mileage as any, 10) || 0,
+      year,
+      mileage,
       photo,
     };
 
@@ -103,6 +134,12 @@ export class VehicleController {
     },
   })
   async getUserVehicles(@CurrentUser() user: UserResponseDto) {
+    if (!user || !user.id) {
+      throw new HttpException(
+        'Usuário não autenticado',
+        HttpStatus.UNAUTHORIZED,
+      );
+    }
     return this.vehicleService.findUserVehicles(user.id);
   }
 
