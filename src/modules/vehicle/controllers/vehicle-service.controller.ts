@@ -60,9 +60,7 @@ export class VehicleServiceController {
     }
 
     try {
-      const userVehicles = await this.vehicleService.findUserVehicles(
-        user.id,
-      );
+      const userVehicles = await this.vehicleService.findUserVehicles(user.id);
       if (!userVehicles.active || userVehicles.active.length === 0) {
         throw new BadRequestException(
           'Você precisa ter pelo menos um veículo cadastrado para criar serviços',
@@ -81,7 +79,10 @@ export class VehicleServiceController {
       return this.vehicleServiceService.create(createVehicleServiceDto);
     } catch (error) {
       // Se já for uma exceção HTTP, re-throw
-      if (error instanceof HttpException || error instanceof BadRequestException) {
+      if (
+        error instanceof HttpException ||
+        error instanceof BadRequestException
+      ) {
         throw error;
       }
       // Caso contrário, logar e lançar erro genérico

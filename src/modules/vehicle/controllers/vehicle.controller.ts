@@ -98,10 +98,7 @@ export class VehicleController {
       ? Number.parseInt(String(createVehicleDto.mileage), 10)
       : 0;
     if (isNaN(mileage) || mileage < 0) {
-      throw new HttpException(
-        'Quilometragem inválida',
-        HttpStatus.BAD_REQUEST,
-      );
+      throw new HttpException('Quilometragem inválida', HttpStatus.BAD_REQUEST);
     }
 
     const vehicleData = {

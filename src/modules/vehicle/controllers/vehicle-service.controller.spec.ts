@@ -146,9 +146,9 @@ describe('VehicleServiceController', () => {
         sold: [] as any,
       });
 
-      await expect(
-        controller.create(createDto, mockUser),
-      ).rejects.toThrow(BadRequestException);
+      await expect(controller.create(createDto, mockUser)).rejects.toThrow(
+        BadRequestException,
+      );
     });
 
     it('should throw BadRequestException when vehicle does not belong to user', async () => {
@@ -168,9 +168,9 @@ describe('VehicleServiceController', () => {
         sold: [] as any,
       });
 
-      await expect(
-        controller.create(createDto, mockUser),
-      ).rejects.toThrow(BadRequestException);
+      await expect(controller.create(createDto, mockUser)).rejects.toThrow(
+        BadRequestException,
+      );
     });
   });
 

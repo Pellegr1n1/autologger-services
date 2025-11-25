@@ -55,10 +55,14 @@ export class AuthService {
       // Enviar email de verificação automaticamente após o registro
       try {
         await this.emailVerificationService.sendVerificationEmail(user.id);
-        this.logger.log('Email de verificação enviado após registro', 'AuthService', {
-          userId: user.id,
-          email: user.email,
-        });
+        this.logger.log(
+          'Email de verificação enviado após registro',
+          'AuthService',
+          {
+            userId: user.id,
+            email: user.email,
+          },
+        );
       } catch (error) {
         // Log do erro mas não falha o registro
         this.logger.warn(
@@ -67,7 +71,8 @@ export class AuthService {
           {
             userId: user.id,
             email: user.email,
-            errorMessage: error instanceof Error ? error.message : String(error),
+            errorMessage:
+              error instanceof Error ? error.message : String(error),
           },
         );
       }

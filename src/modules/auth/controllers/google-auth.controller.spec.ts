@@ -197,7 +197,11 @@ describe('GoogleAuthController', () => {
         headers: {},
       } as any;
 
-      await controller.authenticateWithGoogle({ credential }, mockResponse, mockRequest);
+      await controller.authenticateWithGoogle(
+        { credential },
+        mockResponse,
+        mockRequest,
+      );
 
       expect(authService.validateGoogleUser).toHaveBeenCalledWith({
         googleId: 'google-123',
@@ -270,7 +274,11 @@ describe('GoogleAuthController', () => {
         headers: {},
       } as any;
 
-      await controller.authenticateWithGoogle({ code }, mockResponse, mockRequest);
+      await controller.authenticateWithGoogle(
+        { code },
+        mockResponse,
+        mockRequest,
+      );
 
       expect(globalThis.fetch).toHaveBeenCalledTimes(2);
       expect(authService.validateGoogleUser).toHaveBeenCalled();
@@ -349,7 +357,11 @@ describe('GoogleAuthController', () => {
       } as any;
 
       await expect(
-        controller.authenticateWithGoogle({ credential }, mockResponse, mockRequest),
+        controller.authenticateWithGoogle(
+          { credential },
+          mockResponse,
+          mockRequest,
+        ),
       ).rejects.toThrow(BadRequestException);
     });
 
@@ -383,7 +395,11 @@ describe('GoogleAuthController', () => {
         headers: {},
       } as any;
 
-      await controller.authenticateWithGoogle({ credential }, mockResponse, mockRequest);
+      await controller.authenticateWithGoogle(
+        { credential },
+        mockResponse,
+        mockRequest,
+      );
 
       expect(authService.validateGoogleUser).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -424,7 +440,11 @@ describe('GoogleAuthController', () => {
         headers: {},
       } as any;
 
-      await controller.authenticateWithGoogle({ credential }, mockResponse, mockRequest);
+      await controller.authenticateWithGoogle(
+        { credential },
+        mockResponse,
+        mockRequest,
+      );
 
       // The code actually concatenates undefined + ' ' + undefined = "undefined undefined"
       // So we check for that or "Google User" depending on the actual behavior
@@ -515,7 +535,11 @@ describe('GoogleAuthController', () => {
       } as any;
 
       await expect(
-        controller.authenticateWithGoogle({ credential }, mockResponse, mockRequest),
+        controller.authenticateWithGoogle(
+          { credential },
+          mockResponse,
+          mockRequest,
+        ),
       ).rejects.toThrow(BadRequestException);
     });
   });

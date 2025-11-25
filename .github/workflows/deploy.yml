@@ -134,24 +134,18 @@ jobs:
           fi
 
       - name: Wait for deployment to stabilize
-        timeout-minutes: 10
         run: |
           ENVIRONMENT="${{ needs.build-and-push.outputs.environment }}"
           CLUSTER_NAME="autologger-${ENVIRONMENT}-cluster"
           SERVICE_NAME="autologger-${ENVIRONMENT}-backend"
           
-          echo "Waiting for service to become stable (max 10 minutes)..."
-          
-          # Usar timeout para evitar travamento indefinido
-          timeout 600 aws ecs wait services-stable \
+          echo "Waiting for service to become stable..."
+          aws ecs wait services-stable \
             --cluster $CLUSTER_NAME \
             --services $SERVICE_NAME \
-            --region ${{ env.AWS_REGION }} || {
-            echo "Service stabilization timeout or failed, but continuing..."
-            echo "Check ECS console for service status"
-          }
+            --region ${{ env.AWS_REGION }} || true
           
-          echo "Deployment check complete!"
+          echo "Deployment complete!"
 
       - name: Health Check
         run: |

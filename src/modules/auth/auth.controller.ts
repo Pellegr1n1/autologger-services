@@ -41,36 +41,43 @@ export class AuthController {
   private setTokenCookie(res: Response, token: string, req?: Request): void {
     const isProduction = process.env.NODE_ENV === 'production';
     const maxAge = 24 * 60 * 60 * 1000;
-    
-    const envHttps = process.env.FRONTEND_URL?.startsWith('https://') || 
-                     process.env.CORS_ORIGINS?.includes('https://') ||
-                     false;
-    
-    const requestHttps = req?.protocol === 'https' || 
-                        req?.headers['x-forwarded-proto'] === 'https' ||
-                        false;
-    
-    const isHttps = requestHttps || envHttps || (isProduction && !process.env.FRONTEND_URL?.startsWith('http://'));
+
+    const envHttps =
+      process.env.FRONTEND_URL?.startsWith('https://') ||
+      process.env.CORS_ORIGINS?.includes('https://') ||
+      false;
+
+    const requestHttps =
+      req?.protocol === 'https' ||
+      req?.headers['x-forwarded-proto'] === 'https' ||
+      false;
+
+    const isHttps =
+      requestHttps ||
+      envHttps ||
+      (isProduction && !process.env.FRONTEND_URL?.startsWith('http://'));
 
     const frontendUrl = process.env.FRONTEND_URL || '';
     let isCrossDomain = false;
-    
+
     try {
       if (frontendUrl) {
         const frontendHost = new URL(frontendUrl).hostname;
         // Se frontend não contém 'api', provavelmente é cross-domain
         // (assumindo que backend está em api.autologger.online)
-        isCrossDomain = !frontendHost.includes('api') && 
-                       (frontendHost.includes('autologger.online') || 
-                        frontendHost.includes('app.autologger.online'));
+        isCrossDomain =
+          !frontendHost.includes('api') &&
+          (frontendHost.includes('autologger.online') ||
+            frontendHost.includes('app.autologger.online'));
       }
-    } catch (error) {
+    } catch {
       // Se não conseguir parsear, assumir cross-domain em produção com HTTPS
       isCrossDomain = isProduction && isHttps;
     }
-    
+
     // Se não conseguir determinar, em produção assumir cross-domain se usar HTTPS
-    const useSameSiteNone = isProduction && isHttps && (isCrossDomain || !frontendUrl);
+    const useSameSiteNone =
+      isProduction && isHttps && (isCrossDomain || !frontendUrl);
 
     const cookieOptions: any = {
       httpOnly: true,
@@ -256,11 +263,12 @@ export class AuthController {
   @Post('logout')
   async logout(@Res() res: Response): Promise<void> {
     const isProduction = process.env.NODE_ENV === 'production';
-    
+
     // Verificar se está usando HTTPS
-    const isHttps = process.env.FRONTEND_URL?.startsWith('https://') || 
-                     process.env.CORS_ORIGINS?.includes('https://') ||
-                     false;
+    const isHttps =
+      process.env.FRONTEND_URL?.startsWith('https://') ||
+      process.env.CORS_ORIGINS?.includes('https://') ||
+      false;
 
     const cookieOptions: any = {
       httpOnly: true,
