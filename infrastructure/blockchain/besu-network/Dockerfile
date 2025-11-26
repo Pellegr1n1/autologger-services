@@ -29,5 +29,7 @@ RUN chmod +x /app/init-besu.sh
 
 EXPOSE 8545
 
-CMD ["/app/init-besu.sh"]
+# Sobrescrever ENTRYPOINT da imagem base e executar script via bash
+ENTRYPOINT []
+CMD ["bash", "/app/init-besu.sh"]
 
