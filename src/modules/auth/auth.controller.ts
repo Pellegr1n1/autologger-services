@@ -113,7 +113,11 @@ export class AuthController {
   async verifyEmail(
     @Param('token') token: string,
   ): Promise<{ message: string }> {
-    await this.emailVerificationService.verifyEmail(token);
+    const decodedToken = decodeURIComponent(token);
+    this.logger.log('Verificando email com token', 'AuthController', {
+      tokenLength: decodedToken.length,
+    });
+    await this.emailVerificationService.verifyEmail(decodedToken);
     return { message: 'Email verificado com sucesso' };
   }
 
