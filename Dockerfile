@@ -25,9 +25,14 @@ RUN apk add --no-cache dumb-init
 COPY package*.json .npmrc ./
 
 RUN npm ci --omit=dev --omit=optional --ignore-scripts && \
+    npm install --save-prod ts-node@^10.9.2 tsconfig-paths@^4.2.0 dotenv@^16.4.5 && \
     npm cache clean --force
 
 COPY --from=builder /app/dist ./dist
+
+# Copy files needed for migrations
+COPY tsconfig.json ./
+COPY src/database/data-source.ts ./src/database/data-source.ts
 
 RUN mkdir -p storage/uploads logs && \
     addgroup -g 1001 -S nodejs && \
