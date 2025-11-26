@@ -32,8 +32,8 @@ export const AppDataSource = new DataSource({
   ssl: dbSsl === 'true' ? { rejectUnauthorized: false } : false,
   extra: {
     max: 20,
-    idleTimeoutMillis: 30000,
-    connectionTimeoutMillis: 2000,
+    idleTimeoutMillis: 120000,
+    connectionTimeoutMillis: 120000,
   },
 });
 
