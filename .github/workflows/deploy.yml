@@ -19,11 +19,12 @@ env:
 
 jobs:
   build-and-push:
-    name: Build and Push Docker Image
+    name: Build and Push Docker Images
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/dev' || github.event_name == 'workflow_dispatch'
     outputs:
       backend-image: ${{ steps.login-ecr.outputs.registry }}/autologger-${{ steps.set-env.outputs.environment }}-backend:${{ github.sha }}
+      besu-image: ${{ steps.login-ecr.outputs.registry }}/autologger-${{ steps.set-env.outputs.environment }}-besu:${{ github.sha }}
       environment: ${{ steps.set-env.outputs.environment }}
 
     steps:
@@ -71,7 +72,7 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Build, tag, and push image to Amazon ECR
+      - name: Build, tag, and push backend image to Amazon ECR
         id: backend-image
         uses: docker/build-push-action@v5
         with:
@@ -83,11 +84,39 @@ jobs:
           cache-from: type=registry,ref=${{ steps.login-ecr.outputs.registry }}/autologger-${{ steps.set-env.outputs.environment }}-backend:buildcache
           cache-to: type=registry,ref=${{ steps.login-ecr.outputs.registry }}/autologger-${{ steps.set-env.outputs.environment }}-backend:buildcache,mode=max
 
+      - name: Create ECR repository for Besu if it doesn't exist
+        run: |
+          BESU_REPO="autologger-${{ steps.set-env.outputs.environment }}-besu"
+          
+          if ! aws ecr describe-repositories --repository-names $BESU_REPO --region ${{ env.AWS_REGION }} 2>/dev/null; then
+            echo "Creating ECR repository: $BESU_REPO"
+            aws ecr create-repository \
+              --repository-name $BESU_REPO \
+              --region ${{ env.AWS_REGION }} \
+              --image-scanning-configuration scanOnPush=true \
+              --encryption-configuration encryptionType=AES256 \
+              --image-tag-mutability MUTABLE
+          else
+            echo "ECR repository $BESU_REPO already exists"
+          fi
+
+      - name: Build, tag, and push Besu image to Amazon ECR
+        id: besu-image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./infrastructure/blockchain/besu-network
+          file: ./infrastructure/blockchain/besu-network/Dockerfile
+          push: true
+          tags: |
+            ${{ steps.login-ecr.outputs.registry }}/autologger-${{ steps.set-env.outputs.environment }}-besu:${{ github.sha }}
+            ${{ steps.login-ecr.outputs.registry }}/autologger-${{ steps.set-env.outputs.environment }}-besu:latest
+          cache-from: type=registry,ref=${{ steps.login-ecr.outputs.registry }}/autologger-${{ steps.set-env.outputs.environment }}-besu:buildcache
+          cache-to: type=registry,ref=${{ steps.login-ecr.outputs.registry }}/autologger-${{ steps.set-env.outputs.environment }}-besu:buildcache,mode=max
+
   deploy-services:
     name: Deploy to ECS
     runs-on: ubuntu-latest
-    needs: [build-and-push]
-    # needs: [build-and-push, run-migrations]  # Migrations disabled - execute manually when needed
+    needs: [build-and-push, run-migrations]
     if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/dev' || github.event_name == 'workflow_dispatch'
     
     steps:
@@ -193,7 +222,7 @@ jobs:
     name: Run Database Migrations
     runs-on: ubuntu-latest
     needs: build-and-push
-    if: false
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/dev' || github.event_name == 'workflow_dispatch'
     steps:
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
@@ -218,25 +247,49 @@ jobs:
         run: |
           ENVIRONMENT="${{ steps.get-cluster-info.outputs.environment }}"
           CLUSTER_NAME="${{ steps.get-cluster-info.outputs.cluster_name }}"
+          SERVICE_NAME="autologger-${ENVIRONMENT}-backend"
           
-          # Get default VPC and subnets (you may need to adjust this based on your setup)
-          VPC_ID=$(aws ec2 describe-vpcs \
-            --filters "Name=isDefault,Values=true" \
-            --query 'Vpcs[0].VpcId' \
-            --output text \
-            --region ${{ env.AWS_REGION }})
+          # Get VPC and subnets from the backend service (which already has DB access)
+          SERVICE_DETAILS=$(aws ecs describe-services \
+            --cluster $CLUSTER_NAME \
+            --services $SERVICE_NAME \
+            --region ${{ env.AWS_REGION }} \
+            --query 'services[0].networkConfiguration.awsvpcConfiguration' \
+            --output json)
           
-          SUBNET_IDS=$(aws ec2 describe-subnets \
-            --filters "Name=vpc-id,Values=$VPC_ID" \
-            --query 'Subnets[*].SubnetId' \
-            --output text \
-            --region ${{ env.AWS_REGION }} | tr '\t' ',')
-          
-          SECURITY_GROUP=$(aws ec2 describe-security-groups \
-            --filters "Name=vpc-id,Values=$VPC_ID" "Name=group-name,Values=default" \
-            --query 'SecurityGroups[0].GroupId' \
-            --output text \
-            --region ${{ env.AWS_REGION }})
+          if [ "$SERVICE_DETAILS" == "null" ] || [ -z "$SERVICE_DETAILS" ]; then
+            echo "⚠️  Backend service not found, using default VPC"
+            # Fallback to default VPC
+            VPC_ID=$(aws ec2 describe-vpcs \
+              --filters "Name=isDefault,Values=true" \
+              --query 'Vpcs[0].VpcId' \
+              --output text \
+              --region ${{ env.AWS_REGION }})
+            
+            SUBNET_IDS=$(aws ec2 describe-subnets \
+              --filters "Name=vpc-id,Values=$VPC_ID" \
+              --query 'Subnets[*].SubnetId' \
+              --output text \
+              --region ${{ env.AWS_REGION }} | tr '\t' ',')
+            
+            SECURITY_GROUP=$(aws ec2 describe-security-groups \
+              --filters "Name=vpc-id,Values=$VPC_ID" "Name=group-name,Values=default" \
+              --query 'SecurityGroups[0].GroupId' \
+              --output text \
+              --region ${{ env.AWS_REGION }})
+          else
+            echo "✅ Using network config from backend service"
+            SUBNET_IDS=$(echo "$SERVICE_DETAILS" | jq -r '.subnets[]' | tr '\n' ',' | sed 's/,$//')
+            SECURITY_GROUP=$(echo "$SERVICE_DETAILS" | jq -r '.securityGroups[0]')
+            
+            # Get VPC from first subnet
+            FIRST_SUBNET=$(echo "$SUBNET_IDS" | cut -d',' -f1)
+            VPC_ID=$(aws ec2 describe-subnets \
+              --subnet-ids $FIRST_SUBNET \
+              --region ${{ env.AWS_REGION }} \
+              --query 'Subnets[0].VpcId' \
+              --output text)
+          fi
           
           echo "vpc_id=$VPC_ID" >> $GITHUB_OUTPUT
           echo "subnet_ids=$SUBNET_IDS" >> $GITHUB_OUTPUT

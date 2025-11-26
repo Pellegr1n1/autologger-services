@@ -6,6 +6,14 @@ config();
 
 const dbSsl = process.env.DB_SSL || 'false';
 
+console.log('🔍 Database Connection Config:');
+console.log(`  Host: ${process.env.DB_HOST || 'localhost'}`);
+console.log(`  Port: ${process.env.DB_PORT || 5432}`);
+console.log(`  Database: ${process.env.DB_NAME || 'autologger'}`);
+console.log(`  Username: ${process.env.DB_USERNAME || 'postgres'}`);
+console.log(`  SSL: ${dbSsl}`);
+console.log(`  NODE_ENV: ${process.env.NODE_ENV || 'development'}`);
+
 const isProduction = process.env.NODE_ENV === 'production';
 const entitiesPath = isProduction
   ? ['dist/**/*.entity.js']
@@ -38,11 +46,26 @@ export const AppDataSource = new DataSource({
 });
 
 if (require.main === module) {
+  console.log('🚀 Tentando conectar ao banco de dados...');
   AppDataSource.initialize()
     .then(() => {
       console.log('✅ DataSource conectado com sucesso!');
+      process.exit(0);
     })
     .catch((error) => {
-      console.error('❌ Erro ao conectar DataSource:', error);
+      console.error('❌ Erro ao conectar DataSource:');
+      console.error('  Tipo:', error.constructor.name);
+      console.error('  Mensagem:', error.message);
+      if (error.code) {
+        console.error('  Código:', error.code);
+      }
+      if (error.address) {
+        console.error('  Endereço:', error.address);
+      }
+      if (error.port) {
+        console.error('  Porta:', error.port);
+      }
+      console.error('  Stack:', error.stack);
+      process.exit(1);
     });
 }
