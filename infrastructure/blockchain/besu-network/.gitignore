@@ -36,7 +36,9 @@ Thumbs.db
 node/*/data/
 node/*/keys/
 
-scripts
+# Scripts - but allow init-besu.sh for Docker build
+scripts/*
+!scripts/init-besu.sh
 genesis/genesis.json
 config/qbftConfigFile.json
 
