@@ -75,21 +75,35 @@ export const createWinstonLogger = () => {
   }
 
   if (process.env.LOKI_HOST && process.env.LOKI_ENABLED === 'true') {
-    transports.push(
-      new LokiTransport({
-        host: process.env.LOKI_HOST || 'http://localhost:3100',
-        labels: {
-          app: 'autologger-service',
-          environment: process.env.NODE_ENV || 'development',
-        },
-        json: true,
-        format: combine(timestamp(), errors({ stack: true }), jsonFormat),
-        replaceTimestamp: true,
-        onConnectionError: (err) => {
-          console.error('Erro na conexão com Loki:', err);
-        },
-      }),
-    );
+    let lokiErrorLogged = false;
+    const lokiHost = process.env.LOKI_HOST || 'http://localhost:3100';
+    
+    try {
+      transports.push(
+        new LokiTransport({
+          host: lokiHost,
+          labels: {
+            app: 'autologger-service',
+            environment: process.env.NODE_ENV || 'development',
+          },
+          json: true,
+          format: combine(timestamp(), errors({ stack: true }), jsonFormat),
+          replaceTimestamp: true,
+          onConnectionError: (err: Error) => {
+            if (!lokiErrorLogged) {
+              console.warn(
+                `⚠️  Loki não está disponível em ${lokiHost}. Logs continuarão sendo enviados apenas para console/arquivo.`,
+              );
+              lokiErrorLogged = true;
+            }
+          },
+        }),
+      );
+    } catch (error) {
+      console.warn(
+        `⚠️  Não foi possível configurar Loki. Logs continuarão sendo enviados apenas para console/arquivo.`,
+      );
+    }
   }
 
   const defaultLogLevel =

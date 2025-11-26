@@ -50,7 +50,7 @@ export class VehicleService {
   @Column({ type: 'text' })
   description: string;
 
-  @Column({ type: 'date' })
+  @Column({ name: 'service_date', type: 'date' })
   serviceDate: Date;
 
   @Column({ type: 'integer' })
@@ -71,7 +71,7 @@ export class VehicleService {
   @Column({ type: 'boolean', default: false })
   warranty: boolean;
 
-  @Column({ type: 'date', nullable: true })
+  @Column({ name: 'next_service_date', type: 'date', nullable: true })
   nextServiceDate: Date;
 
   @Column({ type: 'text', nullable: true })
@@ -85,25 +85,25 @@ export class VehicleService {
   status: ServiceStatus;
 
   // Blockchain fields
-  @Column({ type: 'varchar', length: 66, nullable: true })
+  @Column({ name: 'blockchain_hash', type: 'varchar', length: 66, nullable: true })
   blockchainHash: string;
 
-  @Column({ type: 'varchar', length: 66, nullable: true })
+  @Column({ name: 'previous_hash', type: 'varchar', length: 66, nullable: true })
   previousHash: string;
 
-  @Column({ type: 'varchar', length: 66, nullable: true })
+  @Column({ name: 'merkle_root', type: 'varchar', length: 66, nullable: true })
   merkleRoot: string;
 
-  @Column({ type: 'boolean', default: false })
+  @Column({ name: 'is_immutable', type: 'boolean', default: false })
   isImmutable: boolean;
 
-  @Column({ type: 'boolean', default: true })
+  @Column({ name: 'can_edit', type: 'boolean', default: true })
   canEdit: boolean;
 
-  @Column({ type: 'timestamp', nullable: true })
+  @Column({ name: 'blockchain_confirmed_at', type: 'timestamp', nullable: true })
   blockchainConfirmedAt: Date;
 
-  @Column({ type: 'varchar', length: 100, nullable: true })
+  @Column({ name: 'confirmed_by', type: 'varchar', length: 100, nullable: true })
   confirmedBy: string;
 
   @CreateDateColumn({ name: 'created_at' })
