@@ -46,7 +46,6 @@ RUN chmod +x /app/init-besu.sh
 
 # Configurar variáveis de ambiente Java
 ENV JAVA_OPTS="-Xmx2g -Xms2g -XX:+UseG1GC -XX:MaxGCPauseMillis=100 -XX:+HeapDumpOnOutOfMemoryError -XX:HeapDumpPath=/opt/besu/data"
-ENV BESU_OPTS="--Xlog-gc=false"
 
 # Expor portas
 EXPOSE 8545 30303

@@ -33,8 +33,11 @@ echo ""
 # Criar e configurar diretórios
 log_info "Setting up directories..."
 mkdir -p /opt/besu/data
-chmod -R 755 /opt/besu
-chmod -R 755 /app
+chmod 755 /opt/besu
+chmod 755 /opt/besu/data
+# Não fazer chmod recursivo em /app (pode ter node_modules e ser muito lento)
+# Apenas garantir que o script seja executável
+chmod +x /app/init-besu.sh 2>/dev/null || true
 
 # Verificar genesis.json
 if [ ! -f /opt/besu/genesis.json ]; then
@@ -113,10 +116,26 @@ fi
 
 log_info "✅ Besu process is running"
 
+# Aguardar um pouco para logs aparecerem
+sleep 3
+
 # Mostrar logs iniciais
 echo ""
-echo "=== Initial Besu Logs (first 20 lines) ==="
-head -20 "$BESU_LOG" 2>/dev/null || echo "No logs yet"
+echo "=== Initial Besu Logs (first 30 lines) ==="
+if [ -f "$BESU_LOG" ] && [ -s "$BESU_LOG" ]; then
+    head -30 "$BESU_LOG" 2>/dev/null || echo "No logs yet"
+else
+    log_warn "Log file is empty or doesn't exist yet"
+    log_info "Checking if Besu process is writing logs..."
+    sleep 2
+    if [ -f "$BESU_LOG" ] && [ -s "$BESU_LOG" ]; then
+        head -30 "$BESU_LOG" 2>/dev/null || echo "Still no logs"
+    else
+        log_error "Besu is not writing to log file!"
+        log_info "Checking process status..."
+        ps aux | grep -E "(besu|java)" | grep -v grep || echo "No besu/java process found"
+    fi
+fi
 echo "==========================================="
 echo ""
 
@@ -155,24 +174,29 @@ while [ $elapsed -lt $MAX_STARTUP_TIME ]; do
     # Mostrar progresso
     echo -n "."
     
-    # A cada 15 segundos, mostrar última linha do log
-    if [ $((elapsed % 15)) -eq 0 ] && [ $elapsed -gt 0 ]; then
+    # A cada 10 segundos, mostrar logs
+    if [ $((elapsed % 10)) -eq 0 ] && [ $elapsed -gt 0 ]; then
         echo ""
-        current_line=$(tail -1 "$BESU_LOG" 2>/dev/null | sed 's/^[[:space:]]*//' || echo "")
-        if [ -n "$current_line" ] && [ "$current_line" != "$last_log_line" ]; then
-            log_info "Status: ${current_line:0:100}"
-            last_log_line="$current_line"
-        fi
-        log_check=$((log_check + 1))
-        
-        # A cada 30s, mostrar mais contexto
-        if [ $log_check -ge 2 ]; then
-            echo ""
-            echo "=== Recent Logs (last 5 lines) ==="
-            tail -5 "$BESU_LOG" 2>/dev/null || echo "No logs"
-            echo "==================================="
-            echo ""
-            log_check=0
+        if [ -f "$BESU_LOG" ] && [ -s "$BESU_LOG" ]; then
+            current_line=$(tail -1 "$BESU_LOG" 2>/dev/null | sed 's/^[[:space:]]*//' || echo "")
+            if [ -n "$current_line" ] && [ "$current_line" != "$last_log_line" ]; then
+                log_info "Latest log: ${current_line:0:120}"
+                last_log_line="$current_line"
+            fi
+            
+            # A cada 20s, mostrar mais contexto
+            if [ $log_check -ge 1 ]; then
+                echo ""
+                echo "=== Recent Besu Logs (last 10 lines) ==="
+                tail -10 "$BESU_LOG" 2>/dev/null || echo "No logs"
+                echo "======================================="
+                echo ""
+                log_check=0
+            else
+                log_check=$((log_check + 1))
+            fi
+        else
+            log_warn "Log file is empty or doesn't exist"
         fi
     fi
     
