@@ -85,10 +85,20 @@ export class VehicleService {
   status: ServiceStatus;
 
   // Blockchain fields
-  @Column({ name: 'blockchain_hash', type: 'varchar', length: 66, nullable: true })
+  @Column({
+    name: 'blockchain_hash',
+    type: 'varchar',
+    length: 66,
+    nullable: true,
+  })
   blockchainHash: string;
 
-  @Column({ name: 'previous_hash', type: 'varchar', length: 66, nullable: true })
+  @Column({
+    name: 'previous_hash',
+    type: 'varchar',
+    length: 66,
+    nullable: true,
+  })
   previousHash: string;
 
   @Column({ name: 'merkle_root', type: 'varchar', length: 66, nullable: true })
@@ -100,10 +110,19 @@ export class VehicleService {
   @Column({ name: 'can_edit', type: 'boolean', default: true })
   canEdit: boolean;
 
-  @Column({ name: 'blockchain_confirmed_at', type: 'timestamp', nullable: true })
+  @Column({
+    name: 'blockchain_confirmed_at',
+    type: 'timestamp',
+    nullable: true,
+  })
   blockchainConfirmedAt: Date;
 
-  @Column({ name: 'confirmed_by', type: 'varchar', length: 100, nullable: true })
+  @Column({
+    name: 'confirmed_by',
+    type: 'varchar',
+    length: 100,
+    nullable: true,
+  })
   confirmedBy: string;
 
   @CreateDateColumn({ name: 'created_at' })

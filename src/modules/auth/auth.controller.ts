@@ -38,11 +38,14 @@ export class AuthController {
     this.logger.setContext('AuthController');
   }
 
-  private setTokenCookie(res: Response, token: string): void {
+  private setTokenCookie(
+    res: Response,
+    token: string,
+    rememberMe: boolean = false,
+  ): void {
     const isProduction = process.env.NODE_ENV === 'production';
-    const maxAge = 24 * 60 * 60 * 1000;
+    const maxAge = rememberMe ? 7 * 24 * 60 * 60 * 1000 : 24 * 60 * 60 * 1000;
 
-    // Verificar se está usando HTTPS
     const isHttps =
       process.env.FRONTEND_URL?.startsWith('https://') ||
       process.env.CORS_ORIGINS?.includes('https://') ||
@@ -50,8 +53,8 @@ export class AuthController {
 
     const cookieOptions: any = {
       httpOnly: true,
-      secure: isHttps, // Só usar secure se for HTTPS
-      sameSite: isProduction ? 'none' : 'lax', // 'none' para cross-domain em produção
+      secure: isHttps,
+      sameSite: isProduction ? 'none' : 'lax',
       maxAge,
       path: '/',
     };
@@ -84,7 +87,8 @@ export class AuthController {
     @Res() res: Response,
   ): Promise<void> {
     const result = await this.authService.login(authLoginDto);
-    this.setTokenCookie(res, result.access_token);
+    const rememberMe = authLoginDto.rememberMe || false;
+    this.setTokenCookie(res, result.access_token, rememberMe);
     res.json({
       user: result.user,
     });

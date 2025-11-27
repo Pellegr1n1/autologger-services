@@ -1,7 +1,9 @@
-name: CD - Continuous Deployment
+name: CI/CD Pipeline
 
 on:
   push:
+    branches: [main, dev]
+  pull_request:
     branches: [main, dev]
   workflow_dispatch:
     inputs:
@@ -18,10 +20,140 @@ env:
   AWS_REGION: us-east-2
 
 jobs:
+  lint:
+    name: Lint e Type Check
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install
+        run: npm ci
+
+      - name: ESLint
+        run: npm run lint
+
+      - name: TypeScript Check
+        run: npx tsc --noEmit
+
+  test:
+    name: Testes
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install
+        run: npm ci
+
+      - name: Run Tests
+        run: npm run test:cov
+        env:
+          NODE_ENV: test
+
+      - name: Upload Coverage
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: coverage-report
+          path: coverage/
+          retention-days: 30
+
+  security:
+    name: Segurança
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install
+        run: npm ci
+
+      - name: npm audit
+        run: npm audit --audit-level=high
+        continue-on-error: true
+
+      - name: Audit Report
+        run: npm audit --json > audit-report.json || true
+
+      - name: Upload Report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: security-report
+          path: audit-report.json
+          retention-days: 30
+
+  sonarcloud:
+    name: SonarCloud Analysis
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request' || github.ref == 'refs/heads/main'
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install
+        run: npm ci
+
+      - name: Run Tests with Coverage
+        run: npm run test:cov
+        env:
+          NODE_ENV: test
+        continue-on-error: true
+
+      - name: SonarCloud Scan
+        uses: SonarSource/sonarcloud-github-action@master
+        continue-on-error: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_HOST_URL: https://sonarcloud.io
+        with:
+          projectKey: Pellegr1n1_autologger-services
+          organization: pellegr1n1
+          args: >
+            -Dsonar.sources=src
+            -Dsonar.tests=src,test
+            -Dsonar.test.inclusions=**/*.spec.ts,**/*.test.ts,**/*.e2e-spec.ts
+            -Dsonar.javascript.lcov.reportPaths=coverage/lcov.info
+            -Dsonar.typescript.lcov.reportPaths=coverage/lcov.info
+            -Dsonar.coverage.exclusions=**/*.spec.ts,**/*.test.ts,**/test/**,**/migrations/**,**/database/migrations/**,**/main.ts,**/database/data-source.ts
+
   build-and-push:
     name: Build and Push Docker Images
     runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/dev' || github.event_name == 'workflow_dispatch'
+    needs: [lint, test]
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/dev') || github.event_name == 'workflow_dispatch'
     outputs:
       backend-image: ${{ steps.login-ecr.outputs.registry }}/autologger-${{ steps.set-env.outputs.environment }}-backend:${{ github.sha }}
       besu-image: ${{ steps.login-ecr.outputs.registry }}/autologger-${{ steps.set-env.outputs.environment }}-besu:${{ github.sha }}
@@ -33,9 +165,8 @@ jobs:
         run: |
           if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
             echo "environment=${{ github.event.inputs.environment }}" >> $GITHUB_OUTPUT
-          elif [ "${{ github.ref }}" == "refs/heads/main" ]; then
-            echo "environment=prod" >> $GITHUB_OUTPUT
           else
+            # Tanto main quanto dev fazem deploy para dev (único ambiente disponível)
             echo "environment=dev" >> $GITHUB_OUTPUT
           fi
 
@@ -113,116 +244,11 @@ jobs:
           cache-from: type=registry,ref=${{ steps.login-ecr.outputs.registry }}/autologger-${{ steps.set-env.outputs.environment }}-besu:buildcache
           cache-to: type=registry,ref=${{ steps.login-ecr.outputs.registry }}/autologger-${{ steps.set-env.outputs.environment }}-besu:buildcache,mode=max
 
-  deploy-services:
-    name: Deploy to ECS
-    runs-on: ubuntu-latest
-    needs: [build-and-push, run-migrations]
-    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/dev' || github.event_name == 'workflow_dispatch'
-    
-    steps:
-      - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ env.AWS_REGION }}
-
-      - name: Deploy Backend to ECS
-        run: |
-          ENVIRONMENT="${{ needs.build-and-push.outputs.environment }}"
-          CLUSTER_NAME="autologger-${ENVIRONMENT}-cluster"
-          SERVICE_NAME="autologger-${ENVIRONMENT}-backend"
-          
-          echo "Forcing new deployment of $SERVICE_NAME..."
-          echo "New image: ${{ needs.build-and-push.outputs.backend-image }}"
-          
-          aws ecs update-service \
-            --cluster $CLUSTER_NAME \
-            --service $SERVICE_NAME \
-            --force-new-deployment \
-            --region ${{ env.AWS_REGION }}
-          
-          echo "Deploy started! ECS will pull new image and restart tasks."
-
-      - name: Deploy Besu to ECS (if exists)
-        continue-on-error: true
-        run: |
-          ENVIRONMENT="${{ needs.build-and-push.outputs.environment }}"
-          CLUSTER_NAME="autologger-${ENVIRONMENT}-cluster"
-          SERVICE_NAME="autologger-${ENVIRONMENT}-besu"
-          
-          if aws ecs describe-services --cluster $CLUSTER_NAME --services $SERVICE_NAME --region ${{ env.AWS_REGION }} --query 'services[0].status' --output text 2>/dev/null | grep -q "ACTIVE"; then
-            echo "Forcing new deployment of $SERVICE_NAME..."
-            aws ecs update-service \
-              --cluster $CLUSTER_NAME \
-              --service $SERVICE_NAME \
-              --force-new-deployment \
-              --region ${{ env.AWS_REGION }}
-            echo "Besu deploy started!"
-          else
-            echo "Besu service not found, skipping..."
-          fi
-
-      - name: Wait for deployment to stabilize
-        run: |
-          ENVIRONMENT="${{ needs.build-and-push.outputs.environment }}"
-          CLUSTER_NAME="autologger-${ENVIRONMENT}-cluster"
-          SERVICE_NAME="autologger-${ENVIRONMENT}-backend"
-          
-          echo "Waiting for service to become stable..."
-          aws ecs wait services-stable \
-            --cluster $CLUSTER_NAME \
-            --services $SERVICE_NAME \
-            --region ${{ env.AWS_REGION }} || true
-          
-          echo "Deployment complete!"
-
-      - name: Health Check
-        run: |
-          ENVIRONMENT="${{ needs.build-and-push.outputs.environment }}"
-          
-          echo "Getting ALB DNS..."
-          
-          # Get ALB DNS from AWS
-          BACKEND_ALB_DNS=$(aws elbv2 describe-load-balancers \
-            --region ${{ env.AWS_REGION }} \
-            --query "LoadBalancers[?contains(LoadBalancerName, 'autologger-${ENVIRONMENT}-backend')].DNSName" \
-            --output text | head -n 1)
-          
-          if [ -n "$BACKEND_ALB_DNS" ] && [ "$BACKEND_ALB_DNS" != "None" ]; then
-            echo "Testing health endpoint: http://$BACKEND_ALB_DNS/health"
-            
-            for i in {1..10}; do
-              status=$(curl -s -o /dev/null -w "%{http_code}" "http://$BACKEND_ALB_DNS/health" || echo "000")
-              if [ "$status" = "200" ]; then
-                echo "API is healthy and responding!"
-                exit 0
-              fi
-              echo "Attempt $i/10... (Status: $status)"
-              sleep 10
-            done
-            
-            echo "Health check timeout, but deployment was successful"
-          else
-            echo "Could not get ALB DNS for health check"
-          fi
-        continue-on-error: true
-
-      - name: Deploy Summary
-        run: |
-          ENVIRONMENT="${{ needs.build-and-push.outputs.environment }}"
-          
-          echo "## Backend Deploy Successful!" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "**Environment:** $ENVIRONMENT" >> $GITHUB_STEP_SUMMARY
-          echo "**Image:** ${{ needs.build-and-push.outputs.backend-image }}" >> $GITHUB_STEP_SUMMARY
-          echo "**Deploy Time:** $(date -u +"%Y-%m-%d %H:%M:%S UTC")" >> $GITHUB_STEP_SUMMARY
-
   run-migrations:
     name: Run Database Migrations
     runs-on: ubuntu-latest
     needs: build-and-push
-    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/dev' || github.event_name == 'workflow_dispatch'
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/dev') || github.event_name == 'workflow_dispatch'
     steps:
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
@@ -398,3 +424,109 @@ jobs:
           echo "**Task Definition:** run-migrations-temp" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "View logs in CloudWatch: /ecs/autologger-${ENVIRONMENT}-backend" >> $GITHUB_STEP_SUMMARY
+
+  deploy-services:
+    name: Deploy to ECS
+    runs-on: ubuntu-latest
+    needs: [build-and-push, run-migrations]
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/dev') || github.event_name == 'workflow_dispatch'
+    
+    steps:
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Deploy Backend to ECS
+        run: |
+          ENVIRONMENT="${{ needs.build-and-push.outputs.environment }}"
+          CLUSTER_NAME="autologger-${ENVIRONMENT}-cluster"
+          SERVICE_NAME="autologger-${ENVIRONMENT}-backend"
+          
+          echo "Forcing new deployment of $SERVICE_NAME..."
+          echo "New image: ${{ needs.build-and-push.outputs.backend-image }}"
+          
+          aws ecs update-service \
+            --cluster $CLUSTER_NAME \
+            --service $SERVICE_NAME \
+            --force-new-deployment \
+            --region ${{ env.AWS_REGION }}
+          
+          echo "Deploy started! ECS will pull new image and restart tasks."
+
+      - name: Deploy Besu to ECS (if exists)
+        continue-on-error: true
+        run: |
+          ENVIRONMENT="${{ needs.build-and-push.outputs.environment }}"
+          CLUSTER_NAME="autologger-${ENVIRONMENT}-cluster"
+          SERVICE_NAME="autologger-${ENVIRONMENT}-besu"
+          
+          if aws ecs describe-services --cluster $CLUSTER_NAME --services $SERVICE_NAME --region ${{ env.AWS_REGION }} --query 'services[0].status' --output text 2>/dev/null | grep -q "ACTIVE"; then
+            echo "Forcing new deployment of $SERVICE_NAME..."
+            aws ecs update-service \
+              --cluster $CLUSTER_NAME \
+              --service $SERVICE_NAME \
+              --force-new-deployment \
+              --region ${{ env.AWS_REGION }}
+            echo "Besu deploy started!"
+          else
+            echo "Besu service not found, skipping..."
+          fi
+
+      - name: Wait for deployment to stabilize
+        run: |
+          ENVIRONMENT="${{ needs.build-and-push.outputs.environment }}"
+          CLUSTER_NAME="autologger-${ENVIRONMENT}-cluster"
+          SERVICE_NAME="autologger-${ENVIRONMENT}-backend"
+          
+          echo "Waiting for service to become stable..."
+          aws ecs wait services-stable \
+            --cluster $CLUSTER_NAME \
+            --services $SERVICE_NAME \
+            --region ${{ env.AWS_REGION }} || true
+          
+          echo "Deployment complete!"
+
+      - name: Health Check
+        run: |
+          ENVIRONMENT="${{ needs.build-and-push.outputs.environment }}"
+          
+          echo "Getting ALB DNS..."
+          
+          # Get ALB DNS from AWS
+          BACKEND_ALB_DNS=$(aws elbv2 describe-load-balancers \
+            --region ${{ env.AWS_REGION }} \
+            --query "LoadBalancers[?contains(LoadBalancerName, 'autologger-${ENVIRONMENT}-backend')].DNSName" \
+            --output text | head -n 1)
+          
+          if [ -n "$BACKEND_ALB_DNS" ] && [ "$BACKEND_ALB_DNS" != "None" ]; then
+            echo "Testing health endpoint: http://$BACKEND_ALB_DNS/health"
+            
+            for i in {1..10}; do
+              status=$(curl -s -o /dev/null -w "%{http_code}" "http://$BACKEND_ALB_DNS/health" || echo "000")
+              if [ "$status" = "200" ]; then
+                echo "API is healthy and responding!"
+                exit 0
+              fi
+              echo "Attempt $i/10... (Status: $status)"
+              sleep 10
+            done
+            
+            echo "Health check timeout, but deployment was successful"
+          else
+            echo "Could not get ALB DNS for health check"
+          fi
+        continue-on-error: true
+
+      - name: Deploy Summary
+        run: |
+          ENVIRONMENT="${{ needs.build-and-push.outputs.environment }}"
+          
+          echo "## Backend Deploy Successful!" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Environment:** $ENVIRONMENT" >> $GITHUB_STEP_SUMMARY
+          echo "**Image:** ${{ needs.build-and-push.outputs.backend-image }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Deploy Time:** $(date -u +"%Y-%m-%d %H:%M:%S UTC")" >> $GITHUB_STEP_SUMMARY
+
