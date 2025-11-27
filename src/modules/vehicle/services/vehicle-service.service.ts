@@ -141,17 +141,33 @@ export class VehicleServiceService {
   }
 
   async findAll(userId?: string): Promise<VehicleService[]> {
-    const queryBuilder = this.vehicleServiceRepository
-      .createQueryBuilder('vehicleService')
-      .leftJoinAndSelect('vehicleService.vehicle', 'vehicle')
-      .orderBy('vehicleService.createdAt', 'DESC');
+    try {
+      const queryBuilder = this.vehicleServiceRepository
+        .createQueryBuilder('vehicleService')
+        .leftJoinAndSelect('vehicleService.vehicle', 'vehicle')
+        .orderBy('vehicleService.createdAt', 'DESC');
 
-    if (userId) {
-      queryBuilder.where('vehicle.userId = :userId', { userId });
+      if (userId) {
+        queryBuilder.where('vehicle.userId = :userId', { userId });
+      }
+
+      const services = await queryBuilder.getMany();
+
+      // Filtrar serviços que não têm veículo (caso algum tenha sido deletado)
+      const validServices = services.filter(
+        (service) => service.vehicle !== null,
+      );
+
+      return await this.vehicleServiceFactory.toResponseDtoArray(validServices);
+    } catch (error) {
+      this.logger.error(
+        'Erro ao buscar serviços de veículos',
+        error.stack,
+        'VehicleServiceService',
+        { userId },
+      );
+      throw error;
     }
-
-    const services = await queryBuilder.getMany();
-    return await this.vehicleServiceFactory.toResponseDtoArray(services);
   }
 
   async findByVehicleId(vehicleId: string): Promise<VehicleService[]> {

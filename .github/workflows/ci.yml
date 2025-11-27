@@ -1,0 +1,141 @@
+name: CI - Continuous Integration
+
+on:
+  push:
+    branches: [main, dev]
+  pull_request:
+    branches: [main, dev]
+
+env:
+  NODE_VERSION: '20.x'
+
+jobs:
+  lint:
+    name: Lint e Type Check
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install
+        run: npm ci
+
+      - name: ESLint
+        run: npm run lint
+
+      - name: TypeScript Check
+        run: npx tsc --noEmit
+
+  test:
+    name: Testes
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install
+        run: npm ci
+
+      - name: Run Tests
+        run: npm run test:cov
+        env:
+          NODE_ENV: test
+
+      - name: Upload Coverage
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: coverage-report
+          path: coverage/
+          retention-days: 30
+
+  security:
+    name: Segurança
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install
+        run: npm ci
+
+      - name: npm audit
+        run: npm audit --audit-level=high
+        continue-on-error: true
+
+      - name: Audit Report
+        run: npm audit --json > audit-report.json || true
+
+      - name: Upload Report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: security-report
+          path: audit-report.json
+          retention-days: 30
+
+  sonarcloud:
+    name: SonarCloud Analysis
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request' || github.ref == 'refs/heads/main'
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install
+        run: npm ci
+
+      - name: Run Tests with Coverage
+        run: npm run test:cov
+        env:
+          NODE_ENV: test
+        continue-on-error: true
+
+      - name: SonarCloud Scan
+        uses: SonarSource/sonarcloud-github-action@master
+        continue-on-error: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_HOST_URL: https://sonarcloud.io
+        with:
+          projectKey: Pellegr1n1_autologger-services
+          organization: pellegr1n1
+          args: >
+            -Dsonar.sources=src
+            -Dsonar.tests=src,test
+            -Dsonar.test.inclusions=**/*.spec.ts,**/*.test.ts,**/*.e2e-spec.ts
+            -Dsonar.javascript.lcov.reportPaths=coverage/lcov.info
+            -Dsonar.typescript.lcov.reportPaths=coverage/lcov.info
+            -Dsonar.coverage.exclusions=**/*.spec.ts,**/*.test.ts,**/test/**,**/migrations/**,**/database/migrations/**,**/main.ts,**/database/data-source.ts
+

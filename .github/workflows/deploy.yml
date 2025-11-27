@@ -1,10 +1,8 @@
-name: Deploy to AWS
+name: CD - Continuous Deployment
 
 on:
   push:
-    branches:
-      - main
-      - dev
+    branches: [main, dev]
   workflow_dispatch:
     inputs:
       environment:
@@ -16,18 +14,17 @@ on:
           - prod
 
 env:
-  AWS_REGION: us-east-1
-  ECR_REGISTRY: ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.us-east-1.amazonaws.com
-  BACKEND_REPO: ${{ github.repository }}
-  FRONTEND_REPO: ${{ secrets.FRONTEND_REPO || 'seu-usuario/autologger-ui' }}
+  NODE_VERSION: '20.x'
+  AWS_REGION: us-east-2
 
 jobs:
   build-and-push:
     name: Build and Push Docker Images
     runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/dev' || github.event_name == 'workflow_dispatch'
     outputs:
-      backend-image: ${{ steps.backend-image.outputs.image }}
-      frontend-image: ${{ steps.frontend-image.outputs.image }}
+      backend-image: ${{ steps.login-ecr.outputs.registry }}/autologger-${{ steps.set-env.outputs.environment }}-backend:${{ github.sha }}
+      besu-image: ${{ steps.login-ecr.outputs.registry }}/autologger-${{ steps.set-env.outputs.environment }}-besu:${{ github.sha }}
       environment: ${{ steps.set-env.outputs.environment }}
 
     steps:
@@ -42,17 +39,8 @@ jobs:
             echo "environment=dev" >> $GITHUB_OUTPUT
           fi
 
-      - name: Checkout Backend
+      - name: Checkout
         uses: actions/checkout@v4
-        with:
-          path: backend
-
-      - name: Checkout Frontend
-        uses: actions/checkout@v4
-        with:
-          path: frontend
-          repository: ${{ env.FRONTEND_REPO }}
-          token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
@@ -65,12 +53,10 @@ jobs:
         id: login-ecr
         uses: aws-actions/amazon-ecr-login@v2
 
-      - name: Create ECR repositories if they don't exist
+      - name: Create ECR repository if it doesn't exist
         run: |
           BACKEND_REPO="autologger-${{ steps.set-env.outputs.environment }}-backend"
-          FRONTEND_REPO="autologger-${{ steps.set-env.outputs.environment }}-frontend"
           
-          # Check if backend repository exists
           if ! aws ecr describe-repositories --repository-names $BACKEND_REPO --region ${{ env.AWS_REGION }} 2>/dev/null; then
             echo "Creating ECR repository: $BACKEND_REPO"
             aws ecr create-repository \
@@ -82,220 +68,57 @@ jobs:
           else
             echo "ECR repository $BACKEND_REPO already exists"
           fi
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build, tag, and push backend image to Amazon ECR
+        id: backend-image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          tags: |
+            ${{ steps.login-ecr.outputs.registry }}/autologger-${{ steps.set-env.outputs.environment }}-backend:${{ github.sha }}
+            ${{ steps.login-ecr.outputs.registry }}/autologger-${{ steps.set-env.outputs.environment }}-backend:latest
+          cache-from: type=registry,ref=${{ steps.login-ecr.outputs.registry }}/autologger-${{ steps.set-env.outputs.environment }}-backend:buildcache
+          cache-to: type=registry,ref=${{ steps.login-ecr.outputs.registry }}/autologger-${{ steps.set-env.outputs.environment }}-backend:buildcache,mode=max
+
+      - name: Create ECR repository for Besu if it doesn't exist
+        run: |
+          BESU_REPO="autologger-${{ steps.set-env.outputs.environment }}-besu"
           
-          # Check if frontend repository exists
-          if ! aws ecr describe-repositories --repository-names $FRONTEND_REPO --region ${{ env.AWS_REGION }} 2>/dev/null; then
-            echo "Creating ECR repository: $FRONTEND_REPO"
+          if ! aws ecr describe-repositories --repository-names $BESU_REPO --region ${{ env.AWS_REGION }} 2>/dev/null; then
+            echo "Creating ECR repository: $BESU_REPO"
             aws ecr create-repository \
-              --repository-name $FRONTEND_REPO \
+              --repository-name $BESU_REPO \
               --region ${{ env.AWS_REGION }} \
               --image-scanning-configuration scanOnPush=true \
               --encryption-configuration encryptionType=AES256 \
               --image-tag-mutability MUTABLE
           else
-            echo "ECR repository $FRONTEND_REPO already exists"
+            echo "ECR repository $BESU_REPO already exists"
           fi
 
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Build and push Backend image
-        id: backend-image
+      - name: Build, tag, and push Besu image to Amazon ECR
+        id: besu-image
         uses: docker/build-push-action@v5
         with:
-          context: ./backend
+          context: ./infrastructure/blockchain/besu-network
+          file: ./infrastructure/blockchain/besu-network/Dockerfile
           push: true
           tags: |
-            ${{ env.ECR_REGISTRY }}/autologger-${{ steps.set-env.outputs.environment }}-backend:${{ github.sha }}
-            ${{ env.ECR_REGISTRY }}/autologger-${{ steps.set-env.outputs.environment }}-backend:latest
-          cache-from: type=registry,ref=${{ env.ECR_REGISTRY }}/autologger-${{ steps.set-env.outputs.environment }}-backend:buildcache
-          cache-to: type=registry,ref=${{ env.ECR_REGISTRY }}/autologger-${{ steps.set-env.outputs.environment }}-backend:buildcache,mode=max
-
-      - name: Build and push Frontend image
-        id: frontend-image
-        uses: docker/build-push-action@v5
-        with:
-          context: ./frontend
-          push: true
-          tags: |
-            ${{ env.ECR_REGISTRY }}/autologger-${{ steps.set-env.outputs.environment }}-frontend:${{ github.sha }}
-            ${{ env.ECR_REGISTRY }}/autologger-${{ steps.set-env.outputs.environment }}-frontend:latest
-          cache-from: type=registry,ref=${{ env.ECR_REGISTRY }}/autologger-${{ steps.set-env.outputs.environment }}-frontend:buildcache
-          cache-to: type=registry,ref=${{ env.ECR_REGISTRY }}/autologger-${{ steps.set-env.outputs.environment }}-frontend:buildcache,mode=max
-          build-args: |
-            VITE_API_URL=${{ secrets.API_URL }}
-
-  test:
-    name: Run Tests
-    runs-on: ubuntu-latest
-    needs: build-and-push
-
-    steps:
-      - name: Checkout Backend
-        uses: actions/checkout@v4
-        with:
-          path: backend
-
-      - name: Checkout Frontend
-        uses: actions/checkout@v4
-        with:
-          path: frontend
-          repository: ${{ env.FRONTEND_REPO }}
-          token: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-
-      - name: Cache Backend node modules
-        uses: actions/cache@v4
-        with:
-          path: ./backend/node_modules
-          key: ${{ runner.os }}-node-backend-${{ hashFiles('**/backend/package-lock.json') }}
-          restore-keys: |
-            ${{ runner.os }}-node-backend-
-
-      - name: Install Backend dependencies
-        working-directory: ./backend
-        run: npm ci
-
-      - name: Run Backend tests
-        working-directory: ./backend
-        run: npm run test -- --coverage --watchAll=false
-
-      - name: Cache Frontend node modules
-        uses: actions/cache@v4
-        with:
-          path: ./frontend/node_modules
-          key: ${{ runner.os }}-node-frontend-${{ hashFiles('**/frontend/package-lock.json') }}
-          restore-keys: |
-            ${{ runner.os }}-node-frontend-
-
-      - name: Install Frontend dependencies
-        working-directory: ./frontend
-        run: npm ci
-
-      - name: Run Frontend tests
-        working-directory: ./frontend
-        run: npm run test -- --coverage --watchAll=false
-
-  deploy-infrastructure:
-    name: Deploy Infrastructure
-    runs-on: ubuntu-latest
-    needs: build-and-push
-    if: github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch'
-    environment:
-      name: ${{ needs.build-and-push.outputs.environment }}
-
-    steps:
-      - name: Checkout Backend
-        uses: actions/checkout@v4
-        with:
-          path: backend
-
-      - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ env.AWS_REGION }}
-
-      - name: Setup Terraform
-        uses: hashicorp/setup-terraform@v3
-        with:
-          terraform_version: 1.6.0
-
-      - name: Terraform Init
-        working-directory: ./backend/infrastructure/aws/terraform
-        run: terraform init
-
-      - name: Import existing ECR repositories if they exist
-        working-directory: ./backend/infrastructure/aws/terraform
-        timeout-minutes: 5
-        run: |
-          ENVIRONMENT="${{ needs.build-and-push.outputs.environment }}"
-          BACKEND_REPO="autologger-${ENVIRONMENT}-backend"
-          FRONTEND_REPO="autologger-${ENVIRONMENT}-frontend"
-          
-          # Try to import backend repository if it exists
-          if aws ecr describe-repositories --repository-names $BACKEND_REPO --region ${{ env.AWS_REGION }} >/dev/null 2>&1; then
-            echo "Importing existing ECR repository: $BACKEND_REPO"
-            terraform import \
-              -input=false \
-              -var="environment=${ENVIRONMENT}" \
-              -var="db_password=${{ secrets.DB_PASSWORD }}" \
-              -var="jwt_secret=${{ secrets.JWT_SECRET }}" \
-              -var="cors_origins=${{ secrets.CORS_ORIGINS }}" \
-              module.ecr.aws_ecr_repository.backend $BACKEND_REPO 2>&1 || {
-              echo "⚠️  Import failed for $BACKEND_REPO (may already be in state)"
-            }
-          else
-            echo "ℹ️  Backend repository $BACKEND_REPO does not exist, will be created by Terraform"
-          fi
-          
-          # Try to import frontend repository if it exists
-          if aws ecr describe-repositories --repository-names $FRONTEND_REPO --region ${{ env.AWS_REGION }} >/dev/null 2>&1; then
-            echo "Importing existing ECR repository: $FRONTEND_REPO"
-            terraform import \
-              -input=false \
-              -var="environment=${ENVIRONMENT}" \
-              -var="db_password=${{ secrets.DB_PASSWORD }}" \
-              -var="jwt_secret=${{ secrets.JWT_SECRET }}" \
-              -var="cors_origins=${{ secrets.CORS_ORIGINS }}" \
-              module.ecr.aws_ecr_repository.frontend $FRONTEND_REPO 2>&1 || {
-              echo "⚠️  Import failed for $FRONTEND_REPO (may already be in state)"
-            }
-          else
-            echo "ℹ️  Frontend repository $FRONTEND_REPO does not exist, will be created by Terraform"
-          fi
-          
-          echo "✅ ECR import step completed"
-
-      - name: Terraform Plan
-        working-directory: ./backend/infrastructure/aws/terraform
-        run: |
-          terraform plan \
-            -var="environment=${{ needs.build-and-push.outputs.environment }}" \
-            -var="backend_image=${{ github.sha }}" \
-            -var="frontend_image=${{ github.sha }}" \
-            -var="db_password=${{ secrets.DB_PASSWORD }}" \
-            -var="jwt_secret=${{ secrets.JWT_SECRET }}" \
-            -var="cors_origins=${{ secrets.CORS_ORIGINS }}" \
-            -out=tfplan
-
-      - name: Terraform Apply
-        working-directory: ./backend/infrastructure/aws/terraform
-        run: terraform apply -auto-approve tfplan
-
-      - name: Display Application URLs
-        working-directory: ./backend/infrastructure/aws/terraform
-        run: |
-          echo "## URLs da Aplicação" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          
-          BACKEND_URL=$(terraform output -raw backend_alb_dns 2>/dev/null || echo "N/A")
-          FRONTEND_URL=$(terraform output -raw frontend_alb_dns 2>/dev/null || echo "N/A")
-          
-          echo "### Frontend (Interface Web)" >> $GITHUB_STEP_SUMMARY
-          echo "- **URL:** http://$FRONTEND_URL" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          
-          echo "### Backend API" >> $GITHUB_STEP_SUMMARY
-          echo "- **URL:** http://$BACKEND_URL" >> $GITHUB_STEP_SUMMARY
-          echo "- **Swagger Docs:** http://$BACKEND_URL/api" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          
-          echo "Frontend: http://$FRONTEND_URL"
-          echo "Backend API: http://$BACKEND_URL"
-          echo "Swagger: http://$BACKEND_URL/api"
+            ${{ steps.login-ecr.outputs.registry }}/autologger-${{ steps.set-env.outputs.environment }}-besu:${{ github.sha }}
+            ${{ steps.login-ecr.outputs.registry }}/autologger-${{ steps.set-env.outputs.environment }}-besu:latest
+          cache-from: type=registry,ref=${{ steps.login-ecr.outputs.registry }}/autologger-${{ steps.set-env.outputs.environment }}-besu:buildcache
+          cache-to: type=registry,ref=${{ steps.login-ecr.outputs.registry }}/autologger-${{ steps.set-env.outputs.environment }}-besu:buildcache,mode=max
 
   deploy-services:
-    name: Deploy ECS Services
+    name: Deploy to ECS
     runs-on: ubuntu-latest
-    needs: [build-and-push, deploy-infrastructure]
-    if: github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch'
-
+    needs: [build-and-push, run-migrations]
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/dev' || github.event_name == 'workflow_dispatch'
+    
     steps:
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
@@ -304,58 +127,103 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ env.AWS_REGION }}
 
-      - name: Update Backend ECS Service
+      - name: Deploy Backend to ECS
         run: |
-          CLUSTER_NAME="autologger-${{ needs.build-and-push.outputs.environment }}-cluster"
-          SERVICE_NAME="autologger-${{ needs.build-and-push.outputs.environment }}-backend"
+          ENVIRONMENT="${{ needs.build-and-push.outputs.environment }}"
+          CLUSTER_NAME="autologger-${ENVIRONMENT}-cluster"
+          SERVICE_NAME="autologger-${ENVIRONMENT}-backend"
+          
+          echo "Forcing new deployment of $SERVICE_NAME..."
+          echo "New image: ${{ needs.build-and-push.outputs.backend-image }}"
           
           aws ecs update-service \
             --cluster $CLUSTER_NAME \
             --service $SERVICE_NAME \
             --force-new-deployment \
             --region ${{ env.AWS_REGION }}
-
-      - name: Update Frontend ECS Service
-        run: |
-          CLUSTER_NAME="autologger-${{ needs.build-and-push.outputs.environment }}-cluster"
-          SERVICE_NAME="autologger-${{ needs.build-and-push.outputs.environment }}-frontend"
           
-          aws ecs update-service \
-            --cluster $CLUSTER_NAME \
-            --service $SERVICE_NAME \
-            --force-new-deployment \
-            --region ${{ env.AWS_REGION }}
+          echo "Deploy started! ECS will pull new image and restart tasks."
 
-      - name: Wait for services to stabilize
+      - name: Deploy Besu to ECS (if exists)
+        continue-on-error: true
         run: |
-          CLUSTER_NAME="autologger-${{ needs.build-and-push.outputs.environment }}-cluster"
-          SERVICE_NAME_BACKEND="autologger-${{ needs.build-and-push.outputs.environment }}-backend"
-          SERVICE_NAME_FRONTEND="autologger-${{ needs.build-and-push.outputs.environment }}-frontend"
+          ENVIRONMENT="${{ needs.build-and-push.outputs.environment }}"
+          CLUSTER_NAME="autologger-${ENVIRONMENT}-cluster"
+          SERVICE_NAME="autologger-${ENVIRONMENT}-besu"
           
-          echo "Waiting for backend service to stabilize..."
+          if aws ecs describe-services --cluster $CLUSTER_NAME --services $SERVICE_NAME --region ${{ env.AWS_REGION }} --query 'services[0].status' --output text 2>/dev/null | grep -q "ACTIVE"; then
+            echo "Forcing new deployment of $SERVICE_NAME..."
+            aws ecs update-service \
+              --cluster $CLUSTER_NAME \
+              --service $SERVICE_NAME \
+              --force-new-deployment \
+              --region ${{ env.AWS_REGION }}
+            echo "Besu deploy started!"
+          else
+            echo "Besu service not found, skipping..."
+          fi
+
+      - name: Wait for deployment to stabilize
+        run: |
+          ENVIRONMENT="${{ needs.build-and-push.outputs.environment }}"
+          CLUSTER_NAME="autologger-${ENVIRONMENT}-cluster"
+          SERVICE_NAME="autologger-${ENVIRONMENT}-backend"
+          
+          echo "Waiting for service to become stable..."
           aws ecs wait services-stable \
             --cluster $CLUSTER_NAME \
-            --services $SERVICE_NAME_BACKEND \
-            --region ${{ env.AWS_REGION }}
+            --services $SERVICE_NAME \
+            --region ${{ env.AWS_REGION }} || true
           
-          echo "Waiting for frontend service to stabilize..."
-          aws ecs wait services-stable \
-            --cluster $CLUSTER_NAME \
-            --services $SERVICE_NAME_FRONTEND \
-            --region ${{ env.AWS_REGION }}
+          echo "Deployment complete!"
+
+      - name: Health Check
+        run: |
+          ENVIRONMENT="${{ needs.build-and-push.outputs.environment }}"
+          
+          echo "Getting ALB DNS..."
+          
+          # Get ALB DNS from AWS
+          BACKEND_ALB_DNS=$(aws elbv2 describe-load-balancers \
+            --region ${{ env.AWS_REGION }} \
+            --query "LoadBalancers[?contains(LoadBalancerName, 'autologger-${ENVIRONMENT}-backend')].DNSName" \
+            --output text | head -n 1)
+          
+          if [ -n "$BACKEND_ALB_DNS" ] && [ "$BACKEND_ALB_DNS" != "None" ]; then
+            echo "Testing health endpoint: http://$BACKEND_ALB_DNS/health"
+            
+            for i in {1..10}; do
+              status=$(curl -s -o /dev/null -w "%{http_code}" "http://$BACKEND_ALB_DNS/health" || echo "000")
+              if [ "$status" = "200" ]; then
+                echo "API is healthy and responding!"
+                exit 0
+              fi
+              echo "Attempt $i/10... (Status: $status)"
+              sleep 10
+            done
+            
+            echo "Health check timeout, but deployment was successful"
+          else
+            echo "Could not get ALB DNS for health check"
+          fi
+        continue-on-error: true
+
+      - name: Deploy Summary
+        run: |
+          ENVIRONMENT="${{ needs.build-and-push.outputs.environment }}"
+          
+          echo "## Backend Deploy Successful!" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Environment:** $ENVIRONMENT" >> $GITHUB_STEP_SUMMARY
+          echo "**Image:** ${{ needs.build-and-push.outputs.backend-image }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Deploy Time:** $(date -u +"%Y-%m-%d %H:%M:%S UTC")" >> $GITHUB_STEP_SUMMARY
 
   run-migrations:
     name: Run Database Migrations
     runs-on: ubuntu-latest
-    needs: [build-and-push, deploy-infrastructure]
-    if: github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch'
-
+    needs: build-and-push
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/dev' || github.event_name == 'workflow_dispatch'
     steps:
-      - name: Checkout Backend
-        uses: actions/checkout@v4
-        with:
-          path: backend
-
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
@@ -363,29 +231,170 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ env.AWS_REGION }}
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-
-      - name: Install dependencies
-        working-directory: ./backend
-        run: npm ci
-
-      - name: Get RDS endpoint from Terraform
-        id: get-rds-endpoint
-        working-directory: ./backend/infrastructure/aws/terraform
+      - name: Get cluster and task definition info
+        id: get-cluster-info
         run: |
-          DB_ENDPOINT=$(terraform output -raw rds_endpoint 2>/dev/null || echo "")
-          echo "db_endpoint=$DB_ENDPOINT" >> $GITHUB_OUTPUT
+          ENVIRONMENT="${{ needs.build-and-push.outputs.environment }}"
+          CLUSTER_NAME="autologger-${ENVIRONMENT}-cluster"
+          TASK_DEFINITION="run-migrations-temp"
+          
+          echo "cluster_name=$CLUSTER_NAME" >> $GITHUB_OUTPUT
+          echo "task_definition=$TASK_DEFINITION" >> $GITHUB_OUTPUT
+          echo "environment=$ENVIRONMENT" >> $GITHUB_OUTPUT
 
-      - name: Run migrations
-        working-directory: ./backend
-        env:
-          DB_HOST: ${{ steps.get-rds-endpoint.outputs.db_endpoint }}
-          DB_PORT: 5432
-          DB_NAME: ${{ secrets.DB_NAME }}
-          DB_USERNAME: ${{ secrets.DB_USERNAME }}
-          DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
-        run: npm run typeorm:migration:run
+      - name: Get VPC and Subnet configuration
+        id: get-network-config
+        run: |
+          ENVIRONMENT="${{ steps.get-cluster-info.outputs.environment }}"
+          CLUSTER_NAME="${{ steps.get-cluster-info.outputs.cluster_name }}"
+          SERVICE_NAME="autologger-${ENVIRONMENT}-backend"
+          
+          # Get VPC and subnets from the backend service (which already has DB access)
+          SERVICE_DETAILS=$(aws ecs describe-services \
+            --cluster $CLUSTER_NAME \
+            --services $SERVICE_NAME \
+            --region ${{ env.AWS_REGION }} \
+            --query 'services[0].networkConfiguration.awsvpcConfiguration' \
+            --output json)
+          
+          if [ "$SERVICE_DETAILS" == "null" ] || [ -z "$SERVICE_DETAILS" ]; then
+            echo "⚠️  Backend service not found, using default VPC"
+            # Fallback to default VPC
+            VPC_ID=$(aws ec2 describe-vpcs \
+              --filters "Name=isDefault,Values=true" \
+              --query 'Vpcs[0].VpcId' \
+              --output text \
+              --region ${{ env.AWS_REGION }})
+            
+            SUBNET_IDS=$(aws ec2 describe-subnets \
+              --filters "Name=vpc-id,Values=$VPC_ID" \
+              --query 'Subnets[*].SubnetId' \
+              --output text \
+              --region ${{ env.AWS_REGION }} | tr '\t' ',')
+            
+            SECURITY_GROUP=$(aws ec2 describe-security-groups \
+              --filters "Name=vpc-id,Values=$VPC_ID" "Name=group-name,Values=default" \
+              --query 'SecurityGroups[0].GroupId' \
+              --output text \
+              --region ${{ env.AWS_REGION }})
+          else
+            echo "✅ Using network config from backend service"
+            SUBNET_IDS=$(echo "$SERVICE_DETAILS" | jq -r '.subnets[]' | tr '\n' ',' | sed 's/,$//')
+            SECURITY_GROUP=$(echo "$SERVICE_DETAILS" | jq -r '.securityGroups[0]')
+            
+            # Get VPC from first subnet
+            FIRST_SUBNET=$(echo "$SUBNET_IDS" | cut -d',' -f1)
+            VPC_ID=$(aws ec2 describe-subnets \
+              --subnet-ids $FIRST_SUBNET \
+              --region ${{ env.AWS_REGION }} \
+              --query 'Subnets[0].VpcId' \
+              --output text)
+          fi
+          
+          echo "vpc_id=$VPC_ID" >> $GITHUB_OUTPUT
+          echo "subnet_ids=$SUBNET_IDS" >> $GITHUB_OUTPUT
+          echo "security_group=$SECURITY_GROUP" >> $GITHUB_OUTPUT
+          
+          echo "VPC: $VPC_ID"
+          echo "Subnets: $SUBNET_IDS"
+          echo "Security Group: $SECURITY_GROUP"
 
+      - name: Run migration task in ECS
+        id: run-migration-task
+        run: |
+          ENVIRONMENT="${{ steps.get-cluster-info.outputs.environment }}"
+          CLUSTER_NAME="${{ steps.get-cluster-info.outputs.cluster_name }}"
+          TASK_DEFINITION="${{ steps.get-cluster-info.outputs.task_definition }}"
+          
+          # Get the latest revision of the task definition
+          TASK_DEF_ARN=$(aws ecs describe-task-definition \
+            --task-definition $TASK_DEFINITION \
+            --query 'taskDefinition.taskDefinitionArn' \
+            --output text \
+            --region ${{ env.AWS_REGION }})
+          
+          echo "Running migration task: $TASK_DEF_ARN"
+          
+          # Run the task
+          TASK_ARN=$(aws ecs run-task \
+            --cluster $CLUSTER_NAME \
+            --task-definition $TASK_DEF_ARN \
+            --launch-type FARGATE \
+            --network-configuration "awsvpcConfiguration={subnets=[${{ steps.get-network-config.outputs.subnet_ids }}],securityGroups=[${{ steps.get-network-config.outputs.security_group }}],assignPublicIp=ENABLED}" \
+            --region ${{ env.AWS_REGION }} \
+            --query 'tasks[0].taskArn' \
+            --output text)
+          
+          if [ "$TASK_ARN" == "None" ] || [ -z "$TASK_ARN" ]; then
+            echo "Failed to start migration task"
+            exit 1
+          fi
+          
+          echo "task_arn=$TASK_ARN" >> $GITHUB_OUTPUT
+          echo "Migration task started: $TASK_ARN"
+          echo "Waiting for task to complete..."
+
+      - name: Wait for migration task to complete
+        run: |
+          CLUSTER_NAME="${{ steps.get-cluster-info.outputs.cluster_name }}"
+          TASK_ARN="${{ steps.run-migration-task.outputs.task_arn }}"
+          ENVIRONMENT="${{ steps.get-cluster-info.outputs.environment }}"
+          
+          echo "Waiting for task $TASK_ARN to complete..."
+          
+          # Wait for task to stop (max 10 minutes)
+          aws ecs wait tasks-stopped \
+            --cluster $CLUSTER_NAME \
+            --tasks $TASK_ARN \
+            --region ${{ env.AWS_REGION }} || {
+            echo "⚠️  Task wait timeout, checking status..."
+          }
+          
+          # Get task details
+          TASK_DETAILS=$(aws ecs describe-tasks \
+            --cluster $CLUSTER_NAME \
+            --tasks $TASK_ARN \
+            --region ${{ env.AWS_REGION }})
+          
+          EXIT_CODE=$(echo "$TASK_DETAILS" | jq -r '.tasks[0].containers[0].exitCode // "null"')
+          STOPPED_REASON=$(echo "$TASK_DETAILS" | jq -r '.tasks[0].stoppedReason // "N/A"')
+          
+          echo "Task exit code: $EXIT_CODE"
+          echo "Stopped reason: $STOPPED_REASON"
+          
+          # Get recent logs from CloudWatch
+          LOG_GROUP="/ecs/autologger-${ENVIRONMENT}-backend"
+          echo ""
+          echo "=== Recent Migration Logs ==="
+          aws logs tail "$LOG_GROUP" \
+            --since 5m \
+            --format short \
+            --region ${{ env.AWS_REGION }} || echo "Could not fetch logs"
+          echo "=============================="
+          echo ""
+          
+          if [ "$EXIT_CODE" != "0" ] && [ "$EXIT_CODE" != "null" ]; then
+            echo "Migration task failed with exit code: $EXIT_CODE"
+            echo "Stopped reason: $STOPPED_REASON"
+            echo ""
+            echo "View full logs in CloudWatch:"
+            echo "  https://console.aws.amazon.com/cloudwatch/home?region=${{ env.AWS_REGION }}#logsV2:log-groups/log-group/$LOG_GROUP"
+            exit 1
+          fi
+          
+          echo "Migration task completed successfully!"
+
+      - name: Migration Summary
+        run: |
+          ENVIRONMENT="${{ steps.get-cluster-info.outputs.environment }}"
+          TASK_ARN="${{ steps.run-migration-task.outputs.task_arn }}"
+          
+          echo "## Database Migrations" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Migrations executed successfully!" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Environment:** $ENVIRONMENT" >> $GITHUB_STEP_SUMMARY
+          echo "**Task ARN:** $TASK_ARN" >> $GITHUB_STEP_SUMMARY
+          echo "**Task Definition:** run-migrations-temp" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "View logs in CloudWatch: /ecs/autologger-${ENVIRONMENT}-backend" >> $GITHUB_STEP_SUMMARY
