@@ -72,20 +72,32 @@ if [ $elapsed -ge $MAX_STARTUP_TIME ]; then
     exit 1
 fi
 
-# Deploy contracts
+# Deploy contracts usando HDWalletProvider (transações assinadas)
 if [ -d "/app/contracts" ] && [ -z "${BESU_CONTRACT_ADDRESS:-}" ]; then
     log "Deploying contracts..."
     cd /app/contracts
+    
+    # Truffle config já está usando HDWalletProvider, então deve funcionar
     if truffle migrate --network development 2>&1 | tee /tmp/migrate.log; then
-        CONTRACT=$(node -pe "
-            const d=JSON.parse(require('fs').readFileSync('build/contracts/VehicleServiceTracker.json','utf8'));
-            const n=Object.keys(d.networks)[0];
-            d.networks[n].address;
-        " 2>/dev/null)
-        if [ -n "$CONTRACT" ]; then
+        # Extrair contract address dos logs ou do JSON
+        CONTRACT=$(grep -oP 'contract address:\s*0x[a-fA-F0-9]{40}' /tmp/migrate.log 2>/dev/null | grep -oP '0x[a-fA-F0-9]{40}' | head -1)
+        
+        if [ -z "$CONTRACT" ]; then
+            CONTRACT=$(node -pe "
+                try {
+                    const d=JSON.parse(require('fs').readFileSync('build/contracts/VehicleServiceTracker.json','utf8'));
+                    const n=Object.keys(d.networks).find(k => d.networks[k].address);
+                    d.networks[n]?.address || '';
+                } catch(e) { '' }
+            " 2>/dev/null || echo "")
+        fi
+        
+        if [ -n "$CONTRACT" ] && [ "$CONTRACT" != "null" ]; then
             echo ""
             echo "✅ CONTRACT: $CONTRACT"
             echo "$CONTRACT" > /opt/besu/contract-address.txt
+        else
+            log "⚠️  Contract address not found in logs"
         fi
     fi
 fi
