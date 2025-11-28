@@ -92,9 +92,8 @@ export class VehicleServiceService {
         ethers.toUtf8Bytes(JSON.stringify(eventData)),
       );
 
-      // Log inicial - CRÍTICO para rastreamento no CloudWatch
       this.logger.log(
-        `🚀 INICIANDO: Registro do serviço ${service.id} na blockchain`,
+        `INICIANDO: Registro do serviço ${service.id} na blockchain`,
         'VehicleServiceService',
         {
           serviceId: service.id,
@@ -124,9 +123,8 @@ export class VehicleServiceService {
 
         await this.vehicleServiceRepository.save(service);
 
-        // Log explícito de SUCESSO para CloudWatch - CRÍTICO para TCC
         this.logger.log(
-          `✅ SUCESSO: Serviço ${service.id} CONFIRMADO na blockchain! Status atualizado para CONFIRMED no banco de dados.`,
+          `SUCESSO: Serviço ${service.id} CONFIRMADO na blockchain! Status atualizado para CONFIRMED no banco de dados.`,
           'VehicleServiceService',
           {
             serviceId: service.id,
@@ -189,7 +187,6 @@ export class VehicleServiceService {
 
       const services = await queryBuilder.getMany();
 
-      // Filtrar serviços que não têm veículo (caso algum tenha sido deletado)
       const validServices = services.filter(
         (service) => service.vehicle !== null,
       );
@@ -270,7 +267,6 @@ export class VehicleServiceService {
   ): Promise<VehicleService> {
     const vehicleService = await this.findOne(id);
 
-    // Se não foi fornecido hash, gerar um
     if (!hash) {
       const eventData = {
         serviceId: vehicleService.id,
@@ -283,7 +279,6 @@ export class VehicleServiceService {
       hash = ethers.keccak256(ethers.toUtf8Bytes(JSON.stringify(eventData)));
     }
 
-    // Marcar como submetido/pendente até confirmação real da blockchain
     vehicleService.blockchainHash = hash;
     vehicleService.status = ServiceStatus.PENDING;
     vehicleService.isImmutable = false;
