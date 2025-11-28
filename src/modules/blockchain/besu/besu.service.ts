@@ -456,7 +456,9 @@ export class BesuService implements OnModuleInit {
 
         // Verificar se a transação foi bem-sucedida (status === 1)
         if (receipt.status !== 1) {
-          throw new Error(`Transação falhou na blockchain. Status: ${receipt.status}`);
+          throw new Error(
+            `Transação falhou na blockchain. Status: ${receipt.status}`,
+          );
         }
 
         // Log explícito de SUCESSO para CloudWatch
@@ -1109,13 +1111,15 @@ export class BesuService implements OnModuleInit {
       }
 
       if (!this.provider) {
-        this.logger.warn(`Provider não disponível para verificar transação ${txHash.substring(0, 10)}...`);
+        this.logger.warn(
+          `Provider não disponível para verificar transação ${txHash.substring(0, 10)}...`,
+        );
         return false;
       }
 
       // Tentar obter o receipt da transação
       const receipt = await this.provider.getTransactionReceipt(txHash);
-      
+
       if (receipt) {
         // Receipt encontrado - verificar status
         const isSuccess = receipt.status === 1;
@@ -1124,21 +1128,30 @@ export class BesuService implements OnModuleInit {
         );
         return isSuccess;
       }
-      
+
       // Se não encontrou receipt, tentar verificar se a transação existe
       const tx = await this.provider.getTransaction(txHash);
       if (tx) {
-        this.logger.log(`Transação ${txHash.substring(0, 10)}... existe mas ainda não foi minerada`);
+        this.logger.log(
+          `Transação ${txHash.substring(0, 10)}... existe mas ainda não foi minerada`,
+        );
         return false; // Transação existe mas não foi confirmada ainda
       }
-      
+
       return false;
     } catch (error) {
       // Se der erro "not found", a transação não existe
-      if (error.message?.includes('not found') || error.message?.includes('does not exist')) {
-        this.logger.warn(`Transação ${txHash.substring(0, 10)}... não encontrada na blockchain`);
+      if (
+        error.message?.includes('not found') ||
+        error.message?.includes('does not exist')
+      ) {
+        this.logger.warn(
+          `Transação ${txHash.substring(0, 10)}... não encontrada na blockchain`,
+        );
       } else {
-        this.logger.error(`Erro ao verificar transação ${txHash.substring(0, 10)}...: ${error.message}`);
+        this.logger.error(
+          `Erro ao verificar transação ${txHash.substring(0, 10)}...: ${error.message}`,
+        );
       }
       return false;
     }

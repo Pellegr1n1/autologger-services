@@ -210,10 +210,58 @@ export class BlockchainService {
 
           if (service.blockchainHash) {
             try {
-              // Verificar se o hash existe no contrato
-              const hashExists = await this.besuService.verifyHashInContract(
+              let hashExists = await this.besuService.verifyHashInContract(
                 service.blockchainHash,
               );
+
+              if (!hashExists) {
+                const isTransaction =
+                  await this.besuService.isTransactionConfirmed(
+                    service.blockchainHash,
+                  );
+
+                if (isTransaction) {
+                  try {
+                    const eventData = {
+                      serviceId: service.id,
+                      vehicleId: service.vehicleId,
+                      type: service.type,
+                      description: service.description,
+                      serviceDate: service.serviceDate,
+                      timestamp:
+                        service.createdAt?.toISOString() ||
+                        new Date().toISOString(),
+                    };
+
+                    const contentHash = ethers.keccak256(
+                      ethers.toUtf8Bytes(JSON.stringify(eventData)),
+                    );
+
+                    hashExists =
+                      await this.besuService.verifyHashInContract(contentHash);
+
+                    if (hashExists) {
+                      await this.vehicleServiceRepository.update(
+                        { id: service.id },
+                        { blockchainHash: contentHash },
+                      );
+                      service.blockchainHash = contentHash;
+                      this.logger.log(
+                        `Hash corrigido: transactionHash → contentHash para serviço ${service.id}`,
+                      );
+                    }
+                  } catch (hashError) {
+                    this.logger.warn(
+                      `Erro ao gerar/verificar hash de conteúdo: ${hashError.message}`,
+                    );
+                  }
+                }
+              }
+
+              this.logger.log(
+                `Hash ${service.blockchainHash.substring(0, 10)}... existe no contrato: ${hashExists}`,
+              );
+
               blockchainVerified = hashExists;
 
               if (hashExists) {
@@ -349,23 +397,26 @@ export class BlockchainService {
       const errors: string[] = [];
 
       for (const service of failedServices) {
-        if (!service.blockchainHash || service.blockchainHash === 'pending-hash') {
+        if (
+          !service.blockchainHash ||
+          service.blockchainHash === 'pending-hash'
+        ) {
           continue;
         }
 
         try {
           // Primeiro, verificar se é uma transação confirmada na blockchain
           let isConfirmed = false;
-          
+
           this.logger.log(
             `Verificando serviço ${service.id} com hash: ${service.blockchainHash.substring(0, 10)}...`,
           );
-          
+
           // Tentar verificar como transação primeiro (mais comum)
           isConfirmed = await this.besuService.isTransactionConfirmed(
             service.blockchainHash,
           );
-          
+
           // Se não for transação confirmada, verificar se é hash de conteúdo no contrato
           if (!isConfirmed) {
             this.logger.log(

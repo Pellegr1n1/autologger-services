@@ -31,6 +31,7 @@ describe('BlockchainService', () => {
       registerService: jest.fn(),
       registerHash: jest.fn(),
       verifyHashInContract: jest.fn(),
+      isTransactionConfirmed: jest.fn(),
       getContractStats: jest.fn(),
       getNetworkInfo: jest.fn(),
     };
@@ -363,10 +364,16 @@ describe('BlockchainService', () => {
         blockchainHash: 'hash-1',
         status: ServiceStatus.CONFIRMED,
         blockchainConfirmedAt: new Date(),
+        vehicleId: 'vehicle-1',
+        type: 'MANUTENCAO',
+        description: 'Test service',
+        serviceDate: new Date(),
+        createdAt: new Date(),
       };
 
       vehicleServiceRepository.find.mockResolvedValue([mockService] as any);
       besuService.verifyHashInContract.mockResolvedValue(false);
+      besuService.isTransactionConfirmed.mockResolvedValue(false);
       vehicleServiceRepository.update.mockResolvedValue(undefined);
 
       await service.forceVerifyAllServices();

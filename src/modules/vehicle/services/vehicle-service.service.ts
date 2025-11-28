@@ -113,8 +113,7 @@ export class VehicleServiceService {
       );
 
       if (hashResult.success) {
-        // Se temos transactionHash, usar ele; caso contrário, usar o serviceHash
-        const blockchainHash = hashResult.transactionHash || serviceHash;
+        const blockchainHash = serviceHash;
 
         service.blockchainHash = blockchainHash;
         service.status = ServiceStatus.CONFIRMED;

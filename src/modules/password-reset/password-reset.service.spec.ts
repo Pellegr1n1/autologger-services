@@ -120,8 +120,10 @@ describe('PasswordResetService', () => {
       await expect(
         service.requestPasswordReset('google@example.com'),
       ).rejects.toThrow(BadRequestException);
-      
-      expect(userService.findByEmail).toHaveBeenCalledWith('google@example.com');
+
+      expect(userService.findByEmail).toHaveBeenCalledWith(
+        'google@example.com',
+      );
       expect(tokenRepository.invalidateUserTokens).not.toHaveBeenCalled();
       expect(emailService.sendPasswordResetEmail).not.toHaveBeenCalled();
     });
