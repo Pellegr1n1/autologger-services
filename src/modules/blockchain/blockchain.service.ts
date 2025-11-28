@@ -315,6 +315,101 @@ export class BlockchainService {
   }
 
   /**
+   * Sincroniza status de serviços marcados como falhados/rejeitados que na verdade estão na blockchain
+   * Útil quando a blockchain fica offline e serviços ficam marcados incorretamente
+   * @returns Resultado da sincronização
+   */
+  async syncFailedServicesStatus() {
+    try {
+      this.logger.log(
+        'Sincronizando status de serviços falhados/rejeitados com a blockchain...',
+      );
+
+      const failedServices = await this.vehicleServiceRepository.find({
+        where: [
+          {
+            blockchainHash: Not(IsNull()),
+            status: ServiceStatus.PENDING,
+          },
+          {
+            blockchainHash: Not(IsNull()),
+            status: ServiceStatus.REJECTED,
+          },
+        ],
+        relations: ['vehicle'],
+        order: { createdAt: 'DESC' },
+      });
+
+      this.logger.log(
+        `Encontrados ${failedServices.length} serviços para sincronizar`,
+      );
+
+      let corrected = 0;
+      let notFound = 0;
+      const errors: string[] = [];
+
+      for (const service of failedServices) {
+        if (!service.blockchainHash || service.blockchainHash === 'pending-hash') {
+          continue;
+        }
+
+        try {
+          const hashExists = await this.besuService.verifyHashInContract(
+            service.blockchainHash,
+          );
+
+          if (hashExists) {
+            await this.vehicleServiceRepository.update(
+              { id: service.id },
+              {
+                status: ServiceStatus.CONFIRMED,
+                blockchainConfirmedAt: new Date(),
+                isImmutable: true,
+                canEdit: false,
+              },
+            );
+
+            corrected++;
+            this.logger.log(
+              `✅ Serviço ${service.id} corrigido: PENDING/REJECTED → CONFIRMED (hash: ${service.blockchainHash.substring(0, 10)}...)`,
+            );
+          } else {
+            notFound++;
+            this.logger.warn(
+              `⚠️  Serviço ${service.id} não encontrado na blockchain (hash: ${service.blockchainHash.substring(0, 10)}...)`,
+            );
+          }
+        } catch (error) {
+          const errorMsg = `Erro ao verificar serviço ${service.id}: ${error.message}`;
+          errors.push(errorMsg);
+          this.logger.error(errorMsg);
+        }
+      }
+
+      const result = {
+        success: true,
+        total: failedServices.length,
+        corrected,
+        notFound,
+        errors: errors.length,
+        message: `Sincronização concluída: ${corrected} serviços corrigidos, ${notFound} não encontrados na blockchain`,
+      };
+
+      this.logger.log(
+        `Sincronização concluída: ${corrected} corrigidos, ${notFound} não encontrados, ${errors.length} erros`,
+      );
+
+      return result;
+    } catch (error) {
+      this.logger.error(
+        'Erro ao sincronizar status de serviços:',
+        error.message,
+      );
+      throw error;
+    }
+  }
+
+  /**
    * Corrige hashes inválidos (pending-hash) e gera hashes reais
    * @returns Resultado da operação
    */
