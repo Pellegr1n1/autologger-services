@@ -49,18 +49,17 @@ export class BesuService implements OnModuleInit {
    * Inicializa o serviço Besu (deve ser chamado após a construção)
    */
   async onModuleInit(): Promise<void> {
-    try {
-      await this.initializeBesu();
-    } catch (error) {
+    this.initializeBesu().catch((error) => {
       this.logger.error(
-        'Erro na inicialização do Besu',
+        'Erro na inicialização do Besu (não bloqueante)',
         error.stack,
         'BesuService',
         {
           errorMessage: error.message,
+          note: 'Backend continuará funcionando, mas operações blockchain podem falhar',
         },
       );
-    }
+    });
   }
 
   /**
@@ -87,7 +86,12 @@ export class BesuService implements OnModuleInit {
 
       this.provider = new ethers.JsonRpcProvider(rpcUrl);
 
-      const network = await this.provider.getNetwork();
+      const network = await Promise.race([
+        this.provider.getNetwork(),
+        new Promise<any>((_, reject) =>
+          setTimeout(() => reject(new Error('Timeout conectando ao Besu (5s)')), 5000),
+        ),
+      ]);
       this.logger.log('Conectado à rede Besu', 'BesuService', {
         chainId: network.chainId.toString(),
         rpcUrl,
@@ -144,16 +148,16 @@ export class BesuService implements OnModuleInit {
     } catch (error) {
       const duration = Date.now() - startTime;
 
-      this.logger.error(
-        'Erro ao inicializar serviço Besu',
-        error.stack,
+      this.logger.warn(
+        'Erro ao inicializar serviço Besu (não bloqueante)',
         'BesuService',
         {
           errorMessage: error.message,
           duration: `${duration}ms`,
+          note: 'Backend continuará funcionando. Operações blockchain podem falhar até o Besu estar disponível.',
         },
       );
-      throw error;
+      // Não lançar erro - permite que o backend inicie mesmo sem Besu
     }
   }
 
