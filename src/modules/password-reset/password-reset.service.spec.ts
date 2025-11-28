@@ -20,6 +20,7 @@ describe('PasswordResetService', () => {
     id: 'user-123',
     name: 'Test User',
     email: 'test@example.com',
+    authProvider: 'local' as const,
   };
 
   const mockToken = {
@@ -101,12 +102,30 @@ describe('PasswordResetService', () => {
       expect(emailService.sendPasswordResetEmail).toHaveBeenCalled();
     });
 
-    it('should not throw error when user not found (security)', async () => {
+    it('should throw NotFoundException when user not found', async () => {
       userService.findByEmail.mockResolvedValue(null);
 
       await expect(
         service.requestPasswordReset('nonexistent@example.com'),
-      ).resolves.not.toThrow();
+      ).rejects.toThrow(NotFoundException);
+    });
+
+    it('should throw BadRequestException when user uses Google Auth', async () => {
+      const googleUser = {
+        ...mockUser,
+        authProvider: 'google' as const,
+      };
+      userService.findByEmail.mockResolvedValue(googleUser as any);
+
+      await expect(
+        service.requestPasswordReset('google@example.com'),
+      ).rejects.toThrow(BadRequestException);
+
+      expect(userService.findByEmail).toHaveBeenCalledWith(
+        'google@example.com',
+      );
+      expect(tokenRepository.invalidateUserTokens).not.toHaveBeenCalled();
+      expect(emailService.sendPasswordResetEmail).not.toHaveBeenCalled();
     });
   });
 

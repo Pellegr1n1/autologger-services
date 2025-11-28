@@ -27,7 +27,13 @@ export class PasswordResetService {
     const user = await this.userService.findByEmail(email);
 
     if (!user) {
-      return;
+      throw new NotFoundException('Email não encontrado');
+    }
+
+    if (user.authProvider === 'google') {
+      throw new BadRequestException(
+        'Este email está associado a uma conta Google. Use a opção "Entrar com Google" para acessar sua conta.',
+      );
     }
 
     await this.tokenRepository.invalidateUserTokens(user.id);

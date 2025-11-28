@@ -17,4 +17,3 @@ export class UpdateVehiclePlateColumnLength1764121333965
     `);
   }
 }
-

@@ -243,7 +243,7 @@ describe('AuthController', () => {
         'test@example.com',
       );
       expect(result).toEqual({
-        message: 'Se o email estiver cadastrado, você receberá instruções',
+        message: 'Email de recuperação enviado com sucesso',
       });
     });
   });

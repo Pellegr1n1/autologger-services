@@ -92,6 +92,19 @@ export class VehicleServiceService {
         ethers.toUtf8Bytes(JSON.stringify(eventData)),
       );
 
+      this.logger.log(
+        `INICIANDO: Registro do serviço ${service.id} na blockchain`,
+        'VehicleServiceService',
+        {
+          serviceId: service.id,
+          vehicleId: service.vehicleId,
+          hash: serviceHash.substring(0, 20) + '...',
+          type: service.type,
+          status: 'PENDING',
+          timestamp: new Date().toISOString(),
+        },
+      );
+
       const hashResult = await this.blockchainService.registerHashInContract(
         serviceHash,
         service.vehicleId,
@@ -99,7 +112,9 @@ export class VehicleServiceService {
       );
 
       if (hashResult.success) {
-        service.blockchainHash = serviceHash;
+        const blockchainHash = serviceHash;
+
+        service.blockchainHash = blockchainHash;
         service.status = ServiceStatus.CONFIRMED;
         service.isImmutable = true;
         service.canEdit = false;
@@ -107,6 +122,25 @@ export class VehicleServiceService {
         service.confirmedBy = 'blockchain';
 
         await this.vehicleServiceRepository.save(service);
+
+        this.logger.log(
+          `SUCESSO: Serviço ${service.id} CONFIRMADO na blockchain! Status atualizado para CONFIRMED no banco de dados.`,
+          'VehicleServiceService',
+          {
+            serviceId: service.id,
+            vehicleId: service.vehicleId,
+            status: 'CONFIRMED',
+            blockchainHash: blockchainHash.substring(0, 20) + '...',
+            transactionHash: hashResult.transactionHash
+              ? hashResult.transactionHash.substring(0, 20) + '...'
+              : 'N/A',
+            blockchainConfirmedAt: service.blockchainConfirmedAt.toISOString(),
+            isImmutable: true,
+            canEdit: false,
+            type: service.type,
+            description: service.description?.substring(0, 50) + '...',
+          },
+        );
       } else {
         this.logger.warn(
           'Falha ao registrar serviço na blockchain',
@@ -153,7 +187,6 @@ export class VehicleServiceService {
 
       const services = await queryBuilder.getMany();
 
-      // Filtrar serviços que não têm veículo (caso algum tenha sido deletado)
       const validServices = services.filter(
         (service) => service.vehicle !== null,
       );
@@ -234,7 +267,6 @@ export class VehicleServiceService {
   ): Promise<VehicleService> {
     const vehicleService = await this.findOne(id);
 
-    // Se não foi fornecido hash, gerar um
     if (!hash) {
       const eventData = {
         serviceId: vehicleService.id,
@@ -247,7 +279,6 @@ export class VehicleServiceService {
       hash = ethers.keccak256(ethers.toUtf8Bytes(JSON.stringify(eventData)));
     }
 
-    // Marcar como submetido/pendente até confirmação real da blockchain
     vehicleService.blockchainHash = hash;
     vehicleService.status = ServiceStatus.PENDING;
     vehicleService.isImmutable = false;

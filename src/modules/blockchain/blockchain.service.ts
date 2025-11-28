@@ -210,10 +210,58 @@ export class BlockchainService {
 
           if (service.blockchainHash) {
             try {
-              // Verificar se o hash existe no contrato
-              const hashExists = await this.besuService.verifyHashInContract(
+              let hashExists = await this.besuService.verifyHashInContract(
                 service.blockchainHash,
               );
+
+              if (!hashExists) {
+                const isTransaction =
+                  await this.besuService.isTransactionConfirmed(
+                    service.blockchainHash,
+                  );
+
+                if (isTransaction) {
+                  try {
+                    const eventData = {
+                      serviceId: service.id,
+                      vehicleId: service.vehicleId,
+                      type: service.type,
+                      description: service.description,
+                      serviceDate: service.serviceDate,
+                      timestamp:
+                        service.createdAt?.toISOString() ||
+                        new Date().toISOString(),
+                    };
+
+                    const contentHash = ethers.keccak256(
+                      ethers.toUtf8Bytes(JSON.stringify(eventData)),
+                    );
+
+                    hashExists =
+                      await this.besuService.verifyHashInContract(contentHash);
+
+                    if (hashExists) {
+                      await this.vehicleServiceRepository.update(
+                        { id: service.id },
+                        { blockchainHash: contentHash },
+                      );
+                      service.blockchainHash = contentHash;
+                      this.logger.log(
+                        `Hash corrigido: transactionHash → contentHash para serviço ${service.id}`,
+                      );
+                    }
+                  } catch (hashError) {
+                    this.logger.warn(
+                      `Erro ao gerar/verificar hash de conteúdo: ${hashError.message}`,
+                    );
+                  }
+                }
+              }
+
+              this.logger.log(
+                `Hash ${service.blockchainHash.substring(0, 10)}... existe no contrato: ${hashExists}`,
+              );
+
               blockchainVerified = hashExists;
 
               if (hashExists) {
@@ -308,6 +356,129 @@ export class BlockchainService {
     } catch (error) {
       this.logger.error(
         'Erro ao forçar verificação de serviços:',
+        error.message,
+      );
+      throw error;
+    }
+  }
+
+  /**
+   * Sincroniza status de serviços marcados como falhados/rejeitados que na verdade estão na blockchain
+   * Útil quando a blockchain fica offline e serviços ficam marcados incorretamente
+   * @returns Resultado da sincronização
+   */
+  async syncFailedServicesStatus() {
+    try {
+      this.logger.log(
+        'Sincronizando status de serviços falhados/rejeitados com a blockchain...',
+      );
+
+      const failedServices = await this.vehicleServiceRepository.find({
+        where: [
+          {
+            blockchainHash: Not(IsNull()),
+            status: ServiceStatus.PENDING,
+          },
+          {
+            blockchainHash: Not(IsNull()),
+            status: ServiceStatus.REJECTED,
+          },
+        ],
+        relations: ['vehicle'],
+        order: { createdAt: 'DESC' },
+      });
+
+      this.logger.log(
+        `Encontrados ${failedServices.length} serviços para sincronizar`,
+      );
+
+      let corrected = 0;
+      let notFound = 0;
+      const errors: string[] = [];
+
+      for (const service of failedServices) {
+        if (
+          !service.blockchainHash ||
+          service.blockchainHash === 'pending-hash'
+        ) {
+          continue;
+        }
+
+        try {
+          // Primeiro, verificar se é uma transação confirmada na blockchain
+          let isConfirmed = false;
+
+          this.logger.log(
+            `Verificando serviço ${service.id} com hash: ${service.blockchainHash.substring(0, 10)}...`,
+          );
+
+          // Tentar verificar como transação primeiro (mais comum)
+          isConfirmed = await this.besuService.isTransactionConfirmed(
+            service.blockchainHash,
+          );
+
+          // Se não for transação confirmada, verificar se é hash de conteúdo no contrato
+          if (!isConfirmed) {
+            this.logger.log(
+              `Hash ${service.blockchainHash.substring(0, 10)}... não é transação confirmada, verificando no contrato...`,
+            );
+            try {
+              isConfirmed = await this.besuService.verifyHashInContract(
+                service.blockchainHash,
+              );
+            } catch (hashError) {
+              this.logger.warn(
+                `Erro ao verificar hash no contrato: ${hashError.message}`,
+              );
+              isConfirmed = false;
+            }
+          }
+
+          if (isConfirmed) {
+            await this.vehicleServiceRepository.update(
+              { id: service.id },
+              {
+                status: ServiceStatus.CONFIRMED,
+                blockchainConfirmedAt: new Date(),
+                isImmutable: true,
+                canEdit: false,
+              },
+            );
+
+            corrected++;
+            this.logger.log(
+              `✅ Serviço ${service.id} corrigido: PENDING/REJECTED → CONFIRMED (hash: ${service.blockchainHash.substring(0, 10)}...)`,
+            );
+          } else {
+            notFound++;
+            this.logger.warn(
+              `⚠️  Serviço ${service.id} não encontrado na blockchain (hash: ${service.blockchainHash.substring(0, 10)}...)`,
+            );
+          }
+        } catch (error) {
+          const errorMsg = `Erro ao verificar serviço ${service.id}: ${error.message}`;
+          errors.push(errorMsg);
+          this.logger.error(errorMsg);
+        }
+      }
+
+      const result = {
+        success: true,
+        total: failedServices.length,
+        corrected,
+        notFound,
+        errors: errors.length,
+        message: `Sincronização concluída: ${corrected} serviços corrigidos, ${notFound} não encontrados na blockchain`,
+      };
+
+      this.logger.log(
+        `Sincronização concluída: ${corrected} corrigidos, ${notFound} não encontrados, ${errors.length} erros`,
+      );
+
+      return result;
+    } catch (error) {
+      this.logger.error(
+        'Erro ao sincronizar status de serviços:',
         error.message,
       );
       throw error;
@@ -1159,15 +1330,30 @@ export class BlockchainService {
     eventType: string,
   ): Promise<{ success: boolean; transactionHash?: string; error?: string }> {
     try {
-      this.logger.log(`Iniciando registro de hash no contrato: ${hash}`);
+      // Log inicial - CRÍTICO para rastreamento no CloudWatch
+      this.logger.log(
+        `🚀 INICIANDO: Registro de hash no contrato blockchain`,
+        'BlockchainService',
+        {
+          hash: hash.substring(0, 20) + '...',
+          vehicleId,
+          eventType,
+          status: 'INITIATED',
+          timestamp: new Date().toISOString(),
+        },
+      );
 
       const isConnected = await this.besuService.isConnected();
-      this.logger.log(`Status da conexão Besu: ${isConnected}`);
+      this.logger.log(
+        `Status da conexão Besu: ${isConnected}`,
+        'BlockchainService',
+      );
 
       if (isConnected) {
         try {
           this.logger.log(
             `Chamando besuService.registerHash com timeout de 25s...`,
+            'BlockchainService',
           );
 
           // Adicionar timeout de 25 segundos para não ultrapassar timeout do HTTP (30s)
@@ -1185,10 +1371,32 @@ export class BlockchainService {
 
           const result = await Promise.race([registerPromise, timeoutPromise]);
 
-          this.logger.log(`Resultado do besuService.registerHash:`, result);
+          this.logger.log(
+            `Resultado do besuService.registerHash: ${result.success ? 'SUCESSO' : 'FALHA'}`,
+            'BlockchainService',
+            {
+              success: result.success,
+              transactionHash: result.transactionHash
+                ? result.transactionHash.substring(0, 16) + '...'
+                : null,
+              error: result.error,
+            },
+          );
 
           if (result.success) {
-            this.logger.log(`Hash registrado no contrato: ${hash}`);
+            // Log explícito de SUCESSO para CloudWatch - CRÍTICO para TCC
+            this.logger.log(
+              `✅ SUCESSO: Hash registrado no contrato blockchain com sucesso! Transação confirmada.`,
+              'BlockchainService',
+              {
+                transactionHash: result.transactionHash,
+                hash: hash.substring(0, 20) + '...',
+                vehicleId,
+                eventType,
+                status: 'CONFIRMED',
+                timestamp: new Date().toISOString(),
+              },
+            );
             return {
               success: true,
               transactionHash: result.transactionHash,
@@ -1196,6 +1404,12 @@ export class BlockchainService {
           } else {
             this.logger.warn(
               `Falha ao registrar hash no contrato: ${result.error}`,
+              'BlockchainService',
+              {
+                hash: hash.substring(0, 16) + '...',
+                vehicleId,
+                error: result.error,
+              },
             );
             return {
               success: false,
@@ -1206,6 +1420,12 @@ export class BlockchainService {
           this.logger.error(
             'Erro ao registrar hash na rede Besu:',
             besuError.message,
+            'BlockchainService',
+            {
+              hash: hash.substring(0, 16) + '...',
+              vehicleId,
+              errorMessage: besuError.message,
+            },
           );
           return {
             success: false,
@@ -1217,13 +1437,27 @@ export class BlockchainService {
       // Se Besu não estiver disponível, retornar falha
       this.logger.warn(
         'Rede Besu não disponível - hash não registrado na blockchain',
+        'BlockchainService',
+        {
+          hash: hash.substring(0, 16) + '...',
+          vehicleId,
+        },
       );
       return {
         success: false,
         error: 'Rede blockchain não disponível',
       };
     } catch (error) {
-      this.logger.error('Erro ao registrar hash no contrato:', error);
+      this.logger.error(
+        'Erro ao registrar hash no contrato:',
+        error.message,
+        'BlockchainService',
+        {
+          hash: hash.substring(0, 16) + '...',
+          vehicleId,
+          errorMessage: error.message,
+        },
+      );
       return {
         success: false,
         error: error.message,

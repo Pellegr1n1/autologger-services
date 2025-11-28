@@ -77,7 +77,7 @@ export const createWinstonLogger = () => {
   if (process.env.LOKI_HOST && process.env.LOKI_ENABLED === 'true') {
     let lokiErrorLogged = false;
     const lokiHost = process.env.LOKI_HOST || 'http://localhost:3100';
-    
+
     try {
       transports.push(
         new LokiTransport({
@@ -107,7 +107,7 @@ export const createWinstonLogger = () => {
   }
 
   const defaultLogLevel =
-    process.env.NODE_ENV === 'production' ? 'warn' : 'info';
+    process.env.NODE_ENV === 'production' ? 'info' : 'info';
   const logLevel = process.env.LOG_LEVEL || defaultLogLevel;
 
   return winston.createLogger({

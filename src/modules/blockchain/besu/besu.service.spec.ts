@@ -218,6 +218,7 @@ describe('BesuService', () => {
           wait: jest.fn().mockResolvedValue({
             blockNumber: 1,
             gasUsed: BigInt(100000),
+            status: 1, // Status 1 = transação bem-sucedida
           }),
         }),
       };
@@ -246,18 +247,27 @@ describe('BesuService', () => {
     });
 
     it('should handle timeout when waiting for transaction', async () => {
-      // Mock wait to never resolve (simulating timeout)
+      // Mock wait que nunca resolve (simulando timeout)
       const mockWait = jest
         .fn()
-        .mockImplementation(createNeverResolvingPromise);
+        .mockImplementation(() => new Promise(() => {})); // Promise que nunca resolve
 
-      (service as any).contract = createMockContractWithRegisterHash(mockWait);
+      (service as any).contract = {
+        registerHash: jest.fn().mockResolvedValue({
+          hash: '0x1234567890abcdef',
+          wait: mockWait,
+        }),
+      };
 
-      // Mock Promise.race to immediately reject with timeout
-      const originalPromiseRace = Promise.race;
-      Promise.race = jest
-        .fn()
-        .mockRejectedValue(new Error('Timeout aguardando mineração (20s)'));
+      // Mock setTimeout para que o timeout aconteça imediatamente
+      const originalSetTimeout = global.setTimeout;
+      global.setTimeout = jest.fn((callback: any, delay: number) => {
+        // Se for o timeout de 20s, executar imediatamente
+        if (delay === 20000) {
+          callback();
+        }
+        return originalSetTimeout(callback, delay) as any;
+      }) as any;
 
       try {
         const result = await service.registerHash(
@@ -268,9 +278,10 @@ describe('BesuService', () => {
         expect(result.success).toBe(false);
         expect(result.error).toContain('Timeout');
       } finally {
-        Promise.race = originalPromiseRace;
+        // Restaurar setTimeout original
+        global.setTimeout = originalSetTimeout;
       }
-    });
+    }, 10000); // Aumentar timeout do teste para 10s
   });
 
   describe('verifyService', () => {
