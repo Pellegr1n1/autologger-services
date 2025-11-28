@@ -100,8 +100,8 @@ async function checkBlockchainHealth(
       besuService.diagnoseNetwork(),
       new Promise<any>((_, reject) =>
         setTimeout(
-          () => reject(new Error('Timeout na verificação de saúde (5s)')),
-          5000,
+          () => reject(new Error('Timeout na verificação de saúde (15s)')),
+          15000,
         ),
       ),
     ]);

@@ -92,6 +92,20 @@ export class VehicleServiceService {
         ethers.toUtf8Bytes(JSON.stringify(eventData)),
       );
 
+      // Log inicial - CRÍTICO para rastreamento no CloudWatch
+      this.logger.log(
+        `🚀 INICIANDO: Registro do serviço ${service.id} na blockchain`,
+        'VehicleServiceService',
+        {
+          serviceId: service.id,
+          vehicleId: service.vehicleId,
+          hash: serviceHash.substring(0, 20) + '...',
+          type: service.type,
+          status: 'PENDING',
+          timestamp: new Date().toISOString(),
+        },
+      );
+
       const hashResult = await this.blockchainService.registerHashInContract(
         serviceHash,
         service.vehicleId,
@@ -99,7 +113,10 @@ export class VehicleServiceService {
       );
 
       if (hashResult.success) {
-        service.blockchainHash = serviceHash;
+        // Se temos transactionHash, usar ele; caso contrário, usar o serviceHash
+        const blockchainHash = hashResult.transactionHash || serviceHash;
+
+        service.blockchainHash = blockchainHash;
         service.status = ServiceStatus.CONFIRMED;
         service.isImmutable = true;
         service.canEdit = false;
@@ -107,6 +124,26 @@ export class VehicleServiceService {
         service.confirmedBy = 'blockchain';
 
         await this.vehicleServiceRepository.save(service);
+
+        // Log explícito de SUCESSO para CloudWatch - CRÍTICO para TCC
+        this.logger.log(
+          `✅ SUCESSO: Serviço ${service.id} CONFIRMADO na blockchain! Status atualizado para CONFIRMED no banco de dados.`,
+          'VehicleServiceService',
+          {
+            serviceId: service.id,
+            vehicleId: service.vehicleId,
+            status: 'CONFIRMED',
+            blockchainHash: blockchainHash.substring(0, 20) + '...',
+            transactionHash: hashResult.transactionHash
+              ? hashResult.transactionHash.substring(0, 20) + '...'
+              : 'N/A',
+            blockchainConfirmedAt: service.blockchainConfirmedAt.toISOString(),
+            isImmutable: true,
+            canEdit: false,
+            type: service.type,
+            description: service.description?.substring(0, 50) + '...',
+          },
+        );
       } else {
         this.logger.warn(
           'Falha ao registrar serviço na blockchain',

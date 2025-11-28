@@ -84,18 +84,53 @@ export class BesuService implements OnModuleInit {
         hasContractAddress: !!contractAddress,
       });
 
-      this.provider = new ethers.JsonRpcProvider(rpcUrl);
-
-      const network = await Promise.race([
-        this.provider.getNetwork(),
-        new Promise<any>((_, reject) =>
-          setTimeout(() => reject(new Error('Timeout conectando ao Besu (5s)')), 5000),
-        ),
-      ]);
-      this.logger.log('Conectado à rede Besu', 'BesuService', {
-        chainId: network.chainId.toString(),
-        rpcUrl,
+      // Configurar provider com staticNetwork para evitar detecção automática que causa erros repetidos
+      // Usar chainId padrão do Besu (2018) ou do ambiente
+      const chainIdNumber = parseInt(
+        this.configService.get<string>('BESU_CHAIN_ID', '2018'),
+        10,
+      );
+      const network = ethers.Network.from({
+        chainId: chainIdNumber,
+        name: 'besu-private',
       });
+
+      this.provider = new ethers.JsonRpcProvider(rpcUrl, network, {
+        staticNetwork: network,
+      });
+
+      // Verificar conexão com timeout
+      try {
+        const blockNumber = await Promise.race([
+          this.provider.getBlockNumber(),
+          new Promise<any>((_, reject) =>
+            setTimeout(
+              () => reject(new Error('Timeout conectando ao Besu (10s)')),
+              10000,
+            ),
+          ),
+        ]);
+        this.logger.log('Conectado à rede Besu', 'BesuService', {
+          chainId: network.chainId.toString(),
+          blockNumber,
+          rpcUrl,
+        });
+      } catch (networkError) {
+        // Se falhar, tentar sem staticNetwork (fallback)
+        this.logger.warn(
+          'Falha na conexão inicial, tentando sem staticNetwork...',
+          'BesuService',
+          {
+            error: networkError.message,
+          },
+        );
+        this.provider = new ethers.JsonRpcProvider(rpcUrl);
+        const blockNumber = await this.provider.getBlockNumber();
+        this.logger.log('Conectado à rede Besu (fallback)', 'BesuService', {
+          blockNumber,
+          rpcUrl,
+        });
+      }
 
       if (privateKey) {
         this.wallet = new ethers.Wallet(privateKey, this.provider);
@@ -235,6 +270,23 @@ export class BesuService implements OnModuleInit {
           const parsed = this.contract.interface.parseLog(event);
           serviceId = Number(parsed?.args.serviceId);
         }
+
+        // Log explícito de SUCESSO para CloudWatch - CRÍTICO para TCC
+        this.logger.log(
+          `✅ SUCESSO: Serviço registrado na blockchain com sucesso! Transação confirmada e minerada.`,
+          'BesuService',
+          {
+            transactionHash: tx.hash,
+            serviceId: serviceId?.toString() || 'N/A',
+            vehicleId: serviceData.vehicleId,
+            serviceType: serviceData.serviceType,
+            blockNumber: receipt.blockNumber,
+            gasUsed: receipt.gasUsed.toString(),
+            duration: `${duration}ms`,
+            status: 'CONFIRMED',
+            timestamp: new Date().toISOString(),
+          },
+        );
 
         this.logger.logBlockchainTransaction(
           'registerService',
@@ -386,6 +438,22 @@ export class BesuService implements OnModuleInit {
       try {
         const receipt = await Promise.race([waitPromise, timeoutPromise]);
         const duration = Date.now() - startTime;
+
+        // Log explícito de SUCESSO para CloudWatch
+        this.logger.log(
+          `✅ SUCESSO: Hash registrado na blockchain com sucesso!`,
+          'BesuService',
+          {
+            transactionHash: tx.hash,
+            blockNumber: receipt.blockNumber,
+            gasUsed: receipt.gasUsed.toString(),
+            vehicleId,
+            eventType,
+            hash: hash.substring(0, 16) + '...',
+            duration: `${duration}ms`,
+            status: 'CONFIRMED',
+          },
+        );
 
         this.logger.logBlockchainTransaction(
           'registerHash',
@@ -1004,6 +1072,53 @@ export class BesuService implements OnModuleInit {
       return exists;
     } catch (error) {
       this.logger.error('Erro ao verificar hash no contrato:', error.message);
+      return false;
+    }
+  }
+
+  /**
+   * Verifica se uma transação foi confirmada na blockchain
+   * @param txHash Hash da transação
+   * @returns True se a transação foi confirmada e bem-sucedida
+   */
+  async isTransactionConfirmed(txHash: string): Promise<boolean> {
+    try {
+      if (!this.provider) {
+        await this.initializeBesu();
+      }
+
+      if (!this.provider) {
+        this.logger.warn(`Provider não disponível para verificar transação ${txHash.substring(0, 10)}...`);
+        return false;
+      }
+
+      // Tentar obter o receipt da transação
+      const receipt = await this.provider.getTransactionReceipt(txHash);
+      
+      if (receipt) {
+        // Receipt encontrado - verificar status
+        const isSuccess = receipt.status === 1;
+        this.logger.log(
+          `Transação ${txHash.substring(0, 10)}... encontrada: status=${receipt.status}, block=${receipt.blockNumber}`,
+        );
+        return isSuccess;
+      }
+      
+      // Se não encontrou receipt, tentar verificar se a transação existe
+      const tx = await this.provider.getTransaction(txHash);
+      if (tx) {
+        this.logger.log(`Transação ${txHash.substring(0, 10)}... existe mas ainda não foi minerada`);
+        return false; // Transação existe mas não foi confirmada ainda
+      }
+      
+      return false;
+    } catch (error) {
+      // Se der erro "not found", a transação não existe
+      if (error.message?.includes('not found') || error.message?.includes('does not exist')) {
+        this.logger.warn(`Transação ${txHash.substring(0, 10)}... não encontrada na blockchain`);
+      } else {
+        this.logger.error(`Erro ao verificar transação ${txHash.substring(0, 10)}...: ${error.message}`);
+      }
       return false;
     }
   }
