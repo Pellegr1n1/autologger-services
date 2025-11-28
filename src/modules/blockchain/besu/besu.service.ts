@@ -84,23 +84,35 @@ export class BesuService implements OnModuleInit {
         hasContractAddress: !!contractAddress,
       });
 
-      // Configurar provider com staticNetwork para evitar detecção automática que causa erros repetidos
-      // Usar chainId padrão do Besu (2018) ou do ambiente
-      const chainIdNumber = parseInt(
-        this.configService.get<string>('BESU_CHAIN_ID', '2018'),
-        10,
-      );
-      const network = ethers.Network.from({
-        chainId: chainIdNumber,
-        name: 'besu-private',
-      });
+      this.provider = new ethers.JsonRpcProvider(rpcUrl);
 
-      this.provider = new ethers.JsonRpcProvider(rpcUrl, network, {
-        staticNetwork: network,
-      });
-
-      // Verificar conexão com timeout
       try {
+        const detectedNetwork = await Promise.race([
+          this.provider.getNetwork(),
+          new Promise<any>((_, reject) =>
+            setTimeout(
+              () => reject(new Error('Timeout detectando chainId (10s)')),
+              10000,
+            ),
+          ),
+        ]);
+
+        const realChainId = Number(detectedNetwork.chainId);
+        this.logger.log('ChainId detectado da rede Besu', 'BesuService', {
+          chainId: realChainId,
+          networkName: detectedNetwork.name,
+        });
+
+        const network = ethers.Network.from({
+          chainId: realChainId,
+          name: 'besu-private',
+        });
+
+        this.provider = new ethers.JsonRpcProvider(rpcUrl, network, {
+          staticNetwork: network,
+        });
+
+        // Verificar conexão
         const blockNumber = await Promise.race([
           this.provider.getBlockNumber(),
           new Promise<any>((_, reject) =>
@@ -110,15 +122,16 @@ export class BesuService implements OnModuleInit {
             ),
           ),
         ]);
+
         this.logger.log('Conectado à rede Besu', 'BesuService', {
-          chainId: network.chainId.toString(),
+          chainId: realChainId.toString(),
           blockNumber,
           rpcUrl,
         });
       } catch (networkError) {
         // Se falhar, tentar sem staticNetwork (fallback)
         this.logger.warn(
-          'Falha na conexão inicial, tentando sem staticNetwork...',
+          'Falha ao detectar chainId, usando provider sem staticNetwork...',
           'BesuService',
           {
             error: networkError.message,
@@ -126,7 +139,9 @@ export class BesuService implements OnModuleInit {
         );
         this.provider = new ethers.JsonRpcProvider(rpcUrl);
         const blockNumber = await this.provider.getBlockNumber();
+        const network = await this.provider.getNetwork();
         this.logger.log('Conectado à rede Besu (fallback)', 'BesuService', {
+          chainId: network.chainId.toString(),
           blockNumber,
           rpcUrl,
         });
@@ -439,9 +454,14 @@ export class BesuService implements OnModuleInit {
         const receipt = await Promise.race([waitPromise, timeoutPromise]);
         const duration = Date.now() - startTime;
 
+        // Verificar se a transação foi bem-sucedida (status === 1)
+        if (receipt.status !== 1) {
+          throw new Error(`Transação falhou na blockchain. Status: ${receipt.status}`);
+        }
+
         // Log explícito de SUCESSO para CloudWatch
         this.logger.log(
-          `✅ SUCESSO: Hash registrado na blockchain com sucesso!`,
+          `✅ SUCESSO: Hash registrado na blockchain com sucesso! Transação confirmada e minerada.`,
           'BesuService',
           {
             transactionHash: tx.hash,
@@ -452,6 +472,7 @@ export class BesuService implements OnModuleInit {
             hash: hash.substring(0, 16) + '...',
             duration: `${duration}ms`,
             status: 'CONFIRMED',
+            receiptStatus: receipt.status,
           },
         );
 
