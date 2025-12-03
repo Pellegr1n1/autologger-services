@@ -1,11 +1,15 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { ConfigService } from '@nestjs/config';
+import { getRepositoryToken } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
 import { BesuService } from './besu.service';
 import { LoggerService } from '@/common/logger/logger.service';
 import { LoggerServiceTestHelper } from '@/common/test-helpers/logger-service.test-helper';
+import { VehicleService } from '@/modules/vehicle/entities/vehicle-service.entity';
 
 describe('BesuService', () => {
   let service: BesuService;
+  let mockVehicleServiceRepository: jest.Mocked<Repository<VehicleService>>;
 
   // Helper function to create a never-resolving promise (for timeout simulation)
   // This avoids deep nesting in test cases
@@ -47,6 +51,10 @@ describe('BesuService', () => {
 
     const mockLoggerService = LoggerServiceTestHelper.createMockLoggerService();
 
+    mockVehicleServiceRepository = {
+      findOne: jest.fn(),
+    } as any;
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         BesuService,
@@ -58,10 +66,17 @@ describe('BesuService', () => {
           provide: LoggerService,
           useValue: mockLoggerService,
         },
+        {
+          provide: getRepositoryToken(VehicleService),
+          useValue: mockVehicleServiceRepository,
+        },
       ],
     }).compile();
 
     service = module.get<BesuService>(BesuService);
+    mockVehicleServiceRepository = module.get(
+      getRepositoryToken(VehicleService),
+    ) as jest.Mocked<Repository<VehicleService>>;
   });
 
   it('should be defined', () => {
@@ -218,6 +233,7 @@ describe('BesuService', () => {
           wait: jest.fn().mockResolvedValue({
             blockNumber: 1,
             gasUsed: BigInt(100000),
+            status: 1, // Status 1 = transação bem-sucedida
           }),
         }),
       };
@@ -246,18 +262,27 @@ describe('BesuService', () => {
     });
 
     it('should handle timeout when waiting for transaction', async () => {
-      // Mock wait to never resolve (simulating timeout)
+      // Mock wait que nunca resolve (simulando timeout)
       const mockWait = jest
         .fn()
-        .mockImplementation(createNeverResolvingPromise);
+        .mockImplementation(() => new Promise(() => {})); // Promise que nunca resolve
 
-      (service as any).contract = createMockContractWithRegisterHash(mockWait);
+      (service as any).contract = {
+        registerHash: jest.fn().mockResolvedValue({
+          hash: '0x1234567890abcdef',
+          wait: mockWait,
+        }),
+      };
 
-      // Mock Promise.race to immediately reject with timeout
-      const originalPromiseRace = Promise.race;
-      Promise.race = jest
-        .fn()
-        .mockRejectedValue(new Error('Timeout aguardando mineração (20s)'));
+      // Mock setTimeout para que o timeout aconteça imediatamente
+      const originalSetTimeout = global.setTimeout;
+      global.setTimeout = jest.fn((callback: any, delay: number) => {
+        // Se for o timeout de 20s, executar imediatamente
+        if (delay === 20000) {
+          callback();
+        }
+        return originalSetTimeout(callback, delay) as any;
+      }) as any;
 
       try {
         const result = await service.registerHash(
@@ -268,9 +293,10 @@ describe('BesuService', () => {
         expect(result.success).toBe(false);
         expect(result.error).toContain('Timeout');
       } finally {
-        Promise.race = originalPromiseRace;
+        // Restaurar setTimeout original
+        global.setTimeout = originalSetTimeout;
       }
-    });
+    }, 10000); // Aumentar timeout do teste para 10s
   });
 
   describe('verifyService', () => {
@@ -903,23 +929,55 @@ describe('BesuService', () => {
   });
 
   describe('verifyHash', () => {
-    it('should verify hash exists', async () => {
-      const mockHashInfo = {
-        owner: '0xOwner',
-        timestamp: BigInt(1234567890),
+    it('should verify hash exists with service info', async () => {
+      const mockVehicleService = {
+        id: 'service-123',
         vehicleId: 'vehicle-123',
-        eventType: 'SERVICE',
+        type: 'maintenance' as any,
+        serviceDate: new Date('2024-01-15'),
+        cost: 250.0,
+        description: 'Troca de óleo',
+        blockchainConfirmedAt: new Date('2024-01-15T10:00:00Z'),
+        vehicle: {
+          id: 'vehicle-123',
+          user: {
+            email: 'usuario@email.com',
+          },
+        },
       };
 
-      (service as any).contract = {
-        hashExists: jest.fn().mockResolvedValue(true),
-        getHashInfo: jest.fn().mockResolvedValue(mockHashInfo),
-      };
+      jest
+        .spyOn(service as any, 'verifyHashInContract')
+        .mockResolvedValue(true);
+      mockVehicleServiceRepository.findOne.mockResolvedValue(
+        mockVehicleService as any,
+      );
 
       const result = await service.verifyHash('hash-123');
 
       expect(result.exists).toBe(true);
       expect(result.info).toBeDefined();
+      expect(result.info?.vehicleId).toBe('vehicle-123');
+      expect(result.info?.eventType).toBe('maintenance');
+      expect(result.info?.serviceId).toBe('service-123');
+      expect(mockVehicleServiceRepository.findOne).toHaveBeenCalledWith({
+        where: { blockchainHash: 'hash-123' },
+        relations: ['vehicle', 'vehicle.user'],
+      });
+    });
+
+    it('should verify hash exists but no service in database', async () => {
+      jest
+        .spyOn(service as any, 'verifyHashInContract')
+        .mockResolvedValue(true);
+      mockVehicleServiceRepository.findOne.mockResolvedValue(null);
+
+      const result = await service.verifyHash('hash-123');
+
+      expect(result.exists).toBe(true);
+      expect(result.info).toBeDefined();
+      expect(result.info?.vehicleId).toBe('');
+      expect(result.info?.eventType).toBe('');
     });
 
     it('should return exists false when hash not found', async () => {

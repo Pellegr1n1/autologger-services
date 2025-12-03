@@ -85,6 +85,11 @@ export class BlockchainController {
     return this.blockchainService.forceVerifyAllServices();
   }
 
+  @Post('services/sync-status')
+  async syncFailedServicesStatus() {
+    return this.blockchainService.syncFailedServicesStatus();
+  }
+
   @Post('services/register-hashes')
   async registerAllExistingHashes() {
     return this.blockchainService.registerAllExistingHashes();

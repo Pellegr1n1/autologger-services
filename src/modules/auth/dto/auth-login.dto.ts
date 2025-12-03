@@ -1,4 +1,10 @@
-import { IsEmail, IsString, MinLength } from 'class-validator';
+import {
+  IsEmail,
+  IsString,
+  MinLength,
+  IsOptional,
+  IsBoolean,
+} from 'class-validator';
 
 export class AuthLoginDto {
   @IsEmail({}, { message: 'Email deve ter um formato válido' })
@@ -7,4 +13,8 @@ export class AuthLoginDto {
   @IsString({ message: 'Senha deve ser uma string' })
   @MinLength(1, { message: 'Senha é obrigatória' })
   password: string;
+
+  @IsOptional()
+  @IsBoolean({ message: 'Remember me deve ser um booleano' })
+  rememberMe?: boolean;
 }

@@ -63,7 +63,11 @@ async function bootstrap() {
   logger.log(`CORS configurado para: ${corsOrigins.join(', ')}`);
   logger.log(`Ambiente: ${process.env.NODE_ENV || 'development'}`);
 
-  await checkBlockchainHealth(app, logger);
+  checkBlockchainHealth(app, logger).catch((error) => {
+    logger.warn('Erro ao verificar blockchain em background', 'Bootstrap', {
+      error: error.message,
+    });
+  });
 }
 
 /**
@@ -74,6 +78,8 @@ async function checkBlockchainHealth(
   logger: LoggerService,
 ): Promise<void> {
   try {
+    await new Promise((resolve) => setTimeout(resolve, 5000));
+
     logger.log('Verificando saúde da blockchain...', 'Bootstrap');
 
     let besuService: BesuService;
@@ -90,14 +96,12 @@ async function checkBlockchainHealth(
       return;
     }
 
-    await new Promise((resolve) => setTimeout(resolve, 2000));
-
     const diagnosis = await Promise.race([
       besuService.diagnoseNetwork(),
       new Promise<any>((_, reject) =>
         setTimeout(
-          () => reject(new Error('Timeout na verificação de saúde (10s)')),
-          10000,
+          () => reject(new Error('Timeout na verificação de saúde (15s)')),
+          15000,
         ),
       ),
     ]);
