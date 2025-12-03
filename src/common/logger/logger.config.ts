@@ -106,8 +106,7 @@ export const createWinstonLogger = () => {
     }
   }
 
-  const defaultLogLevel =
-    process.env.NODE_ENV === 'production' ? 'info' : 'info';
+  const defaultLogLevel = 'info';
   const logLevel = process.env.LOG_LEVEL || defaultLogLevel;
 
   return winston.createLogger({
