@@ -1,7 +1,13 @@
 import { Injectable, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
 import { ethers } from 'ethers';
 import { LoggerService } from '@/common/logger/logger.service';
+import {
+  VehicleService,
+  ServiceType,
+} from '@/modules/vehicle/entities/vehicle-service.entity';
 
 /**
  * Serviço para interação com a rede privada Besu
@@ -41,6 +47,8 @@ export class BesuService implements OnModuleInit {
   constructor(
     private readonly configService: ConfigService,
     private readonly logger: LoggerService,
+    @InjectRepository(VehicleService)
+    private readonly vehicleServiceRepository: Repository<VehicleService>,
   ) {
     this.logger.setContext('BesuService');
   }
@@ -651,33 +659,82 @@ export class BesuService implements OnModuleInit {
       vehicleId: string;
       eventType: string;
       verificationCount: number;
+      serviceId?: string;
+      serviceDate?: string;
+      cost?: number;
+      description?: string;
     };
   }> {
     try {
       const exists = await this.verifyHashInContract(hash);
 
       if (exists) {
-        this.logger.log(
-          `Hash ${hash.substring(0, 10)}... encontrado na blockchain`,
-        );
-        return {
-          exists: true,
-          info: {
-            owner: '',
-            timestamp: Date.now() / 1000,
-            vehicleId: '',
-            eventType: '',
-            verificationCount: 0,
-          },
-        };
+        // Buscar informações do serviço no banco de dados
+        const vehicleService = await this.vehicleServiceRepository.findOne({
+          where: { blockchainHash: hash },
+          relations: ['vehicle', 'vehicle.user'],
+        });
+
+        if (vehicleService) {
+          this.logger.log(
+            `Hash ${hash.substring(0, 10)}... encontrado na blockchain com informações do serviço`,
+            'BesuService',
+            {
+              vehicleId: vehicleService.vehicleId,
+              serviceId: vehicleService.id,
+            },
+          );
+
+          return {
+            exists: true,
+            info: {
+              owner: vehicleService.vehicle?.user?.email || '',
+              timestamp: vehicleService.blockchainConfirmedAt
+                ? Math.floor(
+                    vehicleService.blockchainConfirmedAt.getTime() / 1000,
+                  )
+                : Math.floor(Date.now() / 1000),
+              vehicleId: vehicleService.vehicleId,
+              eventType: vehicleService.type || 'service',
+              verificationCount: 0, // TODO: Implementar contador de verificações se necessário
+              serviceId: vehicleService.id,
+              serviceDate: vehicleService.serviceDate
+                ? vehicleService.serviceDate.toISOString()
+                : undefined,
+              cost: vehicleService.cost ? Number(vehicleService.cost) : undefined,
+              description: vehicleService.description,
+            },
+          };
+        } else {
+          // Hash existe na blockchain mas não encontrado no banco
+          this.logger.warn(
+            `Hash ${hash.substring(0, 10)}... encontrado na blockchain mas não encontrado no banco de dados`,
+            'BesuService',
+          );
+          return {
+            exists: true,
+            info: {
+              owner: '',
+              timestamp: Math.floor(Date.now() / 1000),
+              vehicleId: '',
+              eventType: '',
+              verificationCount: 0,
+            },
+          };
+        }
       } else {
         this.logger.log(
           `Hash ${hash.substring(0, 10)}... não encontrado na blockchain`,
+          'BesuService',
         );
         return { exists: false };
       }
     } catch (error) {
-      this.logger.error('Erro ao verificar hash:', error.message);
+      this.logger.error(
+        'Erro ao verificar hash:',
+        error instanceof Error ? error.message : String(error),
+        'BesuService',
+      );
       return { exists: false };
     }
   }

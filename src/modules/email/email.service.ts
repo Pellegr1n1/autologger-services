@@ -39,7 +39,8 @@ export class EmailService {
     userName: string,
   ): Promise<void> {
     const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
-    const verificationUrl = `${frontendUrl}/verify-email/${token}`;
+    const encodedToken = encodeURIComponent(token);
+    const verificationUrl = `${frontendUrl}/verify-email/${encodedToken}`;
     const { emailFrom } = validateEmailEnvVars();
     const sanitizedUserName = sanitizeUserName(userName);
 
