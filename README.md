@@ -6,6 +6,7 @@ O AutoLogger Service é uma API REST desenvolvida em NestJS que permite o gerenc
 
 🌐 **Acesso**
 
+- **RFC**: [Documento_de_RFC_Autologger_Besu.pdf](https://github.com/user-attachments/files/23917812/Documento_de_RFC_Autologger_Besu.pdf)
 - **API em Produção**: [https://api.autologger.online](https://api.autologger.online)
 - **Documentação Swagger**: [https://api.autologger.online/api](https://api.autologger.online/api)
 - **Health Check**: [https://api.autologger.online/health](https://api.autologger.online/health)
@@ -138,4 +139,5 @@ autologger-service/
 - **Diagramas de Casos de Uso**: `docs/use_case_diagram/`
 
 ---
+
 
