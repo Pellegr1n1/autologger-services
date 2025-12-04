@@ -673,6 +673,7 @@ export class BesuService implements OnModuleInit {
   }> {
     try {
       const existsInContract = await this.verifyHashInContract(hash);
+      let isTransactionHash = false;
 
       if (!existsInContract) {
         const isTransaction = await this.isTransactionConfirmed(hash);
@@ -687,6 +688,9 @@ export class BesuService implements OnModuleInit {
             message: 'Hash não encontrado na blockchain',
           };
         }
+        
+        // Se não está no mapping mas é uma transação confirmada, é um transactionHash
+        isTransactionHash = true;
       }
 
       let vehicleService = await this.vehicleServiceRepository.findOne({
@@ -837,7 +841,12 @@ export class BesuService implements OnModuleInit {
         ethers.toUtf8Bytes(JSON.stringify(eventData)),
       );
 
-      const verified = calculatedHash.toLowerCase() === hash.toLowerCase();
+      let verified: boolean;
+      if (isTransactionHash && vehicleService.blockchainHash) {
+        verified = calculatedHash.toLowerCase() === vehicleService.blockchainHash.toLowerCase();
+      } else {
+        verified = calculatedHash.toLowerCase() === hash.toLowerCase();
+      }
 
       const serviceTypeMap: Record<string, string> = {
         maintenance: 'Manutenção',
