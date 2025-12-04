@@ -7,6 +7,7 @@ import { LoggerService } from '@/common/logger/logger.service';
 import {
   VehicleService,
   ServiceType,
+  ServiceStatus,
 } from '@/modules/vehicle/entities/vehicle-service.entity';
 
 /**
@@ -653,89 +654,236 @@ export class BesuService implements OnModuleInit {
    */
   async verifyHash(hash: string): Promise<{
     exists: boolean;
+    hash?: string;
+    blockchainData?: {
+      blockNumber: number;
+      timestamp: string;
+      transactionHash: string;
+    };
     info?: {
-      owner: string;
-      timestamp: number;
-      vehicleId: string;
-      eventType: string;
-      verificationCount: number;
-      serviceId?: string;
-      serviceDate?: string;
+      service: string;
+      vehicle: string;
+      serviceDate: string;
       cost?: number;
+      category?: string;
       description?: string;
     };
   }> {
     try {
-      const exists = await this.verifyHashInContract(hash);
+      const existsInContract = await this.verifyHashInContract(hash);
+      let isTransactionHash = false;
 
-      if (exists) {
-        // Buscar informações do serviço no banco de dados
-        const vehicleService = await this.vehicleServiceRepository.findOne({
-          where: { blockchainHash: hash },
-          relations: ['vehicle', 'vehicle.user'],
-        });
-
-        if (vehicleService) {
+      if (!existsInContract) {
+        const isTransaction = await this.isTransactionConfirmed(hash);
+        
+        if (!isTransaction) {
           this.logger.log(
-            `Hash ${hash.substring(0, 10)}... encontrado na blockchain com informações do serviço`,
-            'BesuService',
-            {
-              vehicleId: vehicleService.vehicleId,
-              serviceId: vehicleService.id,
-            },
-          );
-
-          return {
-            exists: true,
-            info: {
-              owner: vehicleService.vehicle?.user?.email || '',
-              timestamp: vehicleService.blockchainConfirmedAt
-                ? Math.floor(
-                    vehicleService.blockchainConfirmedAt.getTime() / 1000,
-                  )
-                : Math.floor(Date.now() / 1000),
-              vehicleId: vehicleService.vehicleId,
-              eventType: vehicleService.type || 'service',
-              verificationCount: 0, // TODO: Implementar contador de verificações se necessário
-              serviceId: vehicleService.id,
-              serviceDate: vehicleService.serviceDate
-                ? vehicleService.serviceDate.toISOString()
-                : undefined,
-              cost: vehicleService.cost ? Number(vehicleService.cost) : undefined,
-              description: vehicleService.description,
-            },
-          };
-        } else {
-          // Hash existe na blockchain mas não encontrado no banco
-          this.logger.warn(
-            `Hash ${hash.substring(0, 10)}... encontrado na blockchain mas não encontrado no banco de dados`,
+            `Hash ${hash.substring(0, 10)}... não encontrado na blockchain`,
             'BesuService',
           );
           return {
-            exists: true,
-            info: {
-              owner: '',
-              timestamp: Math.floor(Date.now() / 1000),
-              vehicleId: '',
-              eventType: '',
-              verificationCount: 0,
-            },
+            exists: false,
           };
         }
-      } else {
-        this.logger.log(
-          `Hash ${hash.substring(0, 10)}... não encontrado na blockchain`,
+        
+        // Se não está no mapping mas é uma transação confirmada, é um transactionHash
+        isTransactionHash = true;
+      }
+
+      let vehicleService = await this.vehicleServiceRepository.findOne({
+        where: { blockchainHash: hash },
+        relations: ['vehicle', 'vehicle.user'],
+      });
+
+      if (!vehicleService && existsInContract === false) {
+        try {
+          if (!this.provider) {
+            await this.initializeBesu();
+          }
+
+          if (this.provider) {
+            const receipt = await this.provider.getTransactionReceipt(hash);
+            if (receipt && receipt.blockNumber) {
+              const block = await this.provider.getBlock(receipt.blockNumber);
+              if (block && block.timestamp) {
+                const transactionDate = new Date(Number(block.timestamp) * 1000);
+                const startDate = new Date(transactionDate.getTime() - 2 * 60 * 60 * 1000);
+                const endDate = new Date(transactionDate.getTime() + 2 * 60 * 60 * 1000);
+
+                vehicleService = await this.vehicleServiceRepository
+                  .createQueryBuilder('service')
+                  .where('service.status = :status', { status: ServiceStatus.CONFIRMED })
+                  .andWhere('service.blockchainConfirmedAt IS NOT NULL')
+                  .andWhere('service.blockchainConfirmedAt >= :startDate', { startDate })
+                  .andWhere('service.blockchainConfirmedAt <= :endDate', { endDate })
+                  .leftJoinAndSelect('service.vehicle', 'vehicle')
+                  .leftJoinAndSelect('vehicle.user', 'user')
+                  .orderBy('service.blockchainConfirmedAt', 'DESC')
+                  .take(1)
+                  .getOne();
+              }
+            }
+          }
+        } catch (searchError) {
+          this.logger.warn(
+            `Erro ao buscar serviço relacionado à transação: ${searchError.message}`,
+            'BesuService',
+          );
+        }
+      }
+
+      if (!vehicleService) {
+        this.logger.warn(
+          `Hash ${hash.substring(0, 10)}... encontrado na blockchain mas não encontrado no banco de dados`,
           'BesuService',
         );
-        return { exists: false };
+        return {
+          exists: true,
+          hash,
+        };
       }
+
+      let blockNumber: number | undefined;
+      let transactionTimestamp: string | undefined;
+      let transactionHash: string | undefined;
+
+      try {
+        if (!this.provider) {
+          await this.initializeBesu();
+        }
+
+        if (this.provider) {
+          try {
+            const receipt = await this.provider.getTransactionReceipt(hash);
+            if (receipt && receipt.blockNumber) {
+              const block = await this.provider.getBlock(receipt.blockNumber);
+              if (block && block.timestamp) {
+                blockNumber = Number(receipt.blockNumber);
+                transactionTimestamp = new Date(Number(block.timestamp) * 1000).toISOString();
+                transactionHash = hash;
+                this.logger.log(
+                  `Informações da transação extraídas: block=${blockNumber}, timestamp=${transactionTimestamp}`,
+                  'BesuService',
+                );
+              }
+            }
+          } catch (receiptError) {
+            this.logger.debug(
+              `Hash fornecido não é uma transação ou não foi encontrado: ${receiptError.message}`,
+              'BesuService',
+            );
+          }
+
+          if (!blockNumber || !transactionTimestamp) {
+            if (vehicleService.blockchainConfirmedAt) {
+              const confirmedAt = vehicleService.blockchainConfirmedAt;
+              transactionTimestamp = confirmedAt instanceof Date
+                ? confirmedAt.toISOString()
+                : typeof confirmedAt === 'string'
+                  ? confirmedAt
+                  : new Date(confirmedAt).toISOString();
+            } else {
+              transactionTimestamp = new Date().toISOString();
+            }
+            
+            try {
+              const currentBlock = await this.provider.getBlockNumber();
+              blockNumber = Number(currentBlock);
+            } catch {
+              blockNumber = 0;
+            }
+          }
+          
+          if (!transactionHash) {
+            transactionHash = hash;
+          }
+        }
+      } catch (txError) {
+        this.logger.warn(
+          `Erro ao obter informações da blockchain: ${txError.message}`,
+          'BesuService',
+        );
+
+        if (vehicleService.blockchainConfirmedAt) {
+          const confirmedAt = vehicleService.blockchainConfirmedAt;
+          transactionTimestamp = confirmedAt instanceof Date
+            ? confirmedAt.toISOString()
+            : typeof confirmedAt === 'string'
+              ? confirmedAt
+              : new Date(confirmedAt).toISOString();
+        } else {
+          transactionTimestamp = new Date().toISOString();
+        }
+        blockNumber = 0;
+        transactionHash = hash;
+      }
+
+      const serviceTypeMap: Record<string, string> = {
+        maintenance: 'Manutenção',
+        repair: 'Reparo',
+        inspection: 'Inspeção',
+        fuel: 'Combustível',
+        expense: 'Despesa',
+        other: 'Outro',
+      };
+
+      const serviceName =
+        serviceTypeMap[vehicleService.type] || vehicleService.category || 'Serviço';
+
+      const vehicleName = vehicleService.vehicle
+        ? `${vehicleService.vehicle.brand} ${vehicleService.vehicle.model} ${vehicleService.vehicle.year}`
+        : 'Veículo não encontrado';
+
+      this.logger.log(
+        `Hash ${hash.substring(0, 10)}... verificado com sucesso`,
+        'BesuService',
+        {
+          vehicleId: vehicleService.vehicleId,
+          serviceId: vehicleService.id,
+        },
+      );
+
+      return {
+        exists: true,
+        hash,
+        blockchainData: {
+          blockNumber: blockNumber || 0,
+          timestamp: transactionTimestamp || new Date().toISOString(),
+          transactionHash: transactionHash || hash,
+        },
+        info: {
+          service: serviceName,
+          vehicle: vehicleName,
+          serviceDate: (() => {
+            const date = vehicleService.serviceDate;
+            if (!date) return '';
+            if (date instanceof Date) {
+              return date.toISOString().split('T')[0];
+            }
+            const dateStr = String(date);
+            if (dateStr.includes('T')) {
+              return dateStr.split('T')[0];
+            }
+            try {
+              return new Date(dateStr).toISOString().split('T')[0];
+            } catch {
+              return '';
+            }
+          })(),
+          cost: vehicleService.cost ? Number(vehicleService.cost) : undefined,
+          category: vehicleService.category || undefined,
+          description: vehicleService.description || undefined,
+        },
+      };
     } catch (error) {
       this.logger.error(
         'Erro ao verificar hash:',
         error instanceof Error ? error.message : String(error),
         'BesuService',
       );
-      return { exists: false };
+      return {
+        exists: false,
+      };
     }
   }
 

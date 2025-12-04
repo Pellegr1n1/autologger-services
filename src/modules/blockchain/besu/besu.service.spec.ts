@@ -357,20 +357,57 @@ describe('BesuService', () => {
 
   describe('verifyHash', () => {
     it('should verify hash exists', async () => {
-      // Mock verifyHashInContract
+      const mockVehicleService = {
+        id: 'service-123',
+        vehicleId: 'vehicle-123',
+        type: 'maintenance' as any,
+        category: 'maintenance',
+        serviceDate: new Date('2024-01-15'),
+        cost: 250.0,
+        description: 'Troca de óleo',
+        blockchainConfirmedAt: new Date('2024-01-15T10:00:00Z'),
+        createdAt: new Date('2024-01-15T10:00:00Z'),
+        vehicle: {
+          id: 'vehicle-123',
+          brand: 'Toyota',
+          model: 'Corolla',
+          year: 2020,
+          user: {
+            email: 'usuario@email.com',
+          },
+        },
+      };
+
       jest
         .spyOn(service as any, 'verifyHashInContract')
         .mockResolvedValue(true);
+      jest
+        .spyOn(service as any, 'isTransactionConfirmed')
+        .mockResolvedValue(false);
+      mockVehicleServiceRepository.findOne.mockResolvedValue(
+        mockVehicleService as any,
+      );
+
+      // Mock provider methods
+      (service as any).provider = {
+        getTransactionReceipt: jest.fn().mockResolvedValue(null),
+        getBlockNumber: jest.fn().mockResolvedValue(12345),
+      };
 
       const result = await service.verifyHash('hash-123');
 
       expect(result.exists).toBe(true);
       expect(result.info).toBeDefined();
+      expect(result.info?.service).toBe('Manutenção');
+      expect(result.info?.vehicle).toBe('Toyota Corolla 2020');
     });
 
     it('should return exists false when hash not found', async () => {
       jest
         .spyOn(service as any, 'verifyHashInContract')
+        .mockResolvedValue(false);
+      jest
+        .spyOn(service as any, 'isTransactionConfirmed')
         .mockResolvedValue(false);
 
       const result = await service.verifyHash('hash-123');
@@ -934,12 +971,17 @@ describe('BesuService', () => {
         id: 'service-123',
         vehicleId: 'vehicle-123',
         type: 'maintenance' as any,
+        category: 'maintenance',
         serviceDate: new Date('2024-01-15'),
         cost: 250.0,
         description: 'Troca de óleo',
         blockchainConfirmedAt: new Date('2024-01-15T10:00:00Z'),
+        createdAt: new Date('2024-01-15T10:00:00Z'),
         vehicle: {
           id: 'vehicle-123',
+          brand: 'Toyota',
+          model: 'Corolla',
+          year: 2020,
           user: {
             email: 'usuario@email.com',
           },
@@ -949,17 +991,30 @@ describe('BesuService', () => {
       jest
         .spyOn(service as any, 'verifyHashInContract')
         .mockResolvedValue(true);
+      jest
+        .spyOn(service as any, 'isTransactionConfirmed')
+        .mockResolvedValue(false);
       mockVehicleServiceRepository.findOne.mockResolvedValue(
         mockVehicleService as any,
       );
+
+      // Mock provider methods
+      (service as any).provider = {
+        getTransactionReceipt: jest.fn().mockResolvedValue(null),
+        getBlockNumber: jest.fn().mockResolvedValue(12345),
+      };
 
       const result = await service.verifyHash('hash-123');
 
       expect(result.exists).toBe(true);
       expect(result.info).toBeDefined();
-      expect(result.info?.vehicleId).toBe('vehicle-123');
-      expect(result.info?.eventType).toBe('maintenance');
-      expect(result.info?.serviceId).toBe('service-123');
+      expect(result.info?.service).toBe('Manutenção');
+      expect(result.info?.vehicle).toBe('Toyota Corolla 2020');
+      expect(result.info?.serviceDate).toBe('2024-01-15');
+      expect(result.info?.cost).toBe(250.0);
+      expect(result.info?.category).toBe('maintenance');
+      expect(result.info?.description).toBe('Troca de óleo');
+      expect(result.blockchainData).toBeDefined();
       expect(mockVehicleServiceRepository.findOne).toHaveBeenCalledWith({
         where: { blockchainHash: 'hash-123' },
         relations: ['vehicle', 'vehicle.user'],
@@ -970,14 +1025,16 @@ describe('BesuService', () => {
       jest
         .spyOn(service as any, 'verifyHashInContract')
         .mockResolvedValue(true);
+      jest
+        .spyOn(service as any, 'isTransactionConfirmed')
+        .mockResolvedValue(false);
       mockVehicleServiceRepository.findOne.mockResolvedValue(null);
 
       const result = await service.verifyHash('hash-123');
 
       expect(result.exists).toBe(true);
-      expect(result.info).toBeDefined();
-      expect(result.info?.vehicleId).toBe('');
-      expect(result.info?.eventType).toBe('');
+      expect(result.hash).toBe('hash-123');
+      expect(result.info).toBeUndefined();
     });
 
     it('should return exists false when hash not found', async () => {
