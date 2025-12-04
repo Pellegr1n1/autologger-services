@@ -668,8 +668,6 @@ export class BesuService implements OnModuleInit {
       category?: string;
       description?: string;
     };
-    verified?: boolean;
-    message?: string;
   }> {
     try {
       const existsInContract = await this.verifyHashInContract(hash);
@@ -685,7 +683,6 @@ export class BesuService implements OnModuleInit {
           );
           return {
             exists: false,
-            message: 'Hash não encontrado na blockchain',
           };
         }
         
@@ -743,7 +740,6 @@ export class BesuService implements OnModuleInit {
         return {
           exists: true,
           hash,
-          message: 'Hash encontrado na blockchain, mas serviço não encontrado no banco de dados',
         };
       }
 
@@ -822,32 +818,6 @@ export class BesuService implements OnModuleInit {
         transactionHash = hash;
       }
 
-      const eventData = {
-        serviceId: vehicleService.id,
-        vehicleId: vehicleService.vehicleId,
-        type: vehicleService.type,
-        description: vehicleService.description,
-        serviceDate: vehicleService.serviceDate,
-        timestamp: vehicleService.createdAt
-          ? (vehicleService.createdAt instanceof Date
-              ? vehicleService.createdAt.toISOString()
-              : typeof vehicleService.createdAt === 'string'
-                ? vehicleService.createdAt
-                : new Date(vehicleService.createdAt).toISOString())
-          : new Date().toISOString(),
-      };
-
-      const calculatedHash = ethers.keccak256(
-        ethers.toUtf8Bytes(JSON.stringify(eventData)),
-      );
-
-      let verified: boolean;
-      if (isTransactionHash && vehicleService.blockchainHash) {
-        verified = calculatedHash.toLowerCase() === vehicleService.blockchainHash.toLowerCase();
-      } else {
-        verified = calculatedHash.toLowerCase() === hash.toLowerCase();
-      }
-
       const serviceTypeMap: Record<string, string> = {
         maintenance: 'Manutenção',
         repair: 'Reparo',
@@ -857,10 +827,10 @@ export class BesuService implements OnModuleInit {
         other: 'Outro',
       };
 
-      const servicoNome =
+      const serviceName =
         serviceTypeMap[vehicleService.type] || vehicleService.category || 'Serviço';
 
-      const veiculoNome = vehicleService.vehicle
+      const vehicleName = vehicleService.vehicle
         ? `${vehicleService.vehicle.brand} ${vehicleService.vehicle.model} ${vehicleService.vehicle.year}`
         : 'Veículo não encontrado';
 
@@ -870,7 +840,6 @@ export class BesuService implements OnModuleInit {
         {
           vehicleId: vehicleService.vehicleId,
           serviceId: vehicleService.id,
-          verified,
         },
       );
 
@@ -883,8 +852,8 @@ export class BesuService implements OnModuleInit {
           transactionHash: transactionHash || hash,
         },
         info: {
-          service: servicoNome,
-          vehicle: veiculoNome,
+          service: serviceName,
+          vehicle: vehicleName,
           serviceDate: (() => {
             const date = vehicleService.serviceDate;
             if (!date) return '';
@@ -905,10 +874,6 @@ export class BesuService implements OnModuleInit {
           category: vehicleService.category || undefined,
           description: vehicleService.description || undefined,
         },
-        verified,
-        message: verified
-          ? 'Dados verificados com sucesso na blockchain'
-          : 'Hash encontrado na blockchain, mas não corresponde aos dados calculados',
       };
     } catch (error) {
       this.logger.error(
@@ -918,7 +883,6 @@ export class BesuService implements OnModuleInit {
       );
       return {
         exists: false,
-        message: `Erro ao verificar hash: ${error instanceof Error ? error.message : String(error)}`,
       };
     }
   }

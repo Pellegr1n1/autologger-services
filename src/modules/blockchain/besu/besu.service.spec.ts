@@ -1034,7 +1034,7 @@ describe('BesuService', () => {
 
       expect(result.exists).toBe(true);
       expect(result.hash).toBe('hash-123');
-      expect(result.message).toContain('não encontrado no banco de dados');
+      expect(result.info).toBeUndefined();
     });
 
     it('should return exists false when hash not found', async () => {
