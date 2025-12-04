@@ -575,4 +575,3 @@ Acesse o endpoint de health check:
 - **Produção**: [https://api.autologger.online/health](https://api.autologger.online/health)
 
 
-
