@@ -776,7 +776,12 @@ export class BesuService implements OnModuleInit {
 
           if (!blockNumber || !transactionTimestamp) {
             if (vehicleService.blockchainConfirmedAt) {
-              transactionTimestamp = vehicleService.blockchainConfirmedAt.toISOString();
+              const confirmedAt = vehicleService.blockchainConfirmedAt;
+              transactionTimestamp = confirmedAt instanceof Date
+                ? confirmedAt.toISOString()
+                : typeof confirmedAt === 'string'
+                  ? confirmedAt
+                  : new Date(confirmedAt).toISOString();
             } else {
               transactionTimestamp = new Date().toISOString();
             }
@@ -800,7 +805,12 @@ export class BesuService implements OnModuleInit {
         );
 
         if (vehicleService.blockchainConfirmedAt) {
-          transactionTimestamp = vehicleService.blockchainConfirmedAt.toISOString();
+          const confirmedAt = vehicleService.blockchainConfirmedAt;
+          transactionTimestamp = confirmedAt instanceof Date
+            ? confirmedAt.toISOString()
+            : typeof confirmedAt === 'string'
+              ? confirmedAt
+              : new Date(confirmedAt).toISOString();
         } else {
           transactionTimestamp = new Date().toISOString();
         }
@@ -814,7 +824,13 @@ export class BesuService implements OnModuleInit {
         type: vehicleService.type,
         description: vehicleService.description,
         serviceDate: vehicleService.serviceDate,
-        timestamp: vehicleService.createdAt?.toISOString() || new Date().toISOString(),
+        timestamp: vehicleService.createdAt
+          ? (vehicleService.createdAt instanceof Date
+              ? vehicleService.createdAt.toISOString()
+              : typeof vehicleService.createdAt === 'string'
+                ? vehicleService.createdAt
+                : new Date(vehicleService.createdAt).toISOString())
+          : new Date().toISOString(),
       };
 
       const calculatedHash = ethers.keccak256(
@@ -860,9 +876,22 @@ export class BesuService implements OnModuleInit {
         info: {
           service: servicoNome,
           vehicle: veiculoNome,
-          serviceDate: vehicleService.serviceDate
-            ? vehicleService.serviceDate.toISOString().split('T')[0]
-            : '',
+          serviceDate: (() => {
+            const date = vehicleService.serviceDate;
+            if (!date) return '';
+            if (date instanceof Date) {
+              return date.toISOString().split('T')[0];
+            }
+            const dateStr = String(date);
+            if (dateStr.includes('T')) {
+              return dateStr.split('T')[0];
+            }
+            try {
+              return new Date(dateStr).toISOString().split('T')[0];
+            } catch {
+              return '';
+            }
+          })(),
           cost: vehicleService.cost ? Number(vehicleService.cost) : undefined,
           category: vehicleService.category || undefined,
           description: vehicleService.description || undefined,
