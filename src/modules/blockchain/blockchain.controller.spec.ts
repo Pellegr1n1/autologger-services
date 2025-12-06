@@ -27,6 +27,8 @@ describe('BlockchainController', () => {
       resetRetryCount: jest.fn(),
       resetAllFailedRetries: jest.fn(),
       registerHashInContract: jest.fn(),
+      verifyServiceIntegrity: jest.fn(),
+      verifyAllServicesIntegrity: jest.fn(),
     };
 
     const mockBesuService = {
@@ -414,6 +416,59 @@ describe('BlockchainController', () => {
 
       expect(besuService.isConnected).toHaveBeenCalled();
       expect(response).toEqual({ connected: true });
+    });
+  });
+
+  describe('verifyServiceIntegrity', () => {
+    it('should verify service integrity', async () => {
+      const result = {
+        isValid: true,
+        integrityStatus: 'valid',
+        currentHash: '0xhash123',
+        blockchainHash: '0xhash123',
+        hashMatches: true,
+        existsInBlockchain: true,
+        message: 'Valid',
+      };
+
+      blockchainService.verifyServiceIntegrity.mockResolvedValue(result as any);
+
+      const response = await controller.verifyServiceIntegrity('service-123');
+
+      expect(blockchainService.verifyServiceIntegrity).toHaveBeenCalledWith('service-123');
+      expect(response).toEqual(result);
+    });
+
+    it('should handle errors', async () => {
+      blockchainService.verifyServiceIntegrity.mockRejectedValue(new Error('Service not found'));
+
+      await expect(controller.verifyServiceIntegrity('service-123')).rejects.toThrow('Service not found');
+    });
+  });
+
+  describe('verifyAllServicesIntegrity', () => {
+    it('should verify all services integrity', async () => {
+      const result = {
+        total: 5,
+        valid: 3,
+        violated: 1,
+        unknown: 1,
+        notVerified: 0,
+        results: [],
+      };
+
+      blockchainService.verifyAllServicesIntegrity.mockResolvedValue(result as any);
+
+      const response = await controller.verifyAllServicesIntegrity();
+
+      expect(blockchainService.verifyAllServicesIntegrity).toHaveBeenCalled();
+      expect(response).toEqual(result);
+    });
+
+    it('should handle errors', async () => {
+      blockchainService.verifyAllServicesIntegrity.mockRejectedValue(new Error('Database error'));
+
+      await expect(controller.verifyAllServicesIntegrity()).rejects.toThrow('Database error');
     });
   });
 });

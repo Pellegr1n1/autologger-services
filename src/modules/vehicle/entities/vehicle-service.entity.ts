@@ -25,6 +25,13 @@ export enum ServiceType {
   OTHER = 'other',
 }
 
+export enum IntegrityStatus {
+  VALID = 'valid',
+  VIOLATED = 'violated',
+  UNKNOWN = 'unknown',
+  NOT_VERIFIED = 'not_verified',
+}
+
 @Entity('vehicle_services')
 export class VehicleService {
   @PrimaryGeneratedColumn('uuid')
@@ -94,6 +101,14 @@ export class VehicleService {
   blockchainHash: string;
 
   @Column({
+    name: 'transaction_hash',
+    type: 'varchar',
+    length: 66,
+    nullable: true,
+  })
+  transactionHash: string;
+
+  @Column({
     name: 'previous_hash',
     type: 'varchar',
     length: 66,
@@ -124,6 +139,22 @@ export class VehicleService {
     nullable: true,
   })
   confirmedBy: string;
+
+  @Column({
+    name: 'integrity_status',
+    type: 'enum',
+    enum: IntegrityStatus,
+    default: IntegrityStatus.NOT_VERIFIED,
+    nullable: true,
+  })
+  integrityStatus: IntegrityStatus;
+
+  @Column({
+    name: 'integrity_checked_at',
+    type: 'timestamp',
+    nullable: true,
+  })
+  integrityCheckedAt: Date;
 
   @CreateDateColumn({ name: 'created_at' })
   createdAt: Date;

@@ -686,14 +686,20 @@ export class BesuService implements OnModuleInit {
           };
         }
         
-        // Se não está no mapping mas é uma transação confirmada, é um transactionHash
         isTransactionHash = true;
       }
 
       let vehicleService = await this.vehicleServiceRepository.findOne({
-        where: { blockchainHash: hash },
+        where: { transactionHash: hash },
         relations: ['vehicle', 'vehicle.user'],
       });
+      
+      if (!vehicleService) {
+        vehicleService = await this.vehicleServiceRepository.findOne({
+          where: { blockchainHash: hash },
+          relations: ['vehicle', 'vehicle.user'],
+        });
+      }
 
       if (!vehicleService && existsInContract === false) {
         try {
@@ -753,25 +759,53 @@ export class BesuService implements OnModuleInit {
         }
 
         if (this.provider) {
+          // ✅ CORREÇÃO: Tentar usar o transactionHash do banco se disponível
+          // Se o hash fornecido é um hash de conteúdo e temos o transactionHash no banco, usar ele
+          const hashToVerify = vehicleService?.transactionHash || hash;
+          
           try {
-            const receipt = await this.provider.getTransactionReceipt(hash);
+            const receipt = await this.provider.getTransactionReceipt(hashToVerify);
             if (receipt && receipt.blockNumber) {
               const block = await this.provider.getBlock(receipt.blockNumber);
               if (block && block.timestamp) {
                 blockNumber = Number(receipt.blockNumber);
                 transactionTimestamp = new Date(Number(block.timestamp) * 1000).toISOString();
-                transactionHash = hash;
+                transactionHash = hashToVerify;
                 this.logger.log(
-                  `Informações da transação extraídas: block=${blockNumber}, timestamp=${transactionTimestamp}`,
+                  `Informações da transação extraídas: block=${blockNumber}, timestamp=${transactionTimestamp}, usando transactionHash=${!!vehicleService?.transactionHash}`,
                   'BesuService',
                 );
               }
             }
           } catch (receiptError) {
-            this.logger.debug(
-              `Hash fornecido não é uma transação ou não foi encontrado: ${receiptError.message}`,
-              'BesuService',
-            );
+            // Se falhou com transactionHash do banco, tentar com o hash fornecido diretamente
+            if (vehicleService?.transactionHash && hashToVerify !== hash) {
+              try {
+                const receipt = await this.provider.getTransactionReceipt(hash);
+                if (receipt && receipt.blockNumber) {
+                  const block = await this.provider.getBlock(receipt.blockNumber);
+                  if (block && block.timestamp) {
+                    blockNumber = Number(receipt.blockNumber);
+                    transactionTimestamp = new Date(Number(block.timestamp) * 1000).toISOString();
+                    transactionHash = hash;
+                    this.logger.log(
+                      `Informações da transação extraídas usando hash fornecido: block=${blockNumber}`,
+                      'BesuService',
+                    );
+                  }
+                }
+              } catch {
+                this.logger.debug(
+                  `Hash fornecido não é uma transação ou não foi encontrado: ${receiptError.message}`,
+                  'BesuService',
+                );
+              }
+            } else {
+              this.logger.debug(
+                `Hash fornecido não é uma transação ou não foi encontrado: ${receiptError.message}`,
+                'BesuService',
+              );
+            }
           }
 
           if (!blockNumber || !transactionTimestamp) {

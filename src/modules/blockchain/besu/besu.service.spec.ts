@@ -356,7 +356,7 @@ describe('BesuService', () => {
   });
 
   describe('verifyHash', () => {
-    it('should verify hash exists', async () => {
+    it('should verify hash exists using transactionHash from database', async () => {
       const mockVehicleService = {
         id: 'service-123',
         vehicleId: 'vehicle-123',
@@ -365,6 +365,8 @@ describe('BesuService', () => {
         serviceDate: new Date('2024-01-15'),
         cost: 250.0,
         description: 'Troca de óleo',
+        blockchainHash: '0xcontenthash123',
+        transactionHash: '0xtransactionhash456',
         blockchainConfirmedAt: new Date('2024-01-15T10:00:00Z'),
         createdAt: new Date('2024-01-15T10:00:00Z'),
         vehicle: {
@@ -384,22 +386,146 @@ describe('BesuService', () => {
       jest
         .spyOn(service as any, 'isTransactionConfirmed')
         .mockResolvedValue(false);
-      mockVehicleServiceRepository.findOne.mockResolvedValue(
-        mockVehicleService as any,
-      );
+      
+      mockVehicleServiceRepository.findOne
+        .mockResolvedValueOnce(mockVehicleService as any);
 
       // Mock provider methods
+      const mockReceipt = {
+        blockNumber: 12345n,
+        hash: '0xtransactionhash456',
+      };
+      const mockBlock = {
+        timestamp: Math.floor(Date.now() / 1000),
+      };
+
       (service as any).provider = {
-        getTransactionReceipt: jest.fn().mockResolvedValue(null),
+        getTransactionReceipt: jest.fn().mockResolvedValue(mockReceipt),
+        getBlock: jest.fn().mockResolvedValue(mockBlock),
         getBlockNumber: jest.fn().mockResolvedValue(12345),
       };
 
-      const result = await service.verifyHash('hash-123');
+      const result = await service.verifyHash('0xcontenthash123');
 
       expect(result.exists).toBe(true);
       expect(result.info).toBeDefined();
       expect(result.info?.service).toBe('Manutenção');
       expect(result.info?.vehicle).toBe('Toyota Corolla 2020');
+      
+      expect(mockVehicleServiceRepository.findOne).toHaveBeenCalledWith({
+        where: { transactionHash: '0xcontenthash123' },
+        relations: ['vehicle', 'vehicle.user'],
+      });
+      
+      expect((service as any).provider.getTransactionReceipt).toHaveBeenCalledWith('0xtransactionhash456');
+    });
+
+    it('should verify hash exists when transactionHash is provided directly', async () => {
+      const mockVehicleService = {
+        id: 'service-123',
+        vehicleId: 'vehicle-123',
+        type: 'maintenance' as any,
+        category: 'maintenance',
+        serviceDate: new Date('2024-01-15'),
+        cost: 250.0,
+        description: 'Troca de óleo',
+        blockchainHash: '0xcontenthash123',
+        transactionHash: '0xtransactionhash456',
+        blockchainConfirmedAt: new Date('2024-01-15T10:00:00Z'),
+        createdAt: new Date('2024-01-15T10:00:00Z'),
+        vehicle: {
+          id: 'vehicle-123',
+          brand: 'Toyota',
+          model: 'Corolla',
+          year: 2020,
+          user: {
+            email: 'usuario@email.com',
+          },
+        },
+      };
+
+      jest
+        .spyOn(service as any, 'verifyHashInContract')
+        .mockResolvedValue(true);
+      jest
+        .spyOn(service as any, 'isTransactionConfirmed')
+        .mockResolvedValue(false);
+      
+      mockVehicleServiceRepository.findOne
+        .mockResolvedValueOnce(mockVehicleService as any);
+
+      const mockReceipt = {
+        blockNumber: 12345n,
+        hash: '0xtransactionhash456',
+      };
+      const mockBlock = {
+        timestamp: Math.floor(Date.now() / 1000),
+      };
+
+      (service as any).provider = {
+        getTransactionReceipt: jest.fn().mockResolvedValue(mockReceipt),
+        getBlock: jest.fn().mockResolvedValue(mockBlock),
+        getBlockNumber: jest.fn().mockResolvedValue(12345),
+      };
+
+      const result = await service.verifyHash('0xtransactionhash456');
+
+      expect(result.exists).toBe(true);
+      expect(result.blockchainData?.transactionHash).toBe('0xtransactionhash456');
+      expect(result.blockchainData?.blockNumber).toBe(12345);
+    });
+
+    it('should fallback to blockchainHash when transactionHash not found', async () => {
+      const mockVehicleService = {
+        id: 'service-123',
+        vehicleId: 'vehicle-123',
+        type: 'maintenance' as any,
+        category: 'maintenance',
+        serviceDate: new Date('2024-01-15'),
+        cost: 250.0,
+        description: 'Troca de óleo',
+        blockchainHash: '0xcontenthash123',
+        transactionHash: null,
+        blockchainConfirmedAt: new Date('2024-01-15T10:00:00Z'),
+        createdAt: new Date('2024-01-15T10:00:00Z'),
+        vehicle: {
+          id: 'vehicle-123',
+          brand: 'Toyota',
+          model: 'Corolla',
+          year: 2020,
+          user: {
+            email: 'usuario@email.com',
+          },
+        },
+      };
+
+      jest
+        .spyOn(service as any, 'verifyHashInContract')
+        .mockResolvedValue(true);
+      jest
+        .spyOn(service as any, 'isTransactionConfirmed')
+        .mockResolvedValue(false);
+      
+      mockVehicleServiceRepository.findOne
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce(mockVehicleService as any);
+
+      (service as any).provider = {
+        getTransactionReceipt: jest.fn().mockResolvedValue(null),
+        getBlockNumber: jest.fn().mockResolvedValue(12345),
+      };
+
+      const result = await service.verifyHash('0xcontenthash123');
+
+      expect(result.exists).toBe(true);
+      expect(mockVehicleServiceRepository.findOne).toHaveBeenNthCalledWith(1, {
+        where: { transactionHash: '0xcontenthash123' },
+        relations: ['vehicle', 'vehicle.user'],
+      });
+      expect(mockVehicleServiceRepository.findOne).toHaveBeenNthCalledWith(2, {
+        where: { blockchainHash: '0xcontenthash123' },
+        relations: ['vehicle', 'vehicle.user'],
+      });
     });
 
     it('should return exists false when hash not found', async () => {
@@ -1015,8 +1141,9 @@ describe('BesuService', () => {
       expect(result.info?.category).toBe('maintenance');
       expect(result.info?.description).toBe('Troca de óleo');
       expect(result.blockchainData).toBeDefined();
-      expect(mockVehicleServiceRepository.findOne).toHaveBeenCalledWith({
-        where: { blockchainHash: 'hash-123' },
+      
+      expect(mockVehicleServiceRepository.findOne).toHaveBeenNthCalledWith(1, {
+        where: { transactionHash: 'hash-123' },
         relations: ['vehicle', 'vehicle.user'],
       });
     });

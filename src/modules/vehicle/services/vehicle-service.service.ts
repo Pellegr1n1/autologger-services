@@ -10,6 +10,7 @@ import {
   VehicleService,
   ServiceStatus,
   ServiceType,
+  IntegrityStatus,
 } from '../entities/vehicle-service.entity';
 import { CreateVehicleServiceDto } from '../dto/create-vehicle-service.dto';
 import { UpdateVehicleServiceDto } from '../dto/update-vehicle-service.dto';
@@ -115,6 +116,8 @@ export class VehicleServiceService {
         const blockchainHash = serviceHash;
 
         service.blockchainHash = blockchainHash;
+        // ✅ Armazenar o transactionHash para uso na verificação
+        service.transactionHash = hashResult.transactionHash || undefined;
         service.status = ServiceStatus.CONFIRMED;
         service.isImmutable = true;
         service.canEdit = false;
@@ -220,6 +223,36 @@ export class VehicleServiceService {
 
     if (!vehicleService) {
       throw new NotFoundException(`Serviço com ID ${id} não encontrado`);
+    }
+
+    // Verificar integridade se o serviço foi confirmado na blockchain
+    // Fazer de forma assíncrona para não bloquear a resposta
+    if (
+      vehicleService.blockchainHash &&
+      vehicleService.blockchainConfirmedAt &&
+      vehicleService.status === ServiceStatus.CONFIRMED
+    ) {
+      this.blockchainService
+        .verifyServiceIntegrity(id)
+        .then((verification) => {
+          if (verification.integrityStatus === IntegrityStatus.VIOLATED) {
+            this.logger.warn(
+              `Serviço ${id} com integridade violada detectada`,
+              'VehicleServiceService',
+              {
+                serviceId: id,
+                currentHash: verification.currentHash,
+                blockchainHash: verification.blockchainHash,
+              },
+            );
+          }
+        })
+        .catch((error) => {
+          this.logger.debug(
+            `Erro ao verificar integridade do serviço ${id}: ${error.message}`,
+            'VehicleServiceService',
+          );
+        });
     }
 
     return await this.vehicleServiceFactory.toResponseDto(vehicleService);

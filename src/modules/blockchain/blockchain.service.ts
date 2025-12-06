@@ -8,6 +8,7 @@ import { Repository, Not, IsNull } from 'typeorm';
 import {
   VehicleService,
   ServiceStatus,
+  IntegrityStatus,
 } from '../vehicle/entities/vehicle-service.entity';
 
 export interface BlockchainTransaction {
@@ -653,6 +654,13 @@ export class BlockchainService {
             );
 
             if (result.success) {
+              // ✅ Armazenar transactionHash quando disponível
+              if (result.transactionHash) {
+                await this.vehicleServiceRepository.update(
+                  { id: service.id },
+                  { transactionHash: result.transactionHash },
+                );
+              }
               successCount++;
               this.logger.log(`Hash registrado: ${service.blockchainHash}`);
             } else {
@@ -738,6 +746,7 @@ export class BlockchainService {
                   isImmutable: true,
                   canEdit: false,
                   confirmedBy: 'blockchain-fix',
+                  transactionHash: result.transactionHash || undefined,
                 },
               );
 
@@ -989,7 +998,7 @@ export class BlockchainService {
             location: service.location,
             status: mappedStatus,
             blockchainHash: service.blockchainHash,
-            transactionHash: service.blockchainHash,
+            transactionHash: service.transactionHash || service.blockchainHash,
             blockNumber: service.blockchainConfirmedAt ? 1 : undefined, // Placeholder
             gasPrice: '-',
             technician: service.technician,
@@ -1149,6 +1158,8 @@ export class BlockchainService {
       if (hashResult.success) {
         // Atualizar o serviço com informações da blockchain
         service.blockchainHash = serviceHash;
+        // ✅ Armazenar o transactionHash para uso na verificação
+        service.transactionHash = hashResult.transactionHash || undefined;
         service.status = ServiceStatus.CONFIRMED;
         service.isImmutable = true;
         service.canEdit = false;
@@ -1504,6 +1515,226 @@ export class BlockchainService {
         gasPrice: '0',
         network: 'Erro de conexão',
       };
+    }
+  }
+
+  /**
+   * Calcula o hash de um serviço usando a mesma lógica do registro
+   * @param service Serviço para calcular o hash
+   * @returns Hash calculado
+   */
+  private calculateServiceHash(service: VehicleService): string {
+    const eventData = {
+      serviceId: service.id,
+      vehicleId: service.vehicleId,
+      type: service.type,
+      description: service.description,
+      serviceDate: service.serviceDate,
+      timestamp:
+        service.createdAt?.toISOString() || new Date().toISOString(),
+    };
+
+    return ethers.keccak256(ethers.toUtf8Bytes(JSON.stringify(eventData)));
+  }
+
+  /**
+   * Verifica a integridade de um serviço comparando o hash atual com o hash registrado na blockchain
+   * @param serviceId ID do serviço a ser verificado
+   * @returns Status de integridade e informações da verificação
+   */
+  async verifyServiceIntegrity(serviceId: string): Promise<{
+    isValid: boolean;
+    integrityStatus: IntegrityStatus;
+    currentHash: string;
+    blockchainHash: string;
+    hashMatches: boolean;
+    existsInBlockchain: boolean;
+    message: string;
+  }> {
+    try {
+      const service = await this.vehicleServiceRepository.findOne({
+        where: { id: serviceId },
+      });
+
+      if (!service) {
+        throw new Error('Serviço não encontrado');
+      }
+
+      // Se o serviço não foi confirmado na blockchain, não há como verificar
+      if (!service.blockchainHash || !service.blockchainConfirmedAt) {
+        return {
+          isValid: false,
+          integrityStatus: IntegrityStatus.NOT_VERIFIED,
+          currentHash: '',
+          blockchainHash: service.blockchainHash || '',
+          hashMatches: false,
+          existsInBlockchain: false,
+          message: 'Serviço não foi confirmado na blockchain',
+        };
+      }
+
+      // Calcular o hash atual do serviço
+      const currentHash = this.calculateServiceHash(service);
+
+      // Comparar com o hash registrado na blockchain
+      const hashMatches = currentHash === service.blockchainHash;
+
+      // Verificar se o hash existe na blockchain
+      let existsInBlockchain = false;
+      try {
+        existsInBlockchain =
+          await this.besuService.verifyHashInContract(service.blockchainHash);
+      } catch (error) {
+        this.logger.warn(
+          `Erro ao verificar hash na blockchain: ${error.message}`,
+          'BlockchainService',
+        );
+      }
+
+      // Determinar o status de integridade
+      let integrityStatus: IntegrityStatus;
+      let isValid: boolean;
+      let message: string;
+
+      if (!hashMatches) {
+        integrityStatus = IntegrityStatus.VIOLATED;
+        isValid = false;
+        message =
+          'Serviço foi alterado após registro na blockchain - INTEGRIDADE VIOLADA';
+        this.logger.warn(
+          `Integridade violada para serviço ${serviceId}`,
+          'BlockchainService',
+          {
+            serviceId,
+            currentHash,
+            blockchainHash: service.blockchainHash,
+          },
+        );
+      } else if (!existsInBlockchain) {
+        integrityStatus = IntegrityStatus.UNKNOWN;
+        isValid = false;
+        message =
+          'Hash não encontrado na blockchain - não é possível confirmar integridade';
+      } else {
+        integrityStatus = IntegrityStatus.VALID;
+        isValid = true;
+        message = 'Serviço íntegro - hash corresponde ao registrado na blockchain';
+      }
+
+      // Atualizar o status de integridade no banco de dados
+      service.integrityStatus = integrityStatus;
+      service.integrityCheckedAt = new Date();
+      await this.vehicleServiceRepository.save(service);
+
+      return {
+        isValid,
+        integrityStatus,
+        currentHash,
+        blockchainHash: service.blockchainHash,
+        hashMatches,
+        existsInBlockchain,
+        message,
+      };
+    } catch (error) {
+      this.logger.error(
+        `Erro ao verificar integridade do serviço ${serviceId}: ${error.message}`,
+        'BlockchainService',
+      );
+      throw error;
+    }
+  }
+
+  /**
+   * Verifica a integridade de todos os serviços confirmados na blockchain
+   * @returns Estatísticas da verificação
+   */
+  async verifyAllServicesIntegrity(): Promise<{
+    total: number;
+    valid: number;
+    violated: number;
+    unknown: number;
+    notVerified: number;
+    results: Array<{
+      serviceId: string;
+      status: IntegrityStatus;
+      message: string;
+    }>;
+  }> {
+    try {
+      const services = await this.vehicleServiceRepository.find({
+        where: {
+          blockchainHash: Not(IsNull()),
+          blockchainConfirmedAt: Not(IsNull()),
+        },
+      });
+
+      const results: Array<{
+        serviceId: string;
+        status: IntegrityStatus;
+        message: string;
+      }> = [];
+
+      let valid = 0;
+      let violated = 0;
+      let unknown = 0;
+      let notVerified = 0;
+
+      for (const service of services) {
+        try {
+          const verification = await this.verifyServiceIntegrity(service.id);
+          results.push({
+            serviceId: service.id,
+            status: verification.integrityStatus,
+            message: verification.message,
+          });
+
+          switch (verification.integrityStatus) {
+            case IntegrityStatus.VALID:
+              valid++;
+              break;
+            case IntegrityStatus.VIOLATED:
+              violated++;
+              break;
+            case IntegrityStatus.UNKNOWN:
+              unknown++;
+              break;
+            case IntegrityStatus.NOT_VERIFIED:
+              notVerified++;
+              break;
+          }
+        } catch (error) {
+          this.logger.warn(
+            `Erro ao verificar integridade do serviço ${service.id}: ${error.message}`,
+            'BlockchainService',
+          );
+          notVerified++;
+          results.push({
+            serviceId: service.id,
+            status: IntegrityStatus.NOT_VERIFIED,
+            message: `Erro na verificação: ${error.message}`,
+          });
+        }
+      }
+
+      this.logger.log(
+        `Verificação de integridade concluída: ${valid} válidos, ${violated} violados, ${unknown} desconhecidos, ${notVerified} não verificados`,
+        'BlockchainService',
+      );
+
+      return {
+        total: services.length,
+        valid,
+        violated,
+        unknown,
+        notVerified,
+        results,
+      };
+    } catch (error) {
+      this.logger.error(
+        `Erro ao verificar integridade de todos os serviços: ${error.message}`,
+        'BlockchainService',
+      );
+      throw error;
     }
   }
 }

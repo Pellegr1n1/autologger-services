@@ -1,64 +1,42 @@
-@startuml event_module
+@startuml vehicle_service_use_case
 
 left to right direction
 
 skinparam {
     usecaseFontSize 12
-    usecaseFontName "Segoe UI"
     usecaseBackgroundColor #FFFFFF
     usecaseBorderColor #34495E
     actorBackgroundColor #FFFFFF
     actorBorderColor #2C3E50
-    actorFontName "Segoe UI"
-    actorFontSize 12
-    arrowColor #34495E
     rectangleBackgroundColor #F8F9FA
     rectangleBorderColor #BDC3C7
-    rectangleFontColor #2C3E50
-    rectangleFontName "Segoe UI"
-    rectangleFontSize 13
-    defaultTextAlignment center
-    wrapWidth 200
-    dpi 150
-    shadowing false
-    linetype ortho
-    defaultFontName "Segoe UI"
-    defaultFontSize 10
-    packageBorderColor #34495E
-    packageBackgroundColor #F8F9FA
 }
 
-actor "Usuário" as User #FFFFFF
-actor "Blockchain" as Blockchain #ECF0F1
+actor "Usuário" as User
+actor "Sistema Blockchain\n(Hyperledger Besu)" as Blockchain #ECF0F1
 
-rectangle "Módulo de Eventos" #F8F9FA {
+rectangle "Sistema de Registro de Serviços Veiculares" {
     
-    (Registrar Evento\nVeicular) as UC05
-    (Confirmar Registro) as UC09
-    (Editar Evento) as UC15
+    (Registrar Serviço Veicular) as UC_Main
+    (Autenticar no Sistema) as UC_Auth
+    (Anexar Comprovantes) as UC_Attach
+    (Consultar Histórico\nde Serviços) as UC_History
+    (Verificar Integridade\ndo Registro) as UC_Verify
     
-    UC05 -[hidden]right- UC09
-    UC09 -[hidden]right- UC15
-    
-    (Upload de\nArquivos) as UC07
-    (Consultar Status\nTransação) as UC11
-    
-    UC05 -[hidden]down- UC07
-    UC09 -[hidden]down- UC11
-    
-    UC07 -[hidden]right- UC11
 }
 
-User --> UC05
-User --> UC09
-User --> UC15
-User --> UC11
+' Relacionamentos com atores
+User --> UC_Main
+User --> UC_History
+User --> UC_Verify
 
-UC05 ..> UC07 : <<extend>>
+' Blockchain como sistema externo
+UC_Main --> Blockchain
+UC_Verify --> Blockchain 
 
-UC09 --> Blockchain
-UC11 --> Blockchain
+' Relacionamentos entre casos de uso
+UC_Main ..> UC_Auth : <<include>>
+UC_Main ..> UC_Attach : <<extend>>
 
-note left of UC05 : Despesas\nautomotivas
 
 @enduml

@@ -172,4 +172,15 @@ export class BlockchainController {
   async diagnoseNetwork() {
     return this.besuService.diagnoseNetwork();
   }
+
+  // Endpoints de verificação de integridade
+  @Get('services/:serviceId/integrity')
+  async verifyServiceIntegrity(@Param('serviceId') serviceId: string) {
+    return this.blockchainService.verifyServiceIntegrity(serviceId);
+  }
+
+  @Post('services/verify-integrity-all')
+  async verifyAllServicesIntegrity() {
+    return this.blockchainService.verifyAllServicesIntegrity();
+  }
 }

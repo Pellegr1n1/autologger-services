@@ -136,6 +136,7 @@ describe('VehicleServiceService', () => {
       );
       blockchainService.registerHashInContract.mockResolvedValue({
         success: true,
+        transactionHash: 'tx-hash-123',
       });
 
       const result = await service.create(createDto);
