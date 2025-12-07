@@ -116,13 +116,14 @@ export class VehicleServiceService {
         const blockchainHash = serviceHash;
 
         service.blockchainHash = blockchainHash;
-        // ✅ Armazenar o transactionHash para uso na verificação
         service.transactionHash = hashResult.transactionHash || undefined;
         service.status = ServiceStatus.CONFIRMED;
         service.isImmutable = true;
         service.canEdit = false;
         service.blockchainConfirmedAt = new Date();
         service.confirmedBy = 'blockchain';
+        service.integrityStatus = IntegrityStatus.VALID;
+        service.integrityCheckedAt = new Date();
 
         await this.vehicleServiceRepository.save(service);
 

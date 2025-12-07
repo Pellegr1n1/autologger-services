@@ -277,10 +277,14 @@ export class BlockchainService {
                       status: ServiceStatus.CONFIRMED,
                       isImmutable: true,
                       canEdit: false,
+                      integrityStatus: IntegrityStatus.VALID,
+                      integrityCheckedAt: new Date(),
                     },
                   );
                   service.blockchainConfirmedAt = new Date();
                   service.status = ServiceStatus.CONFIRMED;
+                  service.integrityStatus = IntegrityStatus.VALID;
+                  service.integrityCheckedAt = new Date();
                   this.logger.log(
                     `Serviço ${service.id} atualizado como CONFIRMED (verificado na blockchain)`,
                   );
@@ -534,6 +538,19 @@ export class BlockchainService {
           );
 
           if (result.success) {
+            await this.vehicleServiceRepository.update(
+              { id: service.id },
+              {
+                transactionHash: result.transactionHash || undefined,
+                integrityStatus: IntegrityStatus.VALID,
+                integrityCheckedAt: new Date(),
+                blockchainConfirmedAt: new Date(),
+                status: ServiceStatus.CONFIRMED,
+                isImmutable: true,
+                canEdit: false,
+                confirmedBy: 'blockchain-fix-invalid',
+              },
+            );
             successCount++;
             this.logger.log(`Hash corrigido e registrado: ${realHash}`);
           } else {
@@ -654,11 +671,15 @@ export class BlockchainService {
             );
 
             if (result.success) {
-              // ✅ Armazenar transactionHash quando disponível
+              // ✅ Armazenar transactionHash e definir integridade quando disponível
               if (result.transactionHash) {
                 await this.vehicleServiceRepository.update(
                   { id: service.id },
-                  { transactionHash: result.transactionHash },
+                  {
+                    transactionHash: result.transactionHash,
+                    integrityStatus: IntegrityStatus.VALID,
+                    integrityCheckedAt: new Date(),
+                  },
                 );
               }
               successCount++;
@@ -747,6 +768,9 @@ export class BlockchainService {
                   canEdit: false,
                   confirmedBy: 'blockchain-fix',
                   transactionHash: result.transactionHash || undefined,
+                  // ✅ Definir integridade como VALID quando corrigido e confirmado
+                  integrityStatus: IntegrityStatus.VALID,
+                  integrityCheckedAt: new Date(),
                 },
               );
 
@@ -1165,6 +1189,9 @@ export class BlockchainService {
         service.canEdit = false;
         service.blockchainConfirmedAt = new Date();
         service.confirmedBy = 'blockchain-resend';
+        // ✅ Definir integridade como VALID quando reenviado e confirmado
+        service.integrityStatus = IntegrityStatus.VALID;
+        service.integrityCheckedAt = new Date();
 
         await this.vehicleServiceRepository.save(service);
 

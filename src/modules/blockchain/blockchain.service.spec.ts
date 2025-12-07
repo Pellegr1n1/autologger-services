@@ -271,6 +271,8 @@ describe('BlockchainService', () => {
       expect(vehicleServiceRepository.save).toHaveBeenCalledWith(
         expect.objectContaining({
           transactionHash: 'tx-hash-123',
+          integrityStatus: IntegrityStatus.VALID,
+          integrityCheckedAt: expect.any(Date),
         })
       );
     });
@@ -473,6 +475,24 @@ describe('BlockchainService', () => {
       expect(result.successCount).toBe(1);
       expect(result.errorCount).toBe(0);
       expect(besuService.registerHash).toHaveBeenCalled();
+      
+      expect(vehicleServiceRepository.update).toHaveBeenCalledTimes(2);
+      expect(vehicleServiceRepository.update).toHaveBeenNthCalledWith(
+        1,
+        { id: 'service-1' },
+        { blockchainHash: expect.any(String) }
+      );
+      expect(vehicleServiceRepository.update).toHaveBeenNthCalledWith(
+        2,
+        { id: 'service-1' },
+        expect.objectContaining({
+          transactionHash: 'tx-hash-123',
+          integrityStatus: IntegrityStatus.VALID,
+          integrityCheckedAt: expect.any(Date),
+          blockchainConfirmedAt: expect.any(Date),
+          status: ServiceStatus.CONFIRMED,
+        })
+      );
     });
 
     it('should handle errors when fixing hashes', async () => {
@@ -617,7 +637,11 @@ describe('BlockchainService', () => {
       
       expect(vehicleServiceRepository.update).toHaveBeenCalledWith(
         { id: 'service-1' },
-        { transactionHash: 'tx-hash-123' }
+        {
+          transactionHash: 'tx-hash-123',
+          integrityStatus: IntegrityStatus.VALID,
+          integrityCheckedAt: expect.any(Date),
+        }
       );
       
       expect(besuService.registerHash).toHaveBeenCalledTimes(1);
@@ -1091,6 +1115,13 @@ describe('BlockchainService', () => {
 
       const result = await service.resendFailedService('service-123');
       expect(result.success).toBe(true);
+      
+      expect(vehicleServiceRepository.save).toHaveBeenCalledWith(
+        expect.objectContaining({
+          integrityStatus: IntegrityStatus.VALID,
+          integrityCheckedAt: expect.any(Date),
+        })
+      );
     });
 
     it('should handle registration failure', async () => {
@@ -1142,6 +1173,14 @@ describe('BlockchainService', () => {
 
       expect(result.success).toBe(true);
       expect(result.status).toBe('CONFIRMED');
+      
+      // ✅ Verificar se integrityStatus é definido quando o serviço é reenviado e confirmado
+      expect(vehicleServiceRepository.save).toHaveBeenCalledWith(
+        expect.objectContaining({
+          integrityStatus: IntegrityStatus.VALID,
+          integrityCheckedAt: expect.any(Date),
+        })
+      );
     });
   });
 
