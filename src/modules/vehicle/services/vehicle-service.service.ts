@@ -75,6 +75,19 @@ export class VehicleServiceService {
   }
 
   /**
+   * Normaliza serviceDate para formato ISO (apenas data, sem hora)
+   */
+  private normalizeServiceDate(serviceDate: any): string {
+    if (serviceDate instanceof Date) {
+      return serviceDate.toISOString().split('T')[0];
+    }
+    if (typeof serviceDate === 'string' && serviceDate) {
+      return serviceDate.split('T')[0];
+    }
+    return serviceDate;
+  }
+
+  /**
    * Processa o registro na blockchain de forma assíncrona
    * @param service Serviço a ser processado
    */
@@ -85,8 +98,8 @@ export class VehicleServiceService {
         vehicleId: service.vehicleId,
         type: service.type,
         description: service.description,
-        serviceDate: service.serviceDate,
-        timestamp: new Date().toISOString(),
+        serviceDate: this.normalizeServiceDate(service.serviceDate),
+        timestamp: service.createdAt?.toISOString() || new Date().toISOString(),
       };
 
       const serviceHash = ethers.keccak256(
@@ -386,8 +399,8 @@ export class VehicleServiceService {
         vehicleId: vehicleService.vehicleId,
         type: vehicleService.type,
         description: vehicleService.description,
-        serviceDate: vehicleService.serviceDate,
-        timestamp: new Date().toISOString(),
+        serviceDate: this.normalizeServiceDate(vehicleService.serviceDate),
+        timestamp: vehicleService.createdAt?.toISOString() || new Date().toISOString(),
       };
       hash = ethers.keccak256(ethers.toUtf8Bytes(JSON.stringify(eventData)));
     }

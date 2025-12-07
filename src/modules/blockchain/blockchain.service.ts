@@ -228,7 +228,7 @@ export class BlockchainService {
                       vehicleId: service.vehicleId,
                       type: service.type,
                       description: service.description,
-                      serviceDate: service.serviceDate,
+                      serviceDate: this.normalizeServiceDate(service.serviceDate),
                       timestamp:
                         service.createdAt?.toISOString() ||
                         new Date().toISOString(),
@@ -516,8 +516,8 @@ export class BlockchainService {
             vehicleId: service.vehicleId,
             type: service.type,
             description: service.description,
-            serviceDate: service.serviceDate,
-            timestamp: new Date().toISOString(),
+            serviceDate: this.normalizeServiceDate(service.serviceDate),
+            timestamp: service.createdAt?.toISOString() || new Date().toISOString(),
           };
 
           const realHash = ethers.keccak256(
@@ -1029,6 +1029,8 @@ export class BlockchainService {
             warranty: service.warranty,
             notes: service.notes,
             isValidHash: isValidHash,
+            integrityStatus: service.integrityStatus,
+            integrityCheckedAt: service.integrityCheckedAt,
           };
         });
 
@@ -1158,8 +1160,8 @@ export class BlockchainService {
         vehicleId: service.vehicleId,
         type: service.type,
         description: service.description,
-        serviceDate: service.serviceDate,
-        timestamp: new Date().toISOString(),
+        serviceDate: this.normalizeServiceDate(service.serviceDate),
+        timestamp: service.createdAt?.toISOString() || new Date().toISOString(),
       };
 
       const serviceHash = ethers.keccak256(
@@ -1546,6 +1548,19 @@ export class BlockchainService {
   }
 
   /**
+   * Normaliza serviceDate para formato ISO (apenas data, sem hora)
+   */
+  private normalizeServiceDate(serviceDate: any): string {
+    if (serviceDate instanceof Date) {
+      return serviceDate.toISOString().split('T')[0];
+    }
+    if (typeof serviceDate === 'string' && serviceDate) {
+      return serviceDate.split('T')[0];
+    }
+    return serviceDate;
+  }
+
+  /**
    * Calcula o hash de um serviço usando a mesma lógica do registro
    * @param service Serviço para calcular o hash
    * @returns Hash calculado
@@ -1556,7 +1571,7 @@ export class BlockchainService {
       vehicleId: service.vehicleId,
       type: service.type,
       description: service.description,
-      serviceDate: service.serviceDate,
+      serviceDate: this.normalizeServiceDate(service.serviceDate),
       timestamp:
         service.createdAt?.toISOString() || new Date().toISOString(),
     };

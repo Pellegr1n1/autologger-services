@@ -1400,6 +1400,63 @@ describe('BlockchainService', () => {
       expect(hash2).toBeDefined();
       expect(hash1).not.toBe(hash2);
     });
+
+    it('should normalize serviceDate correctly (Date object)', () => {
+      const mockService = {
+        id: 'service-123',
+        vehicleId: 'vehicle-123',
+        type: 'MANUTENCAO',
+        description: 'Troca de oleo',
+        serviceDate: new Date('2024-01-15T14:30:00Z'),
+        createdAt: new Date('2024-01-15T10:00:00Z'),
+      };
+
+      const hash = (service as any).calculateServiceHash(mockService);
+
+      expect(hash).toBeDefined();
+      expect(hash).toMatch(/^0x[a-f0-9]{64}$/);
+    });
+
+    it('should normalize serviceDate correctly (string)', () => {
+      const mockService = {
+        id: 'service-123',
+        vehicleId: 'vehicle-123',
+        type: 'MANUTENCAO',
+        description: 'Troca de oleo',
+        serviceDate: '2024-01-15',
+        createdAt: new Date('2024-01-15T10:00:00Z'),
+      };
+
+      const hash = (service as any).calculateServiceHash(mockService);
+
+      expect(hash).toBeDefined();
+      expect(hash).toMatch(/^0x[a-f0-9]{64}$/);
+    });
+
+    it('should produce same hash for Date and string serviceDate with same date', () => {
+      const mockService1 = {
+        id: 'service-123',
+        vehicleId: 'vehicle-123',
+        type: 'MANUTENCAO',
+        description: 'Troca de oleo',
+        serviceDate: new Date('2024-01-15T14:30:00Z'),
+        createdAt: new Date('2024-01-15T10:00:00Z'),
+      };
+
+      const mockService2 = {
+        id: 'service-123',
+        vehicleId: 'vehicle-123',
+        type: 'MANUTENCAO',
+        description: 'Troca de oleo',
+        serviceDate: '2024-01-15',
+        createdAt: new Date('2024-01-15T10:00:00Z'),
+      };
+
+      const hash1 = (service as any).calculateServiceHash(mockService1);
+      const hash2 = (service as any).calculateServiceHash(mockService2);
+
+      expect(hash1).toBe(hash2);
+    });
   });
 
   describe('verifyServiceIntegrity', () => {
