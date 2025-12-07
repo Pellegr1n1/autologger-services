@@ -54,3 +54,4 @@ export class AddIntegrityFieldsToVehicleService1765000000000
     await queryRunner.query(`DROP TYPE IF EXISTS "public"."integrity_status_enum"`);
   }
 }
+

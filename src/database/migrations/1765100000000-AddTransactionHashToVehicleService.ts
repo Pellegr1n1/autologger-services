@@ -33,3 +33,4 @@ export class AddTransactionHashToVehicleService1765100000000
     await queryRunner.dropColumn('vehicle_services', 'transaction_hash');
   }
 }
+

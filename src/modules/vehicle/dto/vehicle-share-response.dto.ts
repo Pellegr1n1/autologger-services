@@ -86,6 +86,9 @@ export class PublicMaintenanceInfoDto {
   @ApiProperty({ description: 'Hash blockchain' })
   blockchainHash?: string;
 
+  @ApiProperty({ description: 'Status de integridade do serviço', required: false })
+  integrityStatus?: string;
+
   @ApiProperty({ description: 'Data de registro do serviço no sistema' })
   createdAt: Date;
 

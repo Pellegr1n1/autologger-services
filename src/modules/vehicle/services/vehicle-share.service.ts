@@ -208,6 +208,7 @@ export class VehicleShareService {
           notes: service.notes,
           blockchainStatus: this.mapBlockchainStatus(service.status),
           blockchainHash: service.blockchainHash,
+          integrityStatus: service.integrityStatus,
           createdAt: service.createdAt,
           attachments: attachments,
         };

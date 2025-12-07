@@ -275,6 +275,85 @@ export class VehicleServiceService {
     return await this.vehicleServiceRepository.save(vehicleService);
   }
 
+  /**
+   * Endpoint para demonstração: permite editar serviços imutáveis
+   * ATENÇÃO: Use apenas para fins de demonstração/apresentação
+   */
+  async updateForDemo(
+    id: string,
+    updateVehicleServiceDto: UpdateVehicleServiceDto,
+  ): Promise<VehicleService> {
+    const vehicleService = await this.findOne(id);
+
+    const wasConfirmed = vehicleService.status === ServiceStatus.CONFIRMED && 
+                         vehicleService.blockchainHash && 
+                         vehicleService.blockchainConfirmedAt;
+
+    const originalBlockchainHash = vehicleService.blockchainHash;
+
+    const wasImmutable = vehicleService.isImmutable;
+    vehicleService.isImmutable = false;
+    vehicleService.canEdit = true;
+
+    Object.assign(vehicleService, updateVehicleServiceDto);
+    
+    vehicleService.blockchainHash = originalBlockchainHash;
+
+    const updatedService = await this.vehicleServiceRepository.save(vehicleService);
+
+    if (wasImmutable) {
+      updatedService.isImmutable = true;
+      updatedService.canEdit = false;
+      await this.vehicleServiceRepository.save(updatedService);
+    }
+
+    if (wasConfirmed) {
+      try {
+        this.logger.log(
+          `Verificando integridade após edição de demonstração do serviço ${id}`,
+          'VehicleServiceService',
+        );
+
+        const integrityResult = await this.blockchainService.verifyServiceIntegrity(id);
+
+        await this.vehicleServiceRepository.update(id, {
+          integrityStatus: integrityResult.integrityStatus,
+          integrityCheckedAt: new Date(),
+        });
+
+        this.logger.log(
+          `Integridade verificada: ${integrityResult.integrityStatus} - ${integrityResult.message}`,
+          'VehicleServiceService',
+          {
+            serviceId: id,
+            isValid: integrityResult.isValid,
+            hashMatches: integrityResult.hashMatches,
+            currentHash: integrityResult.currentHash?.substring(0, 10) + '...',
+            blockchainHash: integrityResult.blockchainHash?.substring(0, 10) + '...',
+          },
+        );
+      } catch (error) {
+        this.logger.error(
+          `Erro ao verificar integridade após edição de demonstração do serviço ${id}: ${error instanceof Error ? error.message : String(error)}`,
+          'VehicleServiceService',
+        );
+      }
+    }
+
+    this.logger.warn(
+      `Serviço ${id} editado via endpoint de demonstração`,
+      'VehicleServiceService',
+      { 
+        serviceId: id, 
+        wasImmutable, 
+        wasConfirmed,
+        originalBlockchainHash: originalBlockchainHash?.substring(0, 10) + '...',
+      },
+    );
+
+    return await this.findOne(id);
+  }
+
   async remove(id: string): Promise<void> {
     const vehicleService = await this.findOne(id);
 

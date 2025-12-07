@@ -300,4 +300,22 @@ export class VehicleServiceController {
       body.confirmedBy,
     );
   }
+
+  @Patch(':id/demo-edit')
+  @ApiOperation({
+    summary: '[DEMONSTRAÇÃO] Editar serviço mesmo se estiver na blockchain',
+    description:
+      'Endpoint especial para demonstração/apresentação. ',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Serviço editado.',
+  })
+  @ApiResponse({ status: 404, description: 'Serviço não encontrado' })
+  updateForDemo(
+    @Param('id') id: string,
+    @Body() updateVehicleServiceDto: UpdateVehicleServiceDto,
+  ) {
+    return this.vehicleServiceService.updateForDemo(id, updateVehicleServiceDto);
+  }
 }
